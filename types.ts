@@ -33,6 +33,7 @@ export interface ProductInput {
 export interface ProductYearlyData {
   id: string;
   gross: number;
+  net: number;
 }
 
 export interface PricingResult {
