@@ -15,7 +15,8 @@ const formatCurrency = (amount: number, currency: 'USD' | 'SAR') => {
   if (currency === 'USD') {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   }
-  return `SAR ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(amount)}`;
+  // Using unicode character for Rial
+  return `﷼ ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(amount)}`;
 };
 
 const App: React.FC = () => {
@@ -379,16 +380,6 @@ const App: React.FC = () => {
                           </th>
                         )}
 
-                        {/* Breakdown for Recognized (Net) if multiple products */}
-                        {selectedProductIds.length > 1 && selectedProductIds.map(pid => {
-                           const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-                           return (
-                             <th key={`net-${pid}`} className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">
-                               {p?.shortName} Net (USD)
-                             </th>
-                           );
-                        })}
-
                         <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Recognized<br/>Total (USD)</th>
                         <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase w-1/4">Notes</th>
                      </tr>
@@ -420,16 +411,6 @@ const App: React.FC = () => {
                              </td>
                            )}
 
-                           {/* Product Columns Data Net (if multiple) */}
-                           {selectedProductIds.length > 1 && selectedProductIds.map(pid => {
-                             const pData = r.breakdown.find(d => d.id === pid);
-                             return (
-                               <td key={`net-${pid}`} className="px-4 py-4 text-center text-sm text-gray-500 font-mono">
-                                 {pData ? formatCurrency(pData.net, 'USD') : '-'}
-                               </td>
-                             );
-                           })}
-
                            <td className="px-4 py-4 text-center text-sm text-gray-600 font-mono">
                               {formatCurrency(r.netUSD, 'USD')}
                            </td>
@@ -458,11 +439,6 @@ const App: React.FC = () => {
                            </td>
                         )}
 
-                        {/* Empty Net Breakdown */}
-                        {selectedProductIds.length > 1 && selectedProductIds.map(pid => (
-                          <td key={`net-total-${pid}`}></td>
-                        ))}
-
                         <td className="px-4 py-4 text-center text-sm font-bold font-mono text-gray-300">
                            {formatCurrency(results.totalNetUSD, 'USD')}
                         </td>
@@ -474,42 +450,71 @@ const App: React.FC = () => {
           </div>
           
           {/* Summary Metrics (ACV & Splits) */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-             <div className="bg-white p-4 shadow rounded-lg border-l-4 border-blue-500">
-                <div className="text-xs text-gray-500 uppercase">Customer TCV</div>
-                <div className="text-lg font-bold text-gray-900 font-mono">{formatCurrency(results.totalGrossUSD, 'USD')}</div>
-             </div>
-             <div className="bg-white p-4 shadow rounded-lg border-l-4 border-indigo-500">
-                <div className="text-xs text-gray-500 uppercase">Customer ACV</div>
-                <div className="text-lg font-bold text-gray-900 font-mono">{formatCurrency(results.acvUSD, 'USD')}</div>
-             </div>
-             
-             {/* Net Metrics (Only for Indirect Channels) */}
-             {channel !== ChannelType.DIRECT && (
-               <>
-                 <div className="bg-gray-100 p-4 shadow rounded-lg border-l-4 border-gray-500">
-                    <div className="text-xs text-gray-500 uppercase">Net TCV</div>
-                    <div className="text-lg font-bold text-gray-700 font-mono">{formatCurrency(results.totalNetUSD, 'USD')}</div>
-                 </div>
-                 <div className="bg-gray-100 p-4 shadow rounded-lg border-l-4 border-gray-500">
-                    <div className="text-xs text-gray-500 uppercase">Net ACV</div>
-                    <div className="text-lg font-bold text-gray-700 font-mono">{formatCurrency(results.netACV, 'USD')}</div>
-                 </div>
-               </>
-             )}
+          <div className="font-sans"> 
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+               <div className="bg-white p-4 shadow rounded-lg border-l-4 border-blue-500">
+                  <div className="text-xs text-gray-500 uppercase font-sans">Customer TCV</div>
+                  <div className="text-lg font-bold text-gray-900 font-sans">{formatCurrency(results.totalGrossUSD, 'USD')}</div>
+               </div>
+               <div className="bg-white p-4 shadow rounded-lg border-l-4 border-indigo-500">
+                  <div className="text-xs text-gray-500 uppercase font-sans">Customer ACV</div>
+                  <div className="text-lg font-bold text-gray-900 font-sans">{formatCurrency(results.acvUSD, 'USD')}</div>
+               </div>
+               
+               {/* Net Metrics (Only for Indirect Channels) */}
+               {channel !== ChannelType.DIRECT && (
+                 <>
+                   <div className="bg-gray-100 p-4 shadow rounded-lg border-l-4 border-gray-500">
+                      <div className="text-xs text-gray-500 uppercase font-sans">Net TCV</div>
+                      <div className="text-lg font-bold text-gray-700 font-sans">{formatCurrency(results.totalNetUSD, 'USD')}</div>
+                   </div>
+                   <div className="bg-gray-100 p-4 shadow rounded-lg border-l-4 border-gray-500">
+                      <div className="text-xs text-gray-500 uppercase font-sans">Net ACV</div>
+                      <div className="text-lg font-bold text-gray-700 font-sans">{formatCurrency(results.netACV, 'USD')}</div>
+                   </div>
+                 </>
+               )}
 
-             {dealType === DealType.RENEWAL && (
-               <>
-                 <div className="bg-white p-4 shadow rounded-lg border-l-4 border-green-500">
-                    <div className="text-xs text-gray-500 uppercase">Renewal ACV (Base)</div>
-                    <div className="text-lg font-bold text-gray-900 font-mono">{formatCurrency(results.renewalBaseACV, 'USD')}</div>
-                 </div>
-                 <div className="bg-white p-4 shadow rounded-lg border-l-4 border-orange-500">
-                    <div className="text-xs text-gray-500 uppercase">Upsell ACV</div>
-                    <div className="text-lg font-bold text-gray-900 font-mono">{formatCurrency(results.upsellACV, 'USD')}</div>
-                 </div>
-               </>
-             )}
+               {dealType === DealType.RENEWAL && (
+                 <>
+                   <div className="bg-white p-4 shadow rounded-lg border-l-4 border-green-500">
+                      <div className="text-xs text-gray-500 uppercase font-sans">Renewal ACV (Base)</div>
+                      <div className="text-lg font-bold text-gray-900 font-sans">{formatCurrency(results.renewalBaseACV, 'USD')}</div>
+                   </div>
+                   <div className="bg-white p-4 shadow rounded-lg border-l-4 border-orange-500">
+                      <div className="text-xs text-gray-500 uppercase font-sans">Upsell ACV</div>
+                      <div className="text-lg font-bold text-gray-900 font-sans">{formatCurrency(results.upsellACV, 'USD')}</div>
+                   </div>
+                 </>
+               )}
+            </div>
+
+            {/* NEW: Net Revenue Breakdown Section with ACV and TCV */}
+            {channel !== ChannelType.DIRECT && selectedProductIds.length > 0 && (
+              <div className="bg-white p-4 shadow rounded-lg border border-gray-200 mb-4">
+                <h4 className="text-sm font-bold text-gray-800 mb-3 font-sans">Net Revenue Breakdown</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {selectedProductIds.map(pid => {
+                     const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                     const tcv = results.productNetTotals[pid] || 0;
+                     const acv = tcv / config.years;
+                     return (
+                       <div key={pid} className="border border-gray-100 rounded p-3 bg-gray-50">
+                          <div className="text-xs font-bold text-gray-700 font-sans mb-2">{p?.shortName}</div>
+                          <div className="flex justify-between items-center mb-1">
+                             <span className="text-[10px] text-gray-500 uppercase">Net TCV</span>
+                             <span className="text-xs font-mono font-medium text-gray-900">{formatCurrency(tcv, 'USD')}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                             <span className="text-[10px] text-gray-500 uppercase">Net ACV</span>
+                             <span className="text-xs font-mono font-medium text-gray-900">{formatCurrency(acv, 'USD')}</span>
+                          </div>
+                       </div>
+                     );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
