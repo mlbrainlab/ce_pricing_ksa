@@ -1,0 +1,245 @@
+import { 
+  DealConfiguration, 
+  PricingResult, 
+  CalculationOutput, 
+  DealType, 
+  ChannelType, 
+  PricingMethod,
+  ProductYearlyData
+} from '../types';
+import { 
+  WHT_FACTOR, 
+  EXCHANGE_RATE_SAR, 
+  STANDARD_FLOOR_RAW, 
+  COMBO_FLOOR_LD_RAW, 
+  AVAILABLE_PRODUCTS,
+  UTD_VARIANTS,
+  LD_VARIANTS
+} from '../constants';
+
+// Dynamic Net Factor Calculation based on Year index and Deal Type
+const getNetFactor = (dealType: DealType, channel: ChannelType, yearIndex: number): number => {
+  if (channel === ChannelType.DIRECT) {
+    return 1.0;
+  }
+
+  // Fulfilment Logic
+  if (channel === ChannelType.FULFILMENT) {
+    if (dealType === DealType.RENEWAL) {
+      return 0.95; // -5% for all years
+    } else {
+      // New Logo
+      if (yearIndex === 0) return 0.925; // Y1: -7.5%
+      return 0.95; // Y2+: -5%
+    }
+  }
+
+  // Partner Sourced Logic
+  if (channel === ChannelType.PARTNER_SOURCED) {
+    if (dealType === DealType.RENEWAL) {
+      return 0.90; // -10% for all years
+    } else {
+      // New Logo
+      if (yearIndex === 0) return 0.85; // Y1: -15%
+      return 0.90; // Y2+: -10%
+    }
+  }
+
+  return 1.0;
+};
+
+const convertToSAR = (usdAmount: number): number => {
+  const rawSar = usdAmount * EXCHANGE_RATE_SAR;
+  return Math.ceil(rawSar / 1000) * 1000;
+};
+
+export const calculatePricing = (config: DealConfiguration): CalculationOutput => {
+  const { dealType, channel, selectedProducts, productInputs, years, method, rates, productRates, applyWHT } = config;
+  
+  // Define Floors based on WHT setting
+  const activeStandardFloor = applyWHT ? (STANDARD_FLOOR_RAW / WHT_FACTOR) : STANDARD_FLOOR_RAW;
+  const activeComboFloor = applyWHT ? (COMBO_FLOOR_LD_RAW / WHT_FACTOR) : COMBO_FLOOR_LD_RAW;
+
+  const yearlyResults: PricingResult[] = [];
+  const productNotes: string[] = [];
+  
+  // --- Step 1: Calculate Year 1 Items (Base Calculation) ---
+  
+  const year1ProductNets: Record<string, number> = {};
+  
+  let totalRenewalBaseForACV = 0; // Sum of Expiring * (1+SpecificRate)
+  
+  selectedProducts.forEach(prodId => {
+    const inputs = productInputs[prodId] || { count: 0, variant: '', baseDiscount: 0, expiringAmount: 0 };
+    const definition = AVAILABLE_PRODUCTS.find(p => p.id === prodId);
+    
+    // 1. Calculate "New Config" Price
+    let listRate = 0;
+    if (prodId === 'utd') {
+      listRate = UTD_VARIANTS[inputs.variant] || 0;
+    } else if (prodId === 'ld') {
+      listRate = LD_VARIANTS[inputs.variant] || 0;
+    } else {
+      listRate = definition?.defaultBasePrice || 0;
+    }
+    
+    const count = (prodId === 'utd' || prodId === 'ld') ? inputs.count : 1; 
+    const baseGross = (definition?.hasVariants || prodId === 'utd' || prodId === 'ld') 
+      ? (inputs.count * listRate) 
+      : (definition?.defaultBasePrice || 0);
+
+    let baseNet = baseGross * (1 - (inputs.baseDiscount / 100));
+
+    // Apply WHT Gross Up if enabled
+    if (applyWHT) {
+      baseNet = baseNet / WHT_FACTOR;
+    }
+
+    // 2. Renewal Logic Check
+    let finalYear1Net = baseNet;
+
+    if (dealType === DealType.RENEWAL) {
+      const expiring = inputs.expiringAmount || 0;
+      
+      // Determine applicable rate for this product for Year 1 (Index 0)
+      const specificRates = productRates[prodId] || rates;
+      const y1FPI = specificRates[0] || 0;
+      
+      const renewalBase = expiring * (1 + (y1FPI / 100));
+      totalRenewalBaseForACV += renewalBase;
+
+      // Logic: For renewal, we start calculations based on current config (Upsell or Flat).
+      // The "Renewal Base" is just a reference number for the ACV split.
+      // The actual Year 1 Price is the "New Config Price" (baseNet).
+      finalYear1Net = baseNet; 
+    }
+
+    year1ProductNets[prodId] = finalYear1Net;
+  });
+
+  // --- Step 2: Apply Floor Logic to Year 1 Nets ---
+  
+  const hasUTD = selectedProducts.includes('utd');
+  const hasLD = selectedProducts.includes('ld');
+
+  let floorTriggered = false;
+  
+  if (hasUTD && hasLD) {
+    if (year1ProductNets['ld'] < activeComboFloor) {
+      year1ProductNets['ld'] = activeComboFloor;
+      productNotes.push(`LD adjusted to Combo Floor`);
+      floorTriggered = true;
+    }
+  } else if (hasUTD) {
+    if (year1ProductNets['utd'] < activeStandardFloor) {
+      year1ProductNets['utd'] = activeStandardFloor;
+      productNotes.push(`UTD adjusted to Minimum Floor`);
+      floorTriggered = true;
+    }
+  } else if (hasLD) {
+    if (year1ProductNets['ld'] < activeStandardFloor) {
+      year1ProductNets['ld'] = activeStandardFloor;
+      productNotes.push(`LD adjusted to Minimum Floor`);
+      floorTriggered = true;
+    }
+  }
+
+  // --- Step 3: Multi-Year Projection (Per Product) ---
+  
+  const productSchedules: Record<string, number[]> = {};
+
+  selectedProducts.forEach(prodId => {
+    const y1Value = year1ProductNets[prodId];
+    const schedule = new Array(years).fill(0);
+    
+    const specificRates = productRates[prodId] || rates;
+
+    if (method === PricingMethod.MYFPI) {
+      // Forward
+      schedule[0] = y1Value;
+      for (let i = 1; i < years; i++) {
+        const rate = specificRates[i] || 0; 
+        schedule[i] = schedule[i - 1] * (1 + (rate / 100));
+      }
+    } else {
+      // MYPP Reverse
+      schedule[years - 1] = y1Value;
+      for (let i = years - 2; i >= 0; i--) {
+        const discountRate = specificRates[i + 1] || 0; // Discount to reverse
+        schedule[i] = schedule[i + 1] / (1 + (discountRate / 100));
+      }
+    }
+    
+    productSchedules[prodId] = schedule;
+  });
+
+  // --- Step 4: Aggregate and Format ---
+  
+  let totalTCV = 0;
+
+  let totalGrossUSD = 0;
+  let totalGrossSAR = 0;
+  let totalNetUSD = 0;
+  let totalNetSAR = 0;
+
+  for (let i = 0; i < years; i++) {
+    const breakdown: ProductYearlyData[] = [];
+    let yearSum = 0;
+
+    selectedProducts.forEach(prodId => {
+      const val = productSchedules[prodId][i];
+      yearSum += val;
+      breakdown.push({
+        id: prodId,
+        gross: val
+      });
+    });
+
+    const netFactor = getNetFactor(dealType, channel, i);
+
+    const quoteSAR = convertToSAR(yearSum);
+    const recognizedUSD = yearSum * netFactor;
+    const recognizedSAR = recognizedUSD * EXCHANGE_RATE_SAR;
+
+    yearlyResults.push({
+      year: i + 1,
+      breakdown,
+      grossUSD: yearSum,
+      grossSAR: quoteSAR,
+      netUSD: recognizedUSD,
+      netSAR: recognizedSAR,
+      floorAdjusted: i === 0 && floorTriggered,
+      notes: i === 0 ? productNotes : [],
+    });
+
+    totalTCV += yearSum;
+    totalGrossUSD += yearSum;
+    totalGrossSAR += quoteSAR;
+    totalNetUSD += recognizedUSD;
+    totalNetSAR += recognizedSAR;
+  }
+
+  // --- Step 5: Splits (ACV) ---
+  const acvUSD = totalTCV / years;
+  const netACV = totalNetUSD / years;
+  
+  let upsellACV = 0;
+  
+  if (dealType === DealType.RENEWAL) {
+    // Upsell = Total ACV - Renewal Base ACV
+    upsellACV = Math.max(0, acvUSD - totalRenewalBaseForACV);
+  }
+
+  return {
+    yearlyResults,
+    totalGrossUSD,
+    totalGrossSAR,
+    totalNetUSD,
+    totalNetSAR,
+    acvUSD,
+    netACV,
+    renewalBaseACV: totalRenewalBaseForACV,
+    upsellACV,
+    currencyToDisplay: channel === ChannelType.DIRECT ? 'USD' : 'SAR',
+  };
+};
