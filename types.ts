@@ -66,9 +66,12 @@ export interface CalculationOutput {
   totalNetUSD: number;
   totalNetSAR: number;
   
+  // Per Product Total Net (for summary)
+  productNetTotals: Record<string, number>;
+
   // ACV & Splits
   acvUSD: number;
-  netACV: number; // New field
+  netACV: number; 
   renewalBaseACV: number;
   upsellACV: number;
   

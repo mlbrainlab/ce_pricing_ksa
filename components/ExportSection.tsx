@@ -13,6 +13,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
   const [customerName, setCustomerName] = useState('');
 
   const formatMoney = (amount: number, currency: string) => {
+    // For PDF usage specifically with Fira Sans or compatible font, we use unicode
+    if (currency === 'SAR') {
+       return `﷼ ${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+    }
     return amount.toLocaleString('en-US', { style: 'currency', currency: currency });
   };
 
@@ -56,7 +60,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       ...prodCols,
       'Total Gross (USD)',
       'Total Gross (SAR)',
-      'Net Recognized (USD)',
       'Notes'
     ];
 
@@ -70,7 +73,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         ...pValues,
         r.grossUSD.toFixed(2),
         r.grossSAR.toFixed(0),
-        r.netUSD.toFixed(2),
         q(r.notes.join('; '))
       ];
     });
@@ -82,7 +84,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       ...totalProdValues,
       data.totalGrossUSD.toFixed(2),
       data.totalGrossSAR.toFixed(0),
-      data.totalNetUSD.toFixed(2),
       ''
     ];
 
@@ -97,6 +98,16 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
        ['Renewal Base ACV', data.renewalBaseACV.toFixed(2)],
        ['Upsell ACV', data.upsellACV.toFixed(2)]
     ];
+    
+    // Add Net Breakdown to CSV
+    if (config.channel !== ChannelType.DIRECT) {
+       metricsRows.push([]);
+       metricsRows.push(['Product', 'Net Total (USD)']);
+       config.selectedProducts.forEach(pid => {
+         const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+         metricsRows.push([p?.shortName || pid, data.productNetTotals[pid].toFixed(2)]);
+       });
+    }
 
     // Assemble CSV
     const allRows = [
@@ -134,13 +145,27 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     const docDate = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
     const refId = `REF-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`;
 
-    // Note: To use Fira Sans, the font file must be loaded as a base64 string and added to VFS.
-    // Since we cannot load external files here, we use Helvetica (Standard Sans Serif) which is the closest native PDF font.
-    doc.setFont("helvetica");
+    // --- Fira Sans Font Setup ---
+    // Note: To make this work, you must replace the empty string below with the actual Base64 encoded string of FiraSans-Regular.ttf
+    // For the purpose of this architecture code, the logic is implemented but the asset is not embedded to avoid file size limits in response.
+    const firaSansBase64 = ""; 
+    
+    if (firaSansBase64) {
+      try {
+        doc.addFileToVFS("FiraSans-Regular.ttf", firaSansBase64);
+        doc.addFont("FiraSans-Regular.ttf", "FiraSans", "normal");
+        doc.setFont("FiraSans");
+      } catch (e) {
+        console.warn("Error loading Fira Sans, falling back to Helvetica");
+        doc.setFont("helvetica");
+      }
+    } else {
+        // Fallback if no base64 provided in code
+        doc.setFont("helvetica");
+    }
 
     // Placeholder Base64 for a logo (Simple colorful box to simulate logo presence)
-    // Replace this string with actual WK Logo base64 if available
-    const logoData = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH5gIeEzgZ6b78TAAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAACxklEQVRo3u2aTUtCURSG33uvFq2ChFpE0CpoE9QmaBPUJmgTtAlqE7QJahO0CWoTtAmCamGQ5i+QlnP13hO6g9t7r849L/swMHj3Oec9555z77kCOTk5OTk5/x8lhw+FQsF5/8658H0/yLIs12g0+PF47O7t7f1Yw0Kh4DQaDUE+n3d3d3fFMAx3b2/v1y0LhYLTbDbF5eWlOzs7E5VKxd3f3/9xy0Kh4DSbTXFxcSGOj4/FwcGBODk5EcfHx+Li4kKs1+vC9/0ftSwUCk6j0RBnZ2f/WBaNRlF8JpPJpwyIoshZLBb/WBbL5fJTAyIIAmcymfxjWTCZTD41IIqiOIvF4h/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQG5ubpx2uy1833f39vbE1tZWyD/n5OTk5OQ05g8j25y0o/CjLAAAAABJRU5ErkJggg==";
+    const logoData = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH5gIeEzgZ6b78TAAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAACxklEQVRo3u2aTUtCURSG33uvFq2ChFpE0CpoE9QmaBPUJmgTtAlqE7QJahO0CWoTtAmCamGQ5i+QlnP13hO6g9t7r849L/swMHj3Oec9555z77kCOTk5OTk5/x8lhw+FQsF5/8658H0/yLIs12g0+PF47O7t7f1Yw0Kh4DQaDUE+n3d3d3fFMAx3b2/v1y0LhYLTbDbF5eWlOzs7E5VKxd3f3/9xy0Kh4DSbTXFxcSGOj4/FwcGBODk5EcfHx+Li4kKs1+vC9/0ftSwUCk6j0RBnZ2f/WBaNRlF8JpPJpwyIoshZLBb/WBbL5fJTAyIIAmcymfxjWTCZTD41IIqiOIvF4h/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQG5ubpx2uy1833f39vbE1tZWyD/n5OTk5OQ05g8j25y0o/CjLAAAAABJRU5ErkJggg==";
 
     const addFooter = (pageNum: number) => {
       doc.setFontSize(8);
@@ -167,12 +192,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     }
 
     // Title
-    doc.setFont("helvetica", "bold");
+    // Use FiraSans if available, else standard font logic implied
     doc.setFontSize(32);
     doc.setTextColor(255, 255, 255);
     doc.text("Wolters Kluwer", 105, 115, { align: 'center' });
 
-    doc.setFont("helvetica", "normal");
     doc.setFontSize(18);
     doc.setTextColor(255, 255, 255);
     doc.text("Budgetary Commercial Proposal", 105, 130, { align: 'center' });
@@ -198,12 +222,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, 210, 297, 'F');
     
-    doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.text("Confidentiality Notice", 14, 25);
 
-    doc.setFont("helvetica", "normal");
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
     
@@ -223,7 +245,6 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     // --- PAGE 3: PRICING DETAILS & TERMS ---
     doc.addPage();
     
-    doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.text("Pricing Details", 14, 25);
@@ -232,7 +253,7 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     const tableHead = [['Year', ...config.selectedProducts.map(pid => {
        const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
        return p?.shortName || pid;
-    }), 'Total (USD)', 'Total (SAR)']]; // Removed Net (USD)
+    }), 'Total (USD)', 'Total (SAR)']]; // Strictly Gross values
 
     const tableBody = data.yearlyResults.map(r => {
        const pValues = config.selectedProducts.map(pid => {
@@ -244,7 +265,6 @@ By accepting this document, the recipient agrees to keep its contents confidenti
           ...pValues,
           formatMoney(r.grossUSD, 'USD'),
           config.channel === ChannelType.DIRECT ? '-' : formatMoney(r.grossSAR, 'SAR')
-          // Removed Net value
        ];
     });
 
@@ -253,30 +273,30 @@ By accepting this document, the recipient agrees to keep its contents confidenti
       ...config.selectedProducts.map(() => ''),
       formatMoney(data.totalGrossUSD, 'USD'),
       config.channel === ChannelType.DIRECT ? '-' : formatMoney(data.totalGrossSAR, 'SAR')
-      // Removed Net value
     ];
     tableBody.push(totalRow);
+
+    // Use current active font family for table
+    const currentFont = doc.getFont().fontName;
 
     autoTable(doc, {
       startY: 35,
       head: tableHead,
       body: tableBody,
       theme: 'grid',
-      headStyles: { fillColor: primaryColor, textColor: 255, font: 'helvetica' },
-      styles: { fontSize: 9, font: 'helvetica' },
+      headStyles: { fillColor: primaryColor, textColor: 255, font: currentFont },
+      styles: { fontSize: 9, font: currentFont }, // Ensure custom font is used in table if loaded
       margin: { left: 14, right: 14 },
     });
 
     let finalY = (doc as any).lastAutoTable.finalY + 15;
 
     // --- Terms & Conditions ---
-    doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.text("Terms & Conditions", 14, finalY);
     
     finalY += 8;
-    doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
 
@@ -309,6 +329,11 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     terms.push(`Refer to the technical proposal for access methods, licensed material and product description.`);
 
     terms.forEach(term => {
+      // Simple pagination check
+      if (finalY > 270) {
+        doc.addPage();
+        finalY = 20;
+      }
       doc.text(`• ${term}`, 14, finalY);
       finalY += 6;
     });

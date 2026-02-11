@@ -182,6 +182,9 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
   let totalNetUSD = 0;
   let totalNetSAR = 0;
 
+  const productNetTotals: Record<string, number> = {};
+  selectedProducts.forEach(p => productNetTotals[p] = 0);
+
   for (let i = 0; i < years; i++) {
     const breakdown: ProductYearlyData[] = [];
     let yearSum = 0;
@@ -191,11 +194,15 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
     selectedProducts.forEach(prodId => {
       const val = productSchedules[prodId][i];
       yearSum += val;
+      
+      const netVal = val * netFactor;
       breakdown.push({
         id: prodId,
         gross: val,
-        net: val * netFactor
+        net: netVal
       });
+
+      productNetTotals[prodId] += netVal;
     });
 
     const quoteSAR = convertToSAR(yearSum);
@@ -237,6 +244,7 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
     totalGrossSAR,
     totalNetUSD,
     totalNetSAR,
+    productNetTotals,
     acvUSD,
     netACV,
     renewalBaseACV: totalRenewalBaseForACV,
