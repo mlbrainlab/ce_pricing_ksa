@@ -185,17 +185,18 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
   for (let i = 0; i < years; i++) {
     const breakdown: ProductYearlyData[] = [];
     let yearSum = 0;
+    
+    const netFactor = getNetFactor(dealType, channel, i);
 
     selectedProducts.forEach(prodId => {
       const val = productSchedules[prodId][i];
       yearSum += val;
       breakdown.push({
         id: prodId,
-        gross: val
+        gross: val,
+        net: val * netFactor
       });
     });
-
-    const netFactor = getNetFactor(dealType, channel, i);
 
     const quoteSAR = convertToSAR(yearSum);
     const recognizedUSD = yearSum * netFactor;

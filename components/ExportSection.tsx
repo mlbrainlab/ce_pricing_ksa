@@ -134,13 +134,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     const docDate = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
     const refId = `REF-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`;
 
-    // Note: Fira Sans is not a standard PDF font. 
-    // Using Helvetica as the closest standard sans-serif font for the PDF.
+    // Note: To use Fira Sans, the font file must be loaded as a base64 string and added to VFS.
+    // Since we cannot load external files here, we use Helvetica (Standard Sans Serif) which is the closest native PDF font.
     doc.setFont("helvetica");
 
     // Placeholder Base64 for a logo (Simple colorful box to simulate logo presence)
     // Replace this string with actual WK Logo base64 if available
-    const logoData = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH5gIeEzgZ6b78TAAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAACxklEQVRo3u2aTUtCURSG33uvFq2ChFpE0CpoE9QmaBPUJmgTtAlqE7QJahO0CWoTtAmCamGQ5i+QlnP13hO6g9t7r849L/swMHj3Oec9555z77kCOTk5OTk5/x8lhw+FQsF5/8658H0/yLIs12g0+PF47O7t7f1Yw0Kh4DQaDUE+n3d3d3fFMAx3b2/v1y0LhYLTbDbF5eWlOzs7E5VKxd3f3/9xy0Kh4DSbTXFxcSGOj4/FwcGBODk5EcfHx+Li4kKs1+vC9/0ftSwUCk6j0RBnZ2f/WBaNRlF8JpPJpwyIoshZLBb/WBbL5fJTAyIIAmcymfxjWTCZTD41IIqiOIvF4h/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQG5ubpx2uy1833f39vbE1tZWyD/n5OTk5OQ05g8j25y0o/CjLAAAAABJRU5ErkJggg==";
+    const logoData = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH5gIeEzgZ6b78TAAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAACxklEQVRo3u2aTUtCURSG33uvFq2ChFpE0CpoE9QmaBPUJmgTtAlqE7QJahO0CWoTtAmCamGQ5i+QlnP13hO6g9t7r849L/swMHj3Oec9555z77kCOTk5OTk5/x8lhw+FQsF5/8658H0/yLIs12g0+PF47O7t7f1Yw0Kh4DQaDUE+n3d3d3fFMAx3b2/v1y0LhYLTbDbF5eWlOzs7E5VKxd3f3/9xy0Kh4DSbTXFxcSGOj4/FwcGBODk5EcfHx+Li4kKs1+vC9/0ftSwUCk6j0RBnZ2f/WBaNRlF8JpPJpwyIoshZLBb/WBbL5fJTAyIIAmcymfxjWTCZTD41IIqiOIvF4h/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQG5ubpx2uy1833f39vbE1tZWyD/n5OTk5OQ05g8j25y0o/CjLAAAAABJRU5ErkJggg==";
 
     const addFooter = (pageNum: number) => {
       doc.setFontSize(8);
@@ -232,7 +232,7 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     const tableHead = [['Year', ...config.selectedProducts.map(pid => {
        const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
        return p?.shortName || pid;
-    }), 'Total (USD)', 'Total (SAR)', 'Net (USD)']];
+    }), 'Total (USD)', 'Total (SAR)']]; // Removed Net (USD)
 
     const tableBody = data.yearlyResults.map(r => {
        const pValues = config.selectedProducts.map(pid => {
@@ -243,8 +243,8 @@ By accepting this document, the recipient agrees to keep its contents confidenti
           `Year ${r.year}`,
           ...pValues,
           formatMoney(r.grossUSD, 'USD'),
-          config.channel === ChannelType.DIRECT ? '-' : formatMoney(r.grossSAR, 'SAR'),
-          formatMoney(r.netUSD, 'USD')
+          config.channel === ChannelType.DIRECT ? '-' : formatMoney(r.grossSAR, 'SAR')
+          // Removed Net value
        ];
     });
 
@@ -252,8 +252,8 @@ By accepting this document, the recipient agrees to keep its contents confidenti
       'TOTAL',
       ...config.selectedProducts.map(() => ''),
       formatMoney(data.totalGrossUSD, 'USD'),
-      config.channel === ChannelType.DIRECT ? '-' : formatMoney(data.totalGrossSAR, 'SAR'),
-      formatMoney(data.totalNetUSD, 'USD')
+      config.channel === ChannelType.DIRECT ? '-' : formatMoney(data.totalGrossSAR, 'SAR')
+      // Removed Net value
     ];
     tableBody.push(totalRow);
 
@@ -284,13 +284,29 @@ By accepting this document, the recipient agrees to keep its contents confidenti
       ? "30 days from invoice date."
       : "As per the entity's regulations.";
 
+    // Build Statistics String
+    const statsList = [];
+    if (config.selectedProducts.includes('utd')) {
+       statsList.push(`${config.productInputs['utd'].count} Physicians`);
+    }
+    if (config.selectedProducts.includes('ld')) {
+       statsList.push(`${config.productInputs['ld'].count} Active Beds`);
+    }
+    const statsString = statsList.length > 0 ? `Statistics: ${statsList.join(' & ')}` : '';
+
     const terms = [
       `Price validity: 60 days.`,
       `Subscription Duration: ${config.years} Years`,
       `Payment terms: ${paymentTermText}`,
       `EMR integration is free of charge over the course of the subscription even if the EMR changed.`,
-      `Refer to the technical proposal for access methods, licensed material and product description.`
     ];
+    
+    // Add statistics if exists
+    if (statsString) {
+      terms.push(statsString);
+    }
+
+    terms.push(`Refer to the technical proposal for access methods, licensed material and product description.`);
 
     terms.forEach(term => {
       doc.text(`• ${term}`, 14, finalY);

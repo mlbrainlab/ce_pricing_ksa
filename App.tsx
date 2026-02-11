@@ -112,7 +112,7 @@ const App: React.FC = () => {
           step="1" 
           value={value}
           onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
-          className={`w-24 text-sm rounded p-2 text-left bg-white text-gray-900 border ${colorClass} focus:ring-2 focus:ring-blue-500`}
+          className={`w-24 text-sm rounded p-2 text-left bg-white text-gray-900 border ${colorClass} focus:ring-2 focus:ring-blue-500 font-mono`}
         />
         <span className="ml-2 text-xs text-gray-400">
            % applied to Years 2-{years}
@@ -201,7 +201,7 @@ const App: React.FC = () => {
                                <input
                                  type="number"
                                  min="0"
-                                 className="block w-full text-xs border-gray-300 rounded shadow-sm focus:ring-orange-500 focus:border-orange-500 border p-1 bg-white text-gray-900"
+                                 className="block w-full text-xs border-gray-300 rounded shadow-sm focus:ring-orange-500 focus:border-orange-500 border p-1 bg-white text-gray-900 font-mono"
                                  value={input.expiringAmount || 0}
                                  onChange={(e) => handleInputChange(product.id, 'expiringAmount', parseFloat(e.target.value) || 0)}
                                />
@@ -243,7 +243,7 @@ const App: React.FC = () => {
                                <input
                                  type="number"
                                  min="0"
-                                 className="block w-full text-xs border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white text-gray-900 bg-gray-50"
+                                 className="block w-full text-xs border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white text-gray-900 bg-gray-50 font-mono"
                                  value={input.count}
                                  onChange={(e) => handleInputChange(product.id, 'count', parseInt(e.target.value) || 0)}
                                />
@@ -257,7 +257,7 @@ const App: React.FC = () => {
                                type="number"
                                min="0"
                                max="100"
-                               className="block w-full text-xs border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white text-gray-900 bg-gray-50"
+                               className="block w-full text-xs border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white text-gray-900 bg-gray-50 font-mono"
                                value={input.baseDiscount}
                                onChange={(e) => handleInputChange(product.id, 'baseDiscount', parseFloat(e.target.value) || 0)}
                              />
@@ -296,7 +296,7 @@ const App: React.FC = () => {
                       type="number" min="1" max="7" 
                       value={years} 
                       onChange={(e) => setYears(parseInt(e.target.value))}
-                      className="mt-1 block w-full text-sm border border-gray-300 rounded-md p-2 bg-white text-gray-900"
+                      className="mt-1 block w-full text-sm border border-gray-300 rounded-md p-2 bg-white text-gray-900 font-mono"
                     />
                  </div>
                  <div className="w-2/3">
@@ -357,7 +357,7 @@ const App: React.FC = () => {
                      <tr>
                         <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Year</th>
                         
-                        {/* Dynamic Product Columns */}
+                        {/* Dynamic Product Columns - Gross */}
                         {selectedProductIds.map(pid => {
                            const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
                            return (
@@ -374,12 +374,22 @@ const App: React.FC = () => {
 
                         {/* Conditionally show SAR Total */}
                         {channel !== ChannelType.DIRECT && (
-                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-800 uppercase bg-yellow-100">
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-800 uppercase bg-yellow-100 whitespace-nowrap">
                              Total (SAR)
                           </th>
                         )}
 
-                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Recognized<br/>(USD)</th>
+                        {/* Breakdown for Recognized (Net) if multiple products */}
+                        {selectedProductIds.length > 1 && selectedProductIds.map(pid => {
+                           const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                           return (
+                             <th key={`net-${pid}`} className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">
+                               {p?.shortName} Net (USD)
+                             </th>
+                           );
+                        })}
+
+                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Recognized<br/>Total (USD)</th>
                         <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase w-1/4">Notes</th>
                      </tr>
                   </thead>
@@ -388,7 +398,7 @@ const App: React.FC = () => {
                         <tr key={r.year} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                            <td className="px-4 py-4 text-center text-sm font-medium text-gray-900">Year {r.year}</td>
                            
-                           {/* Product Columns Data */}
+                           {/* Product Columns Data Gross */}
                            {selectedProductIds.map(pid => {
                              const pData = r.breakdown.find(d => d.id === pid);
                              return (
@@ -405,10 +415,20 @@ const App: React.FC = () => {
 
                            {/* Total SAR (if Indirect) */}
                            {channel !== ChannelType.DIRECT && (
-                             <td className="px-4 py-4 text-center text-sm font-bold text-gray-800 font-mono bg-yellow-50">
+                             <td className="px-4 py-4 text-center text-sm font-bold text-gray-800 font-mono bg-yellow-50 whitespace-nowrap">
                                 {formatCurrency(r.grossSAR, 'SAR')}
                              </td>
                            )}
+
+                           {/* Product Columns Data Net (if multiple) */}
+                           {selectedProductIds.length > 1 && selectedProductIds.map(pid => {
+                             const pData = r.breakdown.find(d => d.id === pid);
+                             return (
+                               <td key={`net-${pid}`} className="px-4 py-4 text-center text-sm text-gray-500 font-mono">
+                                 {pData ? formatCurrency(pData.net, 'USD') : '-'}
+                               </td>
+                             );
+                           })}
 
                            <td className="px-4 py-4 text-center text-sm text-gray-600 font-mono">
                               {formatCurrency(r.netUSD, 'USD')}
@@ -433,10 +453,15 @@ const App: React.FC = () => {
 
                          {/* Total SAR */}
                         {channel !== ChannelType.DIRECT && (
-                           <td className="px-4 py-4 text-center text-sm font-bold font-mono text-yellow-300">
+                           <td className="px-4 py-4 text-center text-sm font-bold font-mono text-yellow-300 whitespace-nowrap">
                               {formatCurrency(results.totalGrossSAR, 'SAR')}
                            </td>
                         )}
+
+                        {/* Empty Net Breakdown */}
+                        {selectedProductIds.length > 1 && selectedProductIds.map(pid => (
+                          <td key={`net-total-${pid}`}></td>
+                        ))}
 
                         <td className="px-4 py-4 text-center text-sm font-bold font-mono text-gray-300">
                            {formatCurrency(results.totalNetUSD, 'USD')}
@@ -452,11 +477,11 @@ const App: React.FC = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
              <div className="bg-white p-4 shadow rounded-lg border-l-4 border-blue-500">
                 <div className="text-xs text-gray-500 uppercase">Customer TCV</div>
-                <div className="text-lg font-bold text-gray-900">{formatCurrency(results.totalGrossUSD, 'USD')}</div>
+                <div className="text-lg font-bold text-gray-900 font-mono">{formatCurrency(results.totalGrossUSD, 'USD')}</div>
              </div>
              <div className="bg-white p-4 shadow rounded-lg border-l-4 border-indigo-500">
                 <div className="text-xs text-gray-500 uppercase">Customer ACV</div>
-                <div className="text-lg font-bold text-gray-900">{formatCurrency(results.acvUSD, 'USD')}</div>
+                <div className="text-lg font-bold text-gray-900 font-mono">{formatCurrency(results.acvUSD, 'USD')}</div>
              </div>
              
              {/* Net Metrics (Only for Indirect Channels) */}
@@ -464,11 +489,11 @@ const App: React.FC = () => {
                <>
                  <div className="bg-gray-100 p-4 shadow rounded-lg border-l-4 border-gray-500">
                     <div className="text-xs text-gray-500 uppercase">Net TCV</div>
-                    <div className="text-lg font-bold text-gray-700">{formatCurrency(results.totalNetUSD, 'USD')}</div>
+                    <div className="text-lg font-bold text-gray-700 font-mono">{formatCurrency(results.totalNetUSD, 'USD')}</div>
                  </div>
                  <div className="bg-gray-100 p-4 shadow rounded-lg border-l-4 border-gray-500">
                     <div className="text-xs text-gray-500 uppercase">Net ACV</div>
-                    <div className="text-lg font-bold text-gray-700">{formatCurrency(results.netACV, 'USD')}</div>
+                    <div className="text-lg font-bold text-gray-700 font-mono">{formatCurrency(results.netACV, 'USD')}</div>
                  </div>
                </>
              )}
@@ -477,11 +502,11 @@ const App: React.FC = () => {
                <>
                  <div className="bg-white p-4 shadow rounded-lg border-l-4 border-green-500">
                     <div className="text-xs text-gray-500 uppercase">Renewal ACV (Base)</div>
-                    <div className="text-lg font-bold text-gray-900">{formatCurrency(results.renewalBaseACV, 'USD')}</div>
+                    <div className="text-lg font-bold text-gray-900 font-mono">{formatCurrency(results.renewalBaseACV, 'USD')}</div>
                  </div>
                  <div className="bg-white p-4 shadow rounded-lg border-l-4 border-orange-500">
                     <div className="text-xs text-gray-500 uppercase">Upsell ACV</div>
-                    <div className="text-lg font-bold text-gray-900">{formatCurrency(results.upsellACV, 'USD')}</div>
+                    <div className="text-lg font-bold text-gray-900 font-mono">{formatCurrency(results.upsellACV, 'USD')}</div>
                  </div>
                </>
              )}
