@@ -11,13 +11,12 @@ interface ExportSectionProps {
 
 export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) => {
   const [customerName, setCustomerName] = useState('');
+  const [isPdfLoading, setIsPdfLoading] = useState(false);
 
   const formatMoney = (amount: number, currency: string) => {
-    // For PDF usage specifically with Fira Sans or compatible font, we use unicode
-    if (currency === 'SAR') {
-       return `﷼ ${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
-    }
-    return amount.toLocaleString('en-US', { style: 'currency', currency: currency });
+    return currency === 'SAR' 
+      ? `SAR ${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+      : amount.toLocaleString('en-US', { style: 'currency', currency: currency });
   };
 
   const handleExcelExport = () => {
@@ -60,7 +59,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       ...prodCols,
       'Total Gross (USD)',
       'Total Gross (SAR)',
-      'Notes'
+      // Notes Removed
     ];
 
     const scheduleRows = data.yearlyResults.map(r => {
@@ -73,7 +72,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         ...pValues,
         r.grossUSD.toFixed(2),
         r.grossSAR.toFixed(0),
-        q(r.notes.join('; '))
+        // Notes Removed
       ];
     });
     
@@ -84,7 +83,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       ...totalProdValues,
       data.totalGrossUSD.toFixed(2),
       data.totalGrossSAR.toFixed(0),
-      ''
     ];
 
     // 4. Summary Metrics
@@ -137,7 +135,19 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     document.body.removeChild(link);
   };
 
-  const handlePDFExport = () => {
+  // Convert ArrayBuffer to Base64
+  const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
+  };
+
+  const handlePDFExport = async () => {
+    setIsPdfLoading(true);
     const doc = new jsPDF();
     
     // Wolters Kluwer Blue
@@ -145,22 +155,19 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     const docDate = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
     const refId = `REF-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`;
 
-    // --- Fira Sans Font Setup ---
-    // Note: To make this work, you must replace the empty string below with the actual Base64 encoded string of FiraSans-Regular.ttf
-    // For the purpose of this architecture code, the logic is implemented but the asset is not embedded to avoid file size limits in response.
-    const firaSansBase64 = ""; 
-    
-    if (firaSansBase64) {
-      try {
-        doc.addFileToVFS("FiraSans-Regular.ttf", firaSansBase64);
-        doc.addFont("FiraSans-Regular.ttf", "FiraSans", "normal");
-        doc.setFont("FiraSans");
-      } catch (e) {
-        console.warn("Error loading Fira Sans, falling back to Helvetica");
-        doc.setFont("helvetica");
-      }
-    } else {
-        // Fallback if no base64 provided in code
+    // --- Font Loading Strategy ---
+    // Try to fetch Fira Sans from Google Fonts
+    try {
+        const response = await fetch('https://fonts.gstatic.com/s/firasans/v17/va9E4kDNxMZdWfMOD5Vvl4jO.ttf');
+        if (!response.ok) throw new Error('Network response was not ok');
+        const fontBuffer = await response.arrayBuffer();
+        const fontBase64 = arrayBufferToBase64(fontBuffer);
+        
+        doc.addFileToVFS('FiraSans-Regular.ttf', fontBase64);
+        doc.addFont('FiraSans-Regular.ttf', 'FiraSans', 'normal');
+        doc.setFont('FiraSans');
+    } catch (error) {
+        console.warn("Could not fetch Fira Sans font, falling back to Helvetica.", error);
         doc.setFont("helvetica");
     }
 
@@ -192,7 +199,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     }
 
     // Title
-    // Use FiraSans if available, else standard font logic implied
     doc.setFontSize(32);
     doc.setTextColor(255, 255, 255);
     doc.text("Wolters Kluwer", 105, 115, { align: 'center' });
@@ -345,6 +351,7 @@ By accepting this document, the recipient agrees to keep its contents confidenti
        : `Quote_${config.dealType}_${new Date().toISOString().slice(0,10)}.pdf`;
 
     doc.save(filename);
+    setIsPdfLoading(false);
   };
 
   return (
@@ -368,9 +375,10 @@ By accepting this document, the recipient agrees to keep its contents confidenti
         </button>
         <button 
           onClick={handlePDFExport}
-          className="flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          disabled={isPdfLoading}
+          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isPdfLoading ? 'bg-red-400' : 'bg-red-600 hover:bg-red-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500`}
         >
-          Export PDF Quote
+          {isPdfLoading ? 'Downloading Font...' : 'Export PDF Quote'}
         </button>
       </div>
     </div>
