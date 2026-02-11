@@ -367,9 +367,18 @@ const App: React.FC = () => {
                            );
                         })}
 
+                        {/* Always show USD Total */}
                         <th className="px-4 py-3 text-center text-xs font-bold text-gray-800 uppercase bg-gray-200">
-                           Total ({results.currencyToDisplay})
+                           Total (USD)
                         </th>
+
+                        {/* Conditionally show SAR Total */}
+                        {channel !== ChannelType.DIRECT && (
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-800 uppercase bg-yellow-100">
+                             Total (SAR)
+                          </th>
+                        )}
+
                         <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Recognized<br/>(USD)</th>
                         <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase w-1/4">Notes</th>
                      </tr>
@@ -389,9 +398,18 @@ const App: React.FC = () => {
                              );
                            })}
 
+                           {/* Total USD */}
                            <td className="px-4 py-4 text-center text-sm font-bold text-blue-700 font-mono bg-blue-50">
-                              {results.currencyToDisplay === 'USD' ? formatCurrency(r.grossUSD, 'USD') : formatCurrency(r.grossSAR, 'SAR')}
+                              {formatCurrency(r.grossUSD, 'USD')}
                            </td>
+
+                           {/* Total SAR (if Indirect) */}
+                           {channel !== ChannelType.DIRECT && (
+                             <td className="px-4 py-4 text-center text-sm font-bold text-gray-800 font-mono bg-yellow-50">
+                                {formatCurrency(r.grossSAR, 'SAR')}
+                             </td>
+                           )}
+
                            <td className="px-4 py-4 text-center text-sm text-gray-600 font-mono">
                               {formatCurrency(r.netUSD, 'USD')}
                            </td>
@@ -408,9 +426,18 @@ const App: React.FC = () => {
                           <td key={pid}></td>
                         ))}
 
+                        {/* Total USD */}
                         <td className="px-4 py-4 text-center text-sm font-bold font-mono">
-                           {results.currencyToDisplay === 'USD' ? formatCurrency(results.totalGrossUSD, 'USD') : formatCurrency(results.totalGrossSAR, 'SAR')}
+                           {formatCurrency(results.totalGrossUSD, 'USD')}
                         </td>
+
+                         {/* Total SAR */}
+                        {channel !== ChannelType.DIRECT && (
+                           <td className="px-4 py-4 text-center text-sm font-bold font-mono text-yellow-300">
+                              {formatCurrency(results.totalGrossSAR, 'SAR')}
+                           </td>
+                        )}
+
                         <td className="px-4 py-4 text-center text-sm font-bold font-mono text-gray-300">
                            {formatCurrency(results.totalNetUSD, 'USD')}
                         </td>
