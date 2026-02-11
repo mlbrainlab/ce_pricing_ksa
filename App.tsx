@@ -15,8 +15,7 @@ const formatCurrency = (amount: number, currency: 'USD' | 'SAR') => {
   if (currency === 'USD') {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   }
-  // Using unicode character for Rial
-  return `﷼ ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(amount)}`;
+  return `SAR ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(amount)}`;
 };
 
 const App: React.FC = () => {
@@ -381,7 +380,7 @@ const App: React.FC = () => {
                         )}
 
                         <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Recognized<br/>Total (USD)</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase w-1/4">Notes</th>
+                        {/* Notes Column Removed */}
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
@@ -414,9 +413,7 @@ const App: React.FC = () => {
                            <td className="px-4 py-4 text-center text-sm text-gray-600 font-mono">
                               {formatCurrency(r.netUSD, 'USD')}
                            </td>
-                           <td className="px-4 py-4 text-left text-xs text-red-600">
-                              {r.notes.map((n, idx) => <div key={idx}>{n}</div>)}
-                           </td>
+                           {/* Notes Data Removed */}
                         </tr>
                      ))}
                      <tr className="bg-gray-800 text-white">
@@ -442,7 +439,6 @@ const App: React.FC = () => {
                         <td className="px-4 py-4 text-center text-sm font-bold font-mono text-gray-300">
                            {formatCurrency(results.totalNetUSD, 'USD')}
                         </td>
-                        <td></td>
                      </tr>
                   </tbody>
                </table>
