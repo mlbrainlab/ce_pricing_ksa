@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CalculationOutput, DealConfiguration, ChannelType } from '../types';
 import { AVAILABLE_PRODUCTS } from '../constants';
 import jsPDF from 'jspdf';
@@ -11,16 +11,77 @@ interface ExportSectionProps {
 
 // Logo URLs
 const WK_LOGO_URL = "https://cdn.wolterskluwer.io/wk/jumpstart-v3-assets/0.x.x/logo/large.svg";
-// Reverted to original URL
-const SAMIR_LOGO_URL = "https://samirgroup.com/wp-content/uploads/2021/05/logo.png"; 
+// Using CORS proxy to ensure the image loads in the browser
+const SAMIR_LOGO_URL = "https://corsproxy.io/?https://samirgroup.com/wp-content/uploads/2021/05/logo.png"; 
+
+// Reliable Font URLs (GitHub Raw)
+const FONT_URLS = {
+  Inter: {
+    regular: "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/static/Inter-Regular.ttf",
+    bold: "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/static/Inter-Bold.ttf"
+  },
+  FiraSans: {
+    regular: "https://raw.githubusercontent.com/google/fonts/main/ofl/firasans/FiraSans-Regular.ttf",
+    bold: "https://raw.githubusercontent.com/google/fonts/main/ofl/firasans/FiraSans-Bold.ttf"
+  }
+};
+
+type FontType = 'Inter' | 'FiraSans';
 
 export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) => {
   const [customerName, setCustomerName] = useState('');
   const [repName, setRepName] = useState('');
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   
-  // Font data state (loaded on demand)
-  const [fontData, setFontData] = useState<{ regular: string | null, bold: string | null }>({ regular: null, bold: null });
+  // Font State
+  const [selectedFont, setSelectedFont] = useState<FontType>('Inter');
+  const [fontCache, setFontCache] = useState<Record<FontType, { regular: string | null, bold: string | null }>>({
+    Inter: { regular: null, bold: null },
+    FiraSans: { regular: null, bold: null }
+  });
+  const [isFontLoading, setIsFontLoading] = useState(false);
+
+  // Load font when selection changes
+  useEffect(() => {
+    const loadSelectedFont = async () => {
+      // If already loaded, do nothing
+      if (fontCache[selectedFont].regular && fontCache[selectedFont].bold) return;
+
+      setIsFontLoading(true);
+      try {
+        console.log(`Fetching ${selectedFont}...`);
+        const urls = FONT_URLS[selectedFont];
+        const [regRes, boldRes] = await Promise.all([
+          fetch(urls.regular),
+          fetch(urls.bold)
+        ]);
+
+        if (regRes.ok && boldRes.ok) {
+          const regBuf = await regRes.arrayBuffer();
+          const boldBuf = await boldRes.arrayBuffer();
+          
+          setFontCache(prev => ({
+            ...prev,
+            [selectedFont]: {
+              regular: arrayBufferToBase64(regBuf),
+              bold: arrayBufferToBase64(boldBuf)
+            }
+          }));
+          console.log(`${selectedFont} loaded successfully.`);
+        } else {
+          console.error(`Failed to fetch ${selectedFont}: Status ${regRes.status}/${boldRes.status}`);
+          alert(`Error loading ${selectedFont}. Please try again or check internet connection.`);
+        }
+      } catch (e) {
+        console.error(`Exception loading ${selectedFont}:`, e);
+        alert(`Error loading ${selectedFont}.`);
+      } finally {
+        setIsFontLoading(false);
+      }
+    };
+
+    loadSelectedFont();
+  }, [selectedFont]); // Only run when selectedFont changes
 
   const formatMoney = (amount: number, currency: string) => {
     return currency === 'SAR' 
@@ -28,138 +89,20 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       : amount.toLocaleString('en-US', { style: 'currency', currency: currency });
   };
 
-  const handleExcelExport = () => {
-    // Helper to sanitize CSV fields
-    const q = (s: string | number) => `"${String(s).replace(/"/g, '""')}"`;
-    
-    // 1. Deal Context
-    const contextRows = [
-      ['Customer Name', q(customerName)],
-      ['Rep Name', q(repName)],
-      ['Deal Type', q(config.dealType)],
-      ['Channel', q(config.channel)],
-      ['Duration (Years)', config.years],
-      ['Pricing Method', q(config.method)],
-      ['Currency Display', q(data.currencyToDisplay)],
-      [] // spacer
-    ];
-
-    // 2. Product Config
-    const productHeader = ['Product', 'Variant', 'Count', 'Base Discount %', 'Expiring Amount (USD)'];
-    const productRows = config.selectedProducts.map(pid => {
-      const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-      const inp = config.productInputs[pid];
-      return [
-        q(p?.name || pid),
-        q(inp.variant),
-        inp.count,
-        inp.baseDiscount,
-        inp.expiringAmount || 0
-      ];
-    });
-    
-    // 3. Main Schedule Header
-    const prodCols = config.selectedProducts.map(pid => {
-      const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-      return `${p?.shortName || pid} (USD)`;
-    });
-    
-    const scheduleHeader = [
-      'Year',
-      ...prodCols,
-      'Total Gross (USD)',
-      'Total Gross (SAR)',
-      'VAT (SAR)',
-      'Grand Total (SAR)',
-    ];
-
-    const scheduleRows = data.yearlyResults.map(r => {
-      const pValues = config.selectedProducts.map(pid => {
-         const bd = r.breakdown.find(x => x.id === pid);
-         return bd ? bd.gross.toFixed(2) : '0.00';
-      });
-      return [
-        `Year ${r.year}`,
-        ...pValues,
-        r.grossUSD.toFixed(2),
-        r.grossSAR.toFixed(0),
-        r.vatSAR.toFixed(0),
-        r.grandTotalSAR.toFixed(0),
-      ];
-    });
-    
-    // Totals Row
-    const productTotals = config.selectedProducts.map(pid => {
-        const total = data.yearlyResults.reduce((sum, r) => {
-            const bd = r.breakdown.find(x => x.id === pid);
-            return sum + (bd ? bd.gross : 0);
-        }, 0);
-        return total.toFixed(2);
-    });
-
-    const totalsRow = [
-      'TOTAL',
-      ...productTotals,
-      data.totalGrossUSD.toFixed(2),
-      data.totalGrossSAR.toFixed(0),
-      data.totalVatSAR.toFixed(0),
-      data.totalGrandTotalSAR.toFixed(0),
-    ];
-
-    // 4. Summary Metrics
-    const metricsRows = [
-       [],
-       ['Metric', 'Value (USD)'],
-       ['Customer TCV', data.totalGrossUSD.toFixed(2)],
-       ['Customer ACV', data.acvUSD.toFixed(2)],
-       ['Net TCV', data.totalNetUSD.toFixed(2)],
-       ['Net ACV', data.netACV.toFixed(2)],
-       ['Renewal Base ACV', data.renewalBaseACV.toFixed(2)],
-       ['Upsell ACV', data.upsellACV.toFixed(2)]
-    ];
-    
-    // Add Net Breakdown to CSV
-    if (config.channel !== ChannelType.DIRECT) {
-       metricsRows.push([]);
-       metricsRows.push(['Product', 'Net Total (USD)']);
-       config.selectedProducts.forEach(pid => {
-         const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-         metricsRows.push([p?.shortName || pid, data.productNetTotals[pid].toFixed(2)]);
-       });
+  const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
     }
-
-    // Assemble CSV
-    const allRows = [
-      ...contextRows,
-      productHeader,
-      ...productRows,
-      [],
-      scheduleHeader,
-      ...scheduleRows,
-      totalsRow,
-      ...metricsRows
-    ];
-
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + allRows.map(e => e.join(",")).join("\n");
-      
-    const filename = customerName 
-       ? `Quote_${customerName.replace(/\s+/g,'_')}_${config.dealType}_${new Date().toISOString().slice(0,10)}.csv`
-       : `Quote_${config.dealType}_${new Date().toISOString().slice(0,10)}.csv`;
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    return window.btoa(binary);
   };
 
   // Robust Image Loader
   const getBase64FromUrl = async (url: string): Promise<string> => {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { cache: 'force-cache' });
       if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
       const blob = await response.blob();
       
@@ -198,11 +141,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       });
 
     } catch (error) {
-      // Fallback Image Load for opaque/CORS issues if fetch failed but img tag might work (unlikely for canvas, but good to have)
+      // Fallback
       return new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = 'Anonymous';
-        const timer = setTimeout(() => resolve(''), 3000); // Short timeout
+        const timer = setTimeout(() => resolve(''), 3000); 
         img.onload = () => {
           clearTimeout(timer);
           const canvas = document.createElement('canvas');
@@ -214,7 +157,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
             try {
               resolve(canvas.toDataURL('image/png'));
             } catch (e) {
-              resolve(''); // Canvas tainted
+              resolve(''); 
             }
           } else {
             resolve('');
@@ -229,47 +172,14 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     }
   };
 
-  const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return window.btoa(binary);
-  };
-
-  const ensureFontsLoaded = async () => {
-    if (fontData.regular && fontData.bold) return true;
-
-    try {
-      const [regRes, boldRes] = await Promise.all([
-          fetch('https://fonts.gstatic.com/s/firasans/v17/va9E4kDNxMZdWfMOD5Vvl4jO.ttf'),
-          fetch('https://fonts.gstatic.com/s/firasans/v17/va9B4kDNxMZdWfMOD5VnSKze6.ttf')
-      ]);
-
-      if (regRes.ok && boldRes.ok) {
-          const regBuf = await regRes.arrayBuffer();
-          const boldBuf = await boldRes.arrayBuffer();
-          
-          setFontData({
-            regular: arrayBufferToBase64(regBuf),
-            bold: arrayBufferToBase64(boldBuf)
-          });
-          return true;
-      }
-    } catch (e) {
-      console.warn("Font fetch failed, falling back to built-in fonts.");
-    }
-    return false;
-  };
-
   const handlePDFExport = async () => {
+    const currentFontData = fontCache[selectedFont];
+    if (!currentFontData.regular || !currentFontData.bold) {
+      alert("Fonts are still loading. Please wait.");
+      return;
+    }
+
     setIsPdfLoading(true);
-    
-    // 1. Ensure fonts are loaded (Fira Sans)
-    await ensureFontsLoaded();
-    
     const doc = new jsPDF();
     
     // Wolters Kluwer Blue
@@ -277,34 +187,27 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     const docDate = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
     const refId = `REF-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`;
 
-    // --- 2. Load Resources ---
+    // --- 1. Load Resources ---
     let wkLogoData = "";
     let samirLogoData = "";
     
-    // Determine Font to use
-    let fontName = 'helvetica';
-    if (fontData.regular && fontData.bold) {
-        doc.addFileToVFS('FiraSans-Regular.ttf', fontData.regular);
-        doc.addFileToVFS('FiraSans-SemiBold.ttf', fontData.bold);
-        doc.addFont('FiraSans-Regular.ttf', 'FiraSans', 'normal');
-        doc.addFont('FiraSans-SemiBold.ttf', 'FiraSans', 'bold');
-        fontName = 'FiraSans';
-    }
-
+    // Add Fonts
+    doc.addFileToVFS('Custom-Regular.ttf', currentFontData.regular);
+    doc.addFileToVFS('Custom-Bold.ttf', currentFontData.bold);
+    doc.addFont('Custom-Regular.ttf', 'CustomFont', 'normal');
+    doc.addFont('Custom-Bold.ttf', 'CustomFont', 'bold');
+    
+    const fontName = 'CustomFont';
     doc.setFont(fontName);
 
     try {
         wkLogoData = await getBase64FromUrl(WK_LOGO_URL);
-    } catch (e) {
-        // Ignore
-    }
+    } catch (e) { console.log('WK Logo fail', e) }
 
     if (config.channel !== ChannelType.DIRECT) {
         try {
             samirLogoData = await getBase64FromUrl(SAMIR_LOGO_URL);
-        } catch (e) {
-            // Ignore
-        }
+        } catch (e) { console.log('Partner Logo fail', e) }
     }
 
     const addFooter = (pageNum: number) => {
@@ -316,15 +219,28 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     };
 
     // --- Header Render Function ---
-    const renderHeader = () => {
-       // Header Color Background
-       doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-       doc.rect(0, 0, 210, 30, 'F'); 
+    const renderHeader = (isCover: boolean) => {
+       const pageWidth = doc.internal.pageSize.getWidth(); // 210 normally
+
+       if (isCover) {
+          // Full Blue Top Half
+          doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+          doc.rect(0, 0, pageWidth, 150, 'F'); 
+       } else {
+          // Standard Header Bar
+          doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+          doc.rect(0, 0, pageWidth, 30, 'F'); 
+       }
        
-       let xOffset = 14;
+       const xOffset = 14;
 
        // Add WK Logo (Left)
        if (wkLogoData) {
+         if (isCover) {
+             // White box behind WK logo on blue bg for visibility
+             doc.setFillColor(255, 255, 255);
+             doc.roundedRect(xOffset - 2, 8, 54, 14, 1, 1, 'F');
+         }
          doc.addImage(wkLogoData, 'PNG', xOffset, 10.5, 50, 9); 
        } else {
          doc.setFontSize(14);
@@ -333,40 +249,40 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
        }
 
        // Add Partner Logo (Right) if Indirect
-       // Page width 210, standard margin 14. Place image aligned to right margin.
-       // Assume logo width 50
        if (config.channel !== ChannelType.DIRECT && samirLogoData) {
          const logoW = 50;
-         const logoH = 10; // Adjusted height for ratio
-         const logoX = 210 - 14 - logoW; // Right align
+         const logoH = 10; 
+         const margin = 14;
+         const logoX = pageWidth - margin - logoW; // Explicitly calculated right align
+         
+         if (isCover) {
+             // White box behind Partner logo
+             doc.setFillColor(255, 255, 255);
+             doc.roundedRect(logoX - 2, 8, logoW + 4, 14, 1, 1, 'F');
+         }
          doc.addImage(samirLogoData, 'PNG', logoX, 10, logoW, logoH);
        }
     };
 
     // --- PAGE 1: COVER ---
-    // Background bar
+    renderHeader(true);
+    
+    // Background (Bottom Half)
     doc.setFillColor(245, 245, 245);
-    doc.rect(0, 30, 210, 267, 'F'); 
+    doc.rect(0, 150, 210, 147, 'F'); 
     
-    renderHeader();
-    
-    // Large Title Block
-    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(0, 100, 210, 50, 'F');
-
-    // Title inside Blue Bar
+    // Title inside Blue Area
     doc.setFontSize(32);
     doc.setTextColor(255, 255, 255);
     doc.setFont(fontName, 'bold');
-    doc.text("Wolters Kluwer", 105, 125, { align: 'center' });
+    doc.text("Wolters Kluwer", 105, 100, { align: 'center' });
 
     doc.setFontSize(18);
     doc.setFont(fontName, 'normal');
-    doc.text("Budgetary Commercial Proposal", 105, 140, { align: 'center' });
+    doc.text("Budgetary Commercial Proposal", 105, 115, { align: 'center' });
 
-    // --- Product Info Section (Below Blue Bar) ---
-    // Replace "Prepared For" / "Date" with Product Titles
-    let currentY = 165;
+    // --- Product Info Section (Below Blue, on Gray) ---
+    let currentY = 170;
     doc.setTextColor(60, 60, 60);
 
     const hasUTD = config.selectedProducts.includes('utd');
@@ -391,11 +307,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
 
     if (hasLD) {
         const variant = config.productInputs['ld']?.variant || '';
-        // Variant mapping
-        // BASE PKG, EE-Combo -> Lexidrug(R)
-        // +FLINK, EE-Combo+FLINK -> Lexidrug(R) incl Formulink(TM)
-        // +FLINK+IPE, EE-Combo+FLINK+IPE -> Lexidrug(R) incl Formulink(TM) and IPE
-
         let subHeading = "Drug Referential Solution";
         
         if (variant.includes('FLINK')) {
@@ -416,7 +327,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         currentY += 15;
     }
 
-
     // Bottom Left Info (Footer Area of Page 1)
     doc.setFontSize(10);
     doc.setTextColor(50, 50, 50);
@@ -428,7 +338,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
 
     // --- PAGE 2: CONFIDENTIALITY ---
     doc.addPage();
-    renderHeader();
+    renderHeader(false);
     doc.setFillColor(255, 255, 255);
     
     doc.setFontSize(16);
@@ -455,7 +365,7 @@ By accepting this document, the recipient agrees to keep its contents confidenti
 
     // --- PAGE 3: PRICING DETAILS & TERMS ---
     doc.addPage();
-    renderHeader();
+    renderHeader(false);
     
     doc.setFontSize(16);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -474,39 +384,29 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     });
 
     const totalStartIndex = 1 + config.selectedProducts.length;
-    // Indirect has 3 total columns: Total SAR, VAT, Grand Total
-    // Direct has 1 total column: Total USD
-
     const columnStyles: any = {};
 
-    // UTD Styling - Light Green
+    // UTD Styling
     if (productColIndices['utd'] !== undefined) {
         columnStyles[productColIndices['utd']] = { fillColor: [220, 252, 231] };
     }
-    // LXD (ld) Styling - Light Blue
+    // LXD Styling
     if (productColIndices['ld'] !== undefined) {
         columnStyles[productColIndices['ld']] = { fillColor: [224, 242, 254] };
     }
 
-    // Totals Styling
-    // Apply bold to 'Total' and 'Grand Total', but NOT 'VAT'
-    
-    // 1. Total (USD or SAR) is always at totalStartIndex
+    // Totals Styling (Columns)
     columnStyles[totalStartIndex] = { fontStyle: 'bold' };
-    
     if (isIndirect) {
-        // totalStartIndex + 1 is VAT -> Leave Regular
-        // totalStartIndex + 2 is Grand Total -> Bold
         columnStyles[totalStartIndex + 2] = { fontStyle: 'bold' };
     }
 
     if (isIndirect) {
-      // INDIRECT: Only SAR, with VAT
+      // INDIRECT
       const prodCols = config.selectedProducts.map(pid => {
          const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
          return `${p?.shortName || pid} (SAR)`;
       });
-      // Added newline to allow wrapping only for Grand Total
       tableHead = [['Year', ...prodCols, 'Total (SAR)', 'VAT (15%)', 'Grand Total\n(SAR)']];
       
       tableBody = data.yearlyResults.map(r => {
@@ -523,7 +423,6 @@ By accepting this document, the recipient agrees to keep its contents confidenti
         ];
       });
 
-      // Calculate Product Totals (SAR)
       const productTotalsSAR = config.selectedProducts.map(pid => {
           const total = data.yearlyResults.reduce((sum, r) => {
               const bd = r.breakdown.find(x => x.id === pid);
@@ -542,7 +441,7 @@ By accepting this document, the recipient agrees to keep its contents confidenti
       tableBody.push(totalRow);
 
     } else {
-      // DIRECT: USD
+      // DIRECT
       const prodCols = config.selectedProducts.map(pid => {
          const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
          return `${p?.shortName || pid} (USD)`;
@@ -561,7 +460,6 @@ By accepting this document, the recipient agrees to keep its contents confidenti
         ];
       });
 
-      // Calculate Product Totals (USD)
       const productTotalsUSD = config.selectedProducts.map(pid => {
           const total = data.yearlyResults.reduce((sum, r) => {
               const bd = r.breakdown.find(x => x.id === pid);
@@ -578,7 +476,6 @@ By accepting this document, the recipient agrees to keep its contents confidenti
       tableBody.push(totalRow);
     }
 
-    // Use FiraSans or Fallback
     autoTable(doc, {
       startY: 55, 
       head: tableHead,
@@ -599,6 +496,12 @@ By accepting this document, the recipient agrees to keep its contents confidenti
       }, 
       columnStyles: columnStyles,
       margin: { left: 14, right: 14 },
+      didParseCell: (data) => {
+        // Bold the entire last row (Totals)
+        if (data.section === 'body' && data.row.index === tableBody.length - 1) {
+            data.cell.styles.fontStyle = 'bold';
+        }
+      }
     });
 
     let finalY = (doc as any).lastAutoTable.finalY + 10;
@@ -699,7 +602,7 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     terms.forEach(term => {
       if (finalY > 270) {
         doc.addPage();
-        renderHeader();
+        renderHeader(false);
         finalY = 55;
       }
       doc.text(`• ${term}`, 14, finalY);
@@ -716,11 +619,132 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     setIsPdfLoading(false);
   };
 
+  const handleExcelExport = () => {
+    // Helper to sanitize CSV fields
+    const q = (s: string | number) => `"${String(s).replace(/"/g, '""')}"`;
+    
+    const contextRows = [
+      ['Customer Name', q(customerName)],
+      ['Rep Name', q(repName)],
+      ['Deal Type', q(config.dealType)],
+      ['Channel', q(config.channel)],
+      ['Duration (Years)', config.years],
+      ['Pricing Method', q(config.method)],
+      ['Currency Display', q(data.currencyToDisplay)],
+      []
+    ];
+
+    const productHeader = ['Product', 'Variant', 'Count', 'Base Discount %', 'Expiring Amount (USD)'];
+    const productRows = config.selectedProducts.map(pid => {
+      const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+      const inp = config.productInputs[pid];
+      return [
+        q(p?.name || pid),
+        q(inp.variant),
+        inp.count,
+        inp.baseDiscount,
+        inp.expiringAmount || 0
+      ];
+    });
+    
+    const prodCols = config.selectedProducts.map(pid => {
+      const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+      return `${p?.shortName || pid} (USD)`;
+    });
+    
+    const scheduleHeader = [
+      'Year',
+      ...prodCols,
+      'Total Gross (USD)',
+      'Total Gross (SAR)',
+      'VAT (SAR)',
+      'Grand Total (SAR)',
+    ];
+
+    const scheduleRows = data.yearlyResults.map(r => {
+      const pValues = config.selectedProducts.map(pid => {
+         const bd = r.breakdown.find(x => x.id === pid);
+         return bd ? bd.gross.toFixed(2) : '0.00';
+      });
+      return [
+        `Year ${r.year}`,
+        ...pValues,
+        r.grossUSD.toFixed(2),
+        r.grossSAR.toFixed(0),
+        r.vatSAR.toFixed(0),
+        r.grandTotalSAR.toFixed(0),
+      ];
+    });
+    
+    const productTotals = config.selectedProducts.map(pid => {
+        const total = data.yearlyResults.reduce((sum, r) => {
+            const bd = r.breakdown.find(x => x.id === pid);
+            return sum + (bd ? bd.gross : 0);
+        }, 0);
+        return total.toFixed(2);
+    });
+
+    const totalsRow = [
+      'TOTAL',
+      ...productTotals,
+      data.totalGrossUSD.toFixed(2),
+      data.totalGrossSAR.toFixed(0),
+      data.totalVatSAR.toFixed(0),
+      data.totalGrandTotalSAR.toFixed(0),
+    ];
+
+    const metricsRows = [
+       [],
+       ['Metric', 'Value (USD)'],
+       ['Customer TCV', data.totalGrossUSD.toFixed(2)],
+       ['Customer ACV', data.acvUSD.toFixed(2)],
+       ['Net TCV', data.totalNetUSD.toFixed(2)],
+       ['Net ACV', data.netACV.toFixed(2)],
+       ['Renewal Base ACV', data.renewalBaseACV.toFixed(2)],
+       ['Upsell ACV', data.upsellACV.toFixed(2)]
+    ];
+    
+    if (config.channel !== ChannelType.DIRECT) {
+       metricsRows.push([]);
+       metricsRows.push(['Product', 'Net Total (USD)']);
+       config.selectedProducts.forEach(pid => {
+         const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+         metricsRows.push([p?.shortName || pid, data.productNetTotals[pid].toFixed(2)]);
+       });
+    }
+
+    const allRows = [
+      ...contextRows,
+      productHeader,
+      ...productRows,
+      [],
+      scheduleHeader,
+      ...scheduleRows,
+      totalsRow,
+      ...metricsRows
+    ];
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + allRows.map(e => e.join(",")).join("\n");
+      
+    const filename = customerName 
+       ? `Quote_${customerName.replace(/\s+/g,'_')}_${config.dealType}_${new Date().toISOString().slice(0,10)}.csv`
+       : `Quote_${config.dealType}_${new Date().toISOString().slice(0,10)}.csv`;
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6">
-      <div className="mb-4 flex space-x-4">
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Customer Name (Optional)</label>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Customer Name</label>
           <input 
             type="text" 
             placeholder="Enter Customer Name"
@@ -729,8 +753,8 @@ By accepting this document, the recipient agrees to keep its contents confidenti
             className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
           />
         </div>
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Rep Name (Optional)</label>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Rep Name</label>
           <input 
             type="text" 
             placeholder="Enter Rep Name"
@@ -738,6 +762,22 @@ By accepting this document, the recipient agrees to keep its contents confidenti
             onChange={(e) => setRepName(e.target.value)}
             className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
           />
+        </div>
+        <div>
+           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">PDF Font</label>
+           <div className="flex items-center space-x-2">
+             <select
+               value={selectedFont}
+               onChange={(e) => setSelectedFont(e.target.value as FontType)}
+               className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+             >
+               <option value="Inter">Inter (Sans)</option>
+               <option value="FiraSans">Fira Sans</option>
+             </select>
+             {isFontLoading && (
+               <span className="text-xs text-blue-500 animate-pulse">Loading...</span>
+             )}
+           </div>
         </div>
       </div>
       <div className="flex space-x-4">
@@ -749,10 +789,10 @@ By accepting this document, the recipient agrees to keep its contents confidenti
         </button>
         <button 
           onClick={handlePDFExport}
-          disabled={isPdfLoading}
-          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isPdfLoading ? 'bg-red-400' : 'bg-red-600 hover:bg-red-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500`}
+          disabled={isPdfLoading || isFontLoading}
+          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isPdfLoading || isFontLoading ? 'bg-red-400' : 'bg-red-600 hover:bg-red-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500`}
         >
-          {isPdfLoading ? 'Processing...' : 'Export PDF Quote'}
+          {isPdfLoading ? 'Processing...' : (isFontLoading ? 'Loading Fonts...' : 'Export PDF Quote')}
         </button>
       </div>
     </div>

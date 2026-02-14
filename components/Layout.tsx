@@ -11,7 +11,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                CE
              </div>
              <h1 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white">
-               Pricing KSA <span className="text-gray-400 font-normal">v6.1</span>
+               Pricing KSA <span className="text-gray-400 font-normal">v6.2</span>
              </h1>
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
