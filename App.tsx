@@ -81,6 +81,48 @@ const App: React.FC = () => {
   // Results
   const results = useMemo(() => calculatePricing(config), [config]);
 
+  // Calculate Monthly Costs for Architect Notes
+  const monthlyCosts = useMemo(() => {
+    const analysisParts: string[] = [];
+    const isIndirect = config.channel !== ChannelType.DIRECT;
+    const displayCurrency = isIndirect ? 'SAR' : 'USD';
+    const getValue = (valUSD: number, valSAR: number) => isIndirect ? valSAR : valUSD;
+
+    if (config.selectedProducts.includes('utd')) {
+        const count = config.productInputs['utd'].count || 1; 
+        const totalGrossUSD = results.yearlyResults.reduce((sum, r) => {
+            const bd = r.breakdown.find(x => x.id === 'utd');
+            return sum + (bd ? bd.gross : 0);
+        }, 0);
+        const totalGrossSAR = results.yearlyResults.reduce((sum, r) => {
+            const bd = r.breakdown.find(x => x.id === 'utd');
+            return sum + (bd ? bd.grossSAR : 0);
+        }, 0);
+
+        const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
+        const monthlyPerUnit = acv / count / 12;
+        analysisParts.push(`UTD: ${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /mo/physician`);
+    }
+
+    if (config.selectedProducts.includes('ld')) {
+        const count = config.productInputs['ld'].count || 1;
+        const totalGrossUSD = results.yearlyResults.reduce((sum, r) => {
+            const bd = r.breakdown.find(x => x.id === 'ld');
+            return sum + (bd ? bd.gross : 0);
+        }, 0);
+        const totalGrossSAR = results.yearlyResults.reduce((sum, r) => {
+            const bd = r.breakdown.find(x => x.id === 'ld');
+            return sum + (bd ? bd.grossSAR : 0);
+        }, 0);
+
+        const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
+        const monthlyPerUnit = acv / count / 12;
+        analysisParts.push(`LD: ${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /mo/bed`);
+    }
+    return analysisParts;
+  }, [config, results]);
+
+
   // Handlers
   const toggleProduct = (id: string) => {
     setSelectedProductIds(prev => 
@@ -356,20 +398,20 @@ const App: React.FC = () => {
                <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-100">
                      <tr>
-                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Year</th>
+                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase whitespace-nowrap">Year</th>
                         
                         {/* Dynamic Product Columns - Gross */}
                         {selectedProductIds.map(pid => {
                            const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
                            return (
-                             <th key={pid} className="px-4 py-3 text-center text-xs font-bold text-gray-600 uppercase">
+                             <th key={pid} className="px-4 py-3 text-center text-xs font-bold text-gray-600 uppercase whitespace-nowrap">
                                {p?.shortName || p?.name} (USD)
                              </th>
                            );
                         })}
 
                         {/* Always show USD Total */}
-                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-800 uppercase bg-gray-200">
+                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-800 uppercase bg-gray-200 whitespace-nowrap">
                            Total (USD)
                         </th>
 
@@ -386,32 +428,32 @@ const App: React.FC = () => {
                              <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase bg-yellow-50 whitespace-nowrap">
                                VAT (15%)
                              </th>
-                             <th className="px-4 py-3 text-center text-xs font-bold text-gray-900 uppercase bg-yellow-200 whitespace-nowrap">
-                               Grand Total (SAR)
+                             <th className="px-4 py-3 text-center text-xs font-bold text-gray-900 uppercase bg-yellow-200">
+                               Grand Total<br/>(SAR)
                              </th>
                           </>
                         )}
 
-                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Recognized<br/>Total (USD)</th>
+                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase whitespace-nowrap">Recognized<br/>Total (USD)</th>
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
                      {results.yearlyResults.map((r, i) => (
                         <tr key={r.year} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                           <td className="px-4 py-4 text-center text-sm font-medium text-gray-900">Year {r.year}</td>
+                           <td className="px-4 py-4 text-center text-sm font-medium text-gray-900 whitespace-nowrap">Year {r.year}</td>
                            
                            {/* Product Columns Data Gross */}
                            {selectedProductIds.map(pid => {
                              const pData = r.breakdown.find(d => d.id === pid);
                              return (
-                               <td key={pid} className="px-4 py-4 text-center text-sm text-gray-600 font-mono">
+                               <td key={pid} className="px-4 py-4 text-center text-sm text-gray-600 font-mono whitespace-nowrap">
                                  {pData ? formatCurrency(pData.gross, 'USD') : '-'}
                                </td>
                              );
                            })}
 
                            {/* Total USD */}
-                           <td className="px-4 py-4 text-center text-sm font-bold text-blue-700 font-mono bg-blue-50">
+                           <td className="px-4 py-4 text-center text-sm font-bold text-blue-700 font-mono bg-blue-50 whitespace-nowrap">
                               {formatCurrency(r.grossUSD, 'USD')}
                            </td>
 
@@ -425,22 +467,22 @@ const App: React.FC = () => {
                            {/* VAT and Grand Total */}
                            {isIndirect && (
                              <>
-                               <td className="px-4 py-4 text-center text-sm text-gray-600 font-mono bg-yellow-50/50">
+                               <td className="px-4 py-4 text-center text-sm text-gray-600 font-mono bg-yellow-50/50 whitespace-nowrap">
                                   {formatCurrency(r.vatSAR, 'SAR')}
                                </td>
-                               <td className="px-4 py-4 text-center text-sm font-bold text-gray-900 font-mono bg-yellow-100">
+                               <td className="px-4 py-4 text-center text-sm font-bold text-gray-900 font-mono bg-yellow-100 whitespace-nowrap">
                                   {formatCurrency(r.grandTotalSAR, 'SAR')}
                                </td>
                              </>
                            )}
 
-                           <td className="px-4 py-4 text-center text-sm text-gray-600 font-mono">
+                           <td className="px-4 py-4 text-center text-sm text-gray-600 font-mono whitespace-nowrap">
                               {formatCurrency(r.netUSD, 'USD')}
                            </td>
                         </tr>
                      ))}
                      <tr className="bg-gray-800 text-white">
-                        <td className="px-4 py-4 text-center text-sm font-bold">Total</td>
+                        <td className="px-4 py-4 text-center text-sm font-bold whitespace-nowrap">Total</td>
                         
                         {/* Empty cells for breakdown columns */}
                         {selectedProductIds.map(pid => (
@@ -448,7 +490,7 @@ const App: React.FC = () => {
                         ))}
 
                         {/* Total USD */}
-                        <td className="px-4 py-4 text-center text-sm font-bold font-mono">
+                        <td className="px-4 py-4 text-center text-sm font-bold font-mono whitespace-nowrap">
                            {formatCurrency(results.totalGrossUSD, 'USD')}
                         </td>
 
@@ -462,16 +504,16 @@ const App: React.FC = () => {
                         {/* VAT and Grand Total */}
                         {isIndirect && (
                            <>
-                              <td className="px-4 py-4 text-center text-sm font-mono text-gray-300">
+                              <td className="px-4 py-4 text-center text-sm font-mono text-gray-300 whitespace-nowrap">
                                  {formatCurrency(results.totalVatSAR, 'SAR')}
                               </td>
-                              <td className="px-4 py-4 text-center text-sm font-bold font-mono text-yellow-300">
+                              <td className="px-4 py-4 text-center text-sm font-bold font-mono text-yellow-300 whitespace-nowrap">
                                  {formatCurrency(results.totalGrandTotalSAR, 'SAR')}
                               </td>
                            </>
                         )}
 
-                        <td className="px-4 py-4 text-center text-sm font-bold font-mono text-gray-300">
+                        <td className="px-4 py-4 text-center text-sm font-bold font-mono text-gray-300 whitespace-nowrap">
                            {formatCurrency(results.totalNetUSD, 'USD')}
                         </td>
                      </tr>
@@ -562,6 +604,12 @@ const App: React.FC = () => {
                 )}
                 {results.yearlyResults[0].floorAdjusted && (
                   <li><strong>Auto-Adjustment:</strong> Pricing was automatically raised to meet the minimum floor requirements.</li>
+                )}
+                {/* Monthly Cost Analysis */}
+                {monthlyCosts.length > 0 && (
+                   <li className="font-semibold italic pt-1 text-yellow-900">
+                     Unit Economics: {monthlyCosts.join(', ')}.
+                   </li>
                 )}
              </ul>
           </div>

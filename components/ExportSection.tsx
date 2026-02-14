@@ -15,6 +15,7 @@ const SAMIR_LOGO_URL = "https://samirgroup.com/wp-content/uploads/2021/05/logo.p
 
 export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) => {
   const [customerName, setCustomerName] = useState('');
+  const [repName, setRepName] = useState('');
   const [isPdfLoading, setIsPdfLoading] = useState(false);
 
   const formatMoney = (amount: number, currency: string) => {
@@ -30,6 +31,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     // 1. Deal Context
     const contextRows = [
       ['Customer Name', q(customerName)],
+      ['Rep Name', q(repName)],
       ['Deal Type', q(config.dealType)],
       ['Channel', q(config.channel)],
       ['Duration (Years)', config.years],
@@ -83,10 +85,17 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     });
     
     // Totals Row
-    const totalProdValues = config.selectedProducts.map(() => ''); 
+    const productTotals = config.selectedProducts.map(pid => {
+        const total = data.yearlyResults.reduce((sum, r) => {
+            const bd = r.breakdown.find(x => x.id === pid);
+            return sum + (bd ? bd.gross : 0);
+        }, 0);
+        return total.toFixed(2);
+    });
+
     const totalsRow = [
       'TOTAL',
-      ...totalProdValues,
+      ...productTotals,
       data.totalGrossUSD.toFixed(2),
       data.totalGrossSAR.toFixed(0),
       data.totalVatSAR.toFixed(0),
@@ -143,17 +152,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     document.body.removeChild(link);
   };
 
-  // Robust Image Loader for Mixed Formats (SVG/PNG/JPG)
+  // Robust Image Loader
   const getBase64FromUrl = async (url: string): Promise<string> => {
     try {
-      // 1. Attempt standard Fetch
-      // Note: This relies on the server sending CORS headers.
       const response = await fetch(url);
       if (!response.ok) throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
-      
       const blob = await response.blob();
       
-      // 2. If SVG, rasterize to PNG via Canvas
       if (blob.type.includes('svg') || url.toLowerCase().endsWith('.svg')) {
          return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -162,7 +167,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
                 img.crossOrigin = 'Anonymous';
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    // Scale up for better PDF resolution
                     canvas.width = img.width * 2;
                     canvas.height = img.height * 2;
                     const ctx = canvas.getContext('2d');
@@ -182,7 +186,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
          });
       }
       
-      // 3. If standard image (PNG/JPG), return Base64 directly from Blob
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
@@ -192,14 +195,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
 
     } catch (error) {
       console.warn(`Fetch loader failed for ${url}, attempting fallback Image load.`, error);
-      
-      // 4. Fallback: Standard Image Object (Can sometimes bypass strict fetch policies if cached or simple GET)
       return new Promise((resolve, reject) => {
         const img = new Image();
         img.crossOrigin = 'Anonymous';
-        
         const timer = setTimeout(() => reject(new Error("Image load timeout")), 8000);
-
         img.onload = () => {
           clearTimeout(timer);
           const canvas = document.createElement('canvas');
@@ -217,18 +216,15 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
             reject(new Error("Canvas context failed"));
           }
         };
-        
         img.onerror = () => {
             clearTimeout(timer);
             reject(new Error(`Image fallback failed for ${url}`));
         };
-        
         img.src = url;
       });
     }
   };
 
-  // Convert ArrayBuffer to Base64 (For Fonts)
   const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
     let binary = '';
     const bytes = new Uint8Array(buffer);
@@ -244,7 +240,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     const doc = new jsPDF();
     
     // Wolters Kluwer Blue
-    const primaryColor = [0, 122, 195]; 
+    const primaryColor: [number, number, number] = [0, 122, 195]; 
     const docDate = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
     const refId = `REF-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`;
 
@@ -253,22 +249,35 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     let samirLogoData = "";
     
     try {
-        // Load Fira Sans
+        // Load Fira Sans Regular (400)
         const fontResponse = await fetch('https://fonts.gstatic.com/s/firasans/v17/va9E4kDNxMZdWfMOD5Vvl4jO.ttf');
-        if (fontResponse.ok) {
+        // Load Fira Sans SemiBold (600) for Bold
+        const fontSemiBoldResponse = await fetch('https://fonts.gstatic.com/s/firasans/v17/va9B4kDNxMZdWfMOD5VnSKze6.ttf');
+
+        if (fontResponse.ok && fontSemiBoldResponse.ok) {
            const fontBuffer = await fontResponse.arrayBuffer();
+           const fontSemiBoldBuffer = await fontSemiBoldResponse.arrayBuffer();
+           
            const fontBase64 = arrayBufferToBase64(fontBuffer);
+           const fontSemiBoldBase64 = arrayBufferToBase64(fontSemiBoldBuffer);
+           
            doc.addFileToVFS('FiraSans-Regular.ttf', fontBase64);
+           doc.addFileToVFS('FiraSans-SemiBold.ttf', fontSemiBoldBase64);
+           
            doc.addFont('FiraSans-Regular.ttf', 'FiraSans', 'normal');
+           // Register SemiBold as 'bold' for automatic usage when fontStyle: 'bold' is set
+           doc.addFont('FiraSans-SemiBold.ttf', 'FiraSans', 'bold');
+           
            doc.setFont('FiraSans');
+        } else {
+           throw new Error("One of the fonts failed to load");
         }
     } catch (error) {
-        console.warn("Font loading failed, falling back", error);
+        console.warn("Font loading failed, falling back to Helvetica", error);
         doc.setFont("helvetica");
     }
 
     try {
-        // Load WK Logo
         wkLogoData = await getBase64FromUrl(WK_LOGO_URL);
     } catch (e) {
         console.warn("WK Logo failed to load", e);
@@ -276,7 +285,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
 
     if (config.channel !== ChannelType.DIRECT) {
         try {
-            // Load Samir Logo
             samirLogoData = await getBase64FromUrl(SAMIR_LOGO_URL);
         } catch (e) {
             console.warn("Samir Logo failed to load", e);
@@ -297,18 +305,25 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
        doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
        doc.rect(0, 0, 210, 30, 'F'); 
        
+       let xOffset = 14;
+
        // Add WK Logo (Left)
        if (wkLogoData) {
-         doc.addImage(wkLogoData, 'PNG', 14, 7, 50, 16); 
+         // Vertically centered in 30 height bar. Logo H=9. Y = (30-9)/2 = 10.5
+         // Width 50 fixed.
+         doc.addImage(wkLogoData, 'PNG', xOffset, 10.5, 50, 9); 
+         xOffset += 55; // Move cursor
        } else {
          doc.setFontSize(14);
          doc.setTextColor(255, 255, 255);
-         doc.text("Wolters Kluwer", 14, 20);
+         doc.text("Wolters Kluwer", xOffset, 20);
+         xOffset += 40;
        }
 
-       // Add Samir Group Logo (Right) if Indirect
+       // Add Samir Group Logo (Next to WK) if Indirect
        if (config.channel !== ChannelType.DIRECT && samirLogoData) {
-         doc.addImage(samirLogoData, 'PNG', 150, 7, 45, 16);
+         // Same dimensions/alignment as WK
+         doc.addImage(samirLogoData, 'PNG', xOffset, 10.5, 50, 9);
        }
     };
 
@@ -323,28 +338,53 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.rect(0, 100, 210, 50, 'F');
 
-    // Title
+    // Title inside Blue Bar
     doc.setFontSize(32);
     doc.setTextColor(255, 255, 255);
+    doc.setFont('FiraSans', 'bold');
     doc.text("Wolters Kluwer", 105, 125, { align: 'center' });
 
     doc.setFontSize(18);
-    doc.setTextColor(255, 255, 255);
+    doc.setFont('FiraSans', 'normal');
     doc.text("Budgetary Commercial Proposal", 105, 140, { align: 'center' });
 
-    // Client Info Center
-    doc.setTextColor(50, 50, 50);
-    doc.setFontSize(14);
-    if (customerName) {
-      doc.text(`Prepared for: ${customerName}`, 105, 170, { align: 'center' });
-    }
-    doc.setFontSize(11);
-    doc.text(`Date: ${docDate}`, 105, 180, { align: 'center' });
-    doc.text(`Reference: ${refId}`, 105, 188, { align: 'center' });
+    // --- Product Info Section (Below Blue Bar) ---
+    // Replace "Prepared For" / "Date" with Product Titles
+    let currentY = 165;
+    doc.setTextColor(60, 60, 60);
 
-    // Bottom Left Info
+    const hasUTD = config.selectedProducts.includes('utd');
+    const hasLD = config.selectedProducts.includes('ld');
+
+    if (hasUTD) {
+        doc.setFontSize(22);
+        doc.setFont('FiraSans', 'bold');
+        doc.text("UpToDate", 105, currentY, { align: 'center' });
+        currentY += 8;
+        doc.setFontSize(12);
+        doc.setFont('FiraSans', 'normal');
+        doc.text("Clinical Decision Support Solution", 105, currentY, { align: 'center' });
+        currentY += 20;
+    }
+
+    if (hasLD) {
+        doc.setFontSize(22);
+        doc.setFont('FiraSans', 'bold');
+        doc.text("Lexidrug", 105, currentY, { align: 'center' });
+        currentY += 8;
+        doc.setFontSize(12);
+        doc.setFont('FiraSans', 'normal');
+        doc.text("Drug Referential Solution", 105, currentY, { align: 'center' });
+        currentY += 15;
+    }
+
+
+    // Bottom Left Info (Footer Area of Page 1)
     doc.setFontSize(10);
-    doc.text(`Customer: ${customerName || 'N/A'}`, 14, 270);
+    doc.setTextColor(50, 50, 50);
+    doc.setFont('FiraSans', 'normal');
+    doc.text(`Customer: ${customerName || 'N/A'}`, 14, 265);
+    doc.text(`Prepared by: ${repName || 'N/A'}`, 14, 270);
     doc.text(`Date: ${docDate}`, 14, 275);
     doc.text(`Ref: ${refId}`, 14, 280);
 
@@ -355,10 +395,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     
     doc.setFontSize(16);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFont('FiraSans', 'bold');
     doc.text("Confidentiality Notice", 14, 45); 
 
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
+    doc.setFont('FiraSans', 'normal');
     
     const disclaimer = `This proposal and the information contained herein is proprietary and confidential information of Wolters Kluwer. 
 
@@ -379,6 +421,7 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     
     doc.setFontSize(16);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFont('FiraSans', 'bold');
     doc.text("Pricing Details", 14, 45);
 
     // --- Table Configuration based on Channel ---
@@ -387,15 +430,14 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     
     const isIndirect = config.channel !== ChannelType.DIRECT;
 
-    // Calculate Styling Indices
     const productColIndices: Record<string, number> = {};
     config.selectedProducts.forEach((pid, idx) => {
-        // Col 0 is Year, Products start at 1
         productColIndices[pid] = 1 + idx;
     });
 
     const totalStartIndex = 1 + config.selectedProducts.length;
-    const totalColsCount = isIndirect ? 3 : 1; 
+    // Indirect has 3 total columns: Total SAR, VAT, Grand Total
+    // Direct has 1 total column: Total USD
 
     const columnStyles: any = {};
 
@@ -408,9 +450,16 @@ By accepting this document, the recipient agrees to keep its contents confidenti
         columnStyles[productColIndices['ld']] = { fillColor: [224, 242, 254] };
     }
 
-    // Totals Styling - Bold
-    for(let i = 0; i < totalColsCount; i++) {
-        columnStyles[totalStartIndex + i] = { fontStyle: 'bold' };
+    // Totals Styling
+    // Apply bold to 'Total' and 'Grand Total', but NOT 'VAT'
+    
+    // 1. Total (USD or SAR) is always at totalStartIndex
+    columnStyles[totalStartIndex] = { fontStyle: 'bold' };
+    
+    if (isIndirect) {
+        // totalStartIndex + 1 is VAT -> Leave Regular
+        // totalStartIndex + 2 is Grand Total -> Bold
+        columnStyles[totalStartIndex + 2] = { fontStyle: 'bold' };
     }
 
     if (isIndirect) {
@@ -419,7 +468,8 @@ By accepting this document, the recipient agrees to keep its contents confidenti
          const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
          return `${p?.shortName || pid} (SAR)`;
       });
-      tableHead = [['Year', ...prodCols, 'Total (SAR)', 'VAT (15%)', 'Grand Total (SAR)']];
+      // Added newline to allow wrapping only for Grand Total
+      tableHead = [['Year', ...prodCols, 'Total (SAR)', 'VAT (15%)', 'Grand Total\n(SAR)']];
       
       tableBody = data.yearlyResults.map(r => {
         const pValues = config.selectedProducts.map(pid => {
@@ -435,9 +485,18 @@ By accepting this document, the recipient agrees to keep its contents confidenti
         ];
       });
 
+      // Calculate Product Totals (SAR)
+      const productTotalsSAR = config.selectedProducts.map(pid => {
+          const total = data.yearlyResults.reduce((sum, r) => {
+              const bd = r.breakdown.find(x => x.id === pid);
+              return sum + (bd ? bd.grossSAR : 0);
+          }, 0);
+          return formatMoney(total, 'SAR');
+      });
+
       const totalRow = [
         'TOTAL',
-        ...config.selectedProducts.map(() => ''),
+        ...productTotalsSAR,
         formatMoney(data.totalGrossSAR, 'SAR'),
         formatMoney(data.totalVatSAR, 'SAR'),
         formatMoney(data.totalGrandTotalSAR, 'SAR'),
@@ -464,44 +523,119 @@ By accepting this document, the recipient agrees to keep its contents confidenti
         ];
       });
 
+      // Calculate Product Totals (USD)
+      const productTotalsUSD = config.selectedProducts.map(pid => {
+          const total = data.yearlyResults.reduce((sum, r) => {
+              const bd = r.breakdown.find(x => x.id === pid);
+              return sum + (bd ? bd.gross : 0);
+          }, 0);
+          return formatMoney(total, 'USD');
+      });
+
       const totalRow = [
         'TOTAL',
-        ...config.selectedProducts.map(() => ''),
+        ...productTotalsUSD,
         formatMoney(data.totalGrossUSD, 'USD'),
       ];
       tableBody.push(totalRow);
     }
 
-    // Use current active font family for table
-    const currentFont = doc.getFont().fontName;
-
+    // Use FiraSans
     autoTable(doc, {
-      startY: 55, // Adjusted Y for header
+      startY: 55, 
       head: tableHead,
       body: tableBody,
       theme: 'grid',
-      headStyles: { fillColor: primaryColor, textColor: 255, font: currentFont },
-      styles: { fontSize: 9, font: currentFont }, 
+      headStyles: { 
+          fillColor: primaryColor, 
+          textColor: 255, 
+          font: 'FiraSans', 
+          fontStyle: 'bold', 
+          valign: 'middle' 
+      },
+      styles: { 
+          fontSize: 9, 
+          font: 'FiraSans', 
+          overflow: 'linebreak',
+          cellPadding: 2
+      }, 
       columnStyles: columnStyles,
       margin: { left: 14, right: 14 },
     });
 
-    let finalY = (doc as any).lastAutoTable.finalY + 15;
+    let finalY = (doc as any).lastAutoTable.finalY + 10;
+
+    // --- Monthly Cost Analysis ---
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+
+    const analysisParts: string[] = [];
+    
+    const displayCurrency = isIndirect ? 'SAR' : 'USD';
+    const getValue = (valUSD: number, valSAR: number) => isIndirect ? valSAR : valUSD;
+
+    if (config.selectedProducts.includes('utd')) {
+        const count = config.productInputs['utd'].count || 1;
+        const totalGrossUSD = data.yearlyResults.reduce((sum, r) => {
+            const bd = r.breakdown.find(x => x.id === 'utd');
+            return sum + (bd ? bd.gross : 0);
+        }, 0);
+        const totalGrossSAR = data.yearlyResults.reduce((sum, r) => {
+            const bd = r.breakdown.find(x => x.id === 'utd');
+            return sum + (bd ? bd.grossSAR : 0);
+        }, 0);
+
+        const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
+        const monthlyPerUnit = acv / count / 12;
+
+        analysisParts.push(`Your UTD subscription costs ${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} monthly per physician`);
+    }
+
+    if (config.selectedProducts.includes('ld')) {
+        const count = config.productInputs['ld'].count || 1;
+        const totalGrossUSD = data.yearlyResults.reduce((sum, r) => {
+            const bd = r.breakdown.find(x => x.id === 'ld');
+            return sum + (bd ? bd.gross : 0);
+        }, 0);
+        const totalGrossSAR = data.yearlyResults.reduce((sum, r) => {
+            const bd = r.breakdown.find(x => x.id === 'ld');
+            return sum + (bd ? bd.grossSAR : 0);
+        }, 0);
+
+        const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
+        const monthlyPerUnit = acv / count / 12;
+
+        analysisParts.push(`your LD subscription costs ${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} monthly per bed`);
+    }
+
+    if (analysisParts.length > 0) {
+        const analysisText = analysisParts.join(', and ') + '.';
+        const finalAnalysisText = analysisText.charAt(0).toUpperCase() + analysisText.slice(1);
+        
+        doc.setFontSize(10);
+        doc.setFont('FiraSans', 'italic');
+        const splitAnalysis = doc.splitTextToSize(finalAnalysisText, 180);
+        doc.text(splitAnalysis, 14, finalY);
+        doc.setFont('FiraSans', 'normal');
+        finalY += (splitAnalysis.length * 5) + 10;
+    }
+
 
     // --- Terms & Conditions ---
     doc.setFontSize(14);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFont('FiraSans', 'bold');
     doc.text("Terms & Conditions", 14, finalY);
     
     finalY += 8;
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
+    doc.setFont('FiraSans', 'normal');
 
     const paymentTermText = config.channel === ChannelType.DIRECT
       ? "30 days from invoice date."
       : "As per the entity's regulations.";
 
-    // Build Statistics String
     const statsList = [];
     if (config.selectedProducts.includes('utd')) {
        statsList.push(`${config.productInputs['utd'].count} Physicians`);
@@ -518,7 +652,6 @@ By accepting this document, the recipient agrees to keep its contents confidenti
       `EMR integration is free of charge over the course of the subscription even if the EMR changed.`,
     ];
     
-    // Add statistics if exists
     if (statsString) {
       terms.push(statsString);
     }
@@ -526,7 +659,6 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     terms.push(`Refer to the technical proposal for access methods, licensed material and product description.`);
 
     terms.forEach(term => {
-      // Simple pagination check
       if (finalY > 270) {
         doc.addPage();
         renderHeader();
@@ -548,15 +680,27 @@ By accepting this document, the recipient agrees to keep its contents confidenti
 
   return (
     <div className="mt-6 border-t border-gray-200 pt-6">
-      <div className="mb-4">
-        <label className="block text-xs font-medium text-gray-500 mb-1">Customer Name (Optional)</label>
-        <input 
-          type="text" 
-          placeholder="Enter Customer Name"
-          value={customerName}
-          onChange={(e) => setCustomerName(e.target.value)}
-          className="block w-full max-w-sm text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
-        />
+      <div className="mb-4 flex space-x-4">
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Customer Name (Optional)</label>
+          <input 
+            type="text" 
+            placeholder="Enter Customer Name"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+          />
+        </div>
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Rep Name (Optional)</label>
+          <input 
+            type="text" 
+            placeholder="Enter Rep Name"
+            value={repName}
+            onChange={(e) => setRepName(e.target.value)}
+            className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+          />
+        </div>
       </div>
       <div className="flex space-x-4">
         <button 
