@@ -143,41 +143,89 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     document.body.removeChild(link);
   };
 
-  // Helper to fetch image and convert to Base64 (PNG)
-  // This handles SVG to PNG conversion via Canvas automatically
+  // Robust Image Loader for Mixed Formats (SVG/PNG/JPG)
   const getBase64FromUrl = async (url: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      // Important: Allow cross-origin to avoid tainted canvas
-      img.crossOrigin = 'Anonymous';
+    try {
+      // 1. Attempt standard Fetch
+      // Note: This relies on the server sending CORS headers.
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
       
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        // Scale up slightly for better print quality
-        canvas.width = img.width * 2;
-        canvas.height = img.height * 2;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.scale(2, 2);
-          ctx.drawImage(img, 0, 0);
-          try {
-            const dataURL = canvas.toDataURL('image/png');
-            resolve(dataURL);
-          } catch (e) {
-            reject(e);
+      const blob = await response.blob();
+      
+      // 2. If SVG, rasterize to PNG via Canvas
+      if (blob.type.includes('svg') || url.toLowerCase().endsWith('.svg')) {
+         return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const img = new Image();
+                img.crossOrigin = 'Anonymous';
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    // Scale up for better PDF resolution
+                    canvas.width = img.width * 2;
+                    canvas.height = img.height * 2;
+                    const ctx = canvas.getContext('2d');
+                    if(ctx) {
+                        ctx.scale(2, 2);
+                        ctx.drawImage(img, 0, 0);
+                        resolve(canvas.toDataURL('image/png'));
+                    } else {
+                        reject(new Error("Canvas context failed"));
+                    }
+                };
+                img.onerror = (e) => reject(new Error("SVG Image render failed"));
+                img.src = reader.result as string;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+         });
+      }
+      
+      // 3. If standard image (PNG/JPG), return Base64 directly from Blob
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
+    } catch (error) {
+      console.warn(`Fetch loader failed for ${url}, attempting fallback Image load.`, error);
+      
+      // 4. Fallback: Standard Image Object (Can sometimes bypass strict fetch policies if cached or simple GET)
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        
+        const timer = setTimeout(() => reject(new Error("Image load timeout")), 8000);
+
+        img.onload = () => {
+          clearTimeout(timer);
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            try {
+              resolve(canvas.toDataURL('image/png'));
+            } catch (e) {
+              reject(new Error("Canvas tainted - CORS blocked"));
+            }
+          } else {
+            reject(new Error("Canvas context failed"));
           }
-        } else {
-          reject(new Error("Canvas context failed"));
-        }
-      };
-      
-      img.onerror = (e) => {
-        console.error("Image load error", e);
-        reject(e);
-      };
-      
-      img.src = url;
-    });
+        };
+        
+        img.onerror = () => {
+            clearTimeout(timer);
+            reject(new Error(`Image fallback failed for ${url}`));
+        };
+        
+        img.src = url;
+      });
+    }
   };
 
   // Convert ArrayBuffer to Base64 (For Fonts)
@@ -220,7 +268,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     }
 
     try {
-        // Load WK Logo (SVG -> PNG)
+        // Load WK Logo
         wkLogoData = await getBase64FromUrl(WK_LOGO_URL);
     } catch (e) {
         console.warn("WK Logo failed to load", e);
@@ -247,14 +295,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     const renderHeader = () => {
        // Header Color Background
        doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-       doc.rect(0, 0, 210, 30, 'F'); // Increased height slightly for logos
+       doc.rect(0, 0, 210, 30, 'F'); 
        
        // Add WK Logo (Left)
        if (wkLogoData) {
-         const wkAspect = 50 / 15; // Approximate aspect ratio
          doc.addImage(wkLogoData, 'PNG', 14, 7, 50, 16); 
        } else {
-         // Fallback Text
          doc.setFontSize(14);
          doc.setTextColor(255, 255, 255);
          doc.text("Wolters Kluwer", 14, 20);
@@ -341,6 +387,32 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     
     const isIndirect = config.channel !== ChannelType.DIRECT;
 
+    // Calculate Styling Indices
+    const productColIndices: Record<string, number> = {};
+    config.selectedProducts.forEach((pid, idx) => {
+        // Col 0 is Year, Products start at 1
+        productColIndices[pid] = 1 + idx;
+    });
+
+    const totalStartIndex = 1 + config.selectedProducts.length;
+    const totalColsCount = isIndirect ? 3 : 1; 
+
+    const columnStyles: any = {};
+
+    // UTD Styling - Light Green
+    if (productColIndices['utd'] !== undefined) {
+        columnStyles[productColIndices['utd']] = { fillColor: [220, 252, 231] };
+    }
+    // LXD (ld) Styling - Light Blue
+    if (productColIndices['ld'] !== undefined) {
+        columnStyles[productColIndices['ld']] = { fillColor: [224, 242, 254] };
+    }
+
+    // Totals Styling - Bold
+    for(let i = 0; i < totalColsCount; i++) {
+        columnStyles[totalStartIndex + i] = { fontStyle: 'bold' };
+    }
+
     if (isIndirect) {
       // INDIRECT: Only SAR, with VAT
       const prodCols = config.selectedProducts.map(pid => {
@@ -410,6 +482,7 @@ By accepting this document, the recipient agrees to keep its contents confidenti
       theme: 'grid',
       headStyles: { fillColor: primaryColor, textColor: 255, font: currentFont },
       styles: { fontSize: 9, font: currentFont }, 
+      columnStyles: columnStyles,
       margin: { left: 14, right: 14 },
     });
 
