@@ -32,15 +32,18 @@ export interface ProductInput {
 
 export interface ProductYearlyData {
   id: string;
-  gross: number;
-  net: number;
+  gross: number; // USD
+  grossSAR: number; // SAR
+  net: number; // USD
 }
 
 export interface PricingResult {
   year: number;
-  breakdown: ProductYearlyData[]; // Per product gross values
+  breakdown: ProductYearlyData[]; // Per product values
   grossUSD: number;
   grossSAR: number;
+  vatSAR: number;       // New: 15% VAT
+  grandTotalSAR: number; // New: Gross + VAT
   netUSD: number;
   netSAR: number;
   floorAdjusted: boolean;
@@ -63,6 +66,8 @@ export interface CalculationOutput {
   yearlyResults: PricingResult[];
   totalGrossUSD: number; // TCV
   totalGrossSAR: number;
+  totalVatSAR: number;
+  totalGrandTotalSAR: number;
   totalNetUSD: number;
   totalNetSAR: number;
   
