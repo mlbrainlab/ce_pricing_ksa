@@ -9,6 +9,10 @@ interface ExportSectionProps {
   config: DealConfiguration;
 }
 
+// Logo URLs provided
+const WK_LOGO_URL = "https://cdn.wolterskluwer.io/wk/jumpstart-v3-assets/0.x.x/logo/large.svg";
+const SAMIR_LOGO_URL = "https://samirgroup.com/wp-content/uploads/2021/05/logo.png";
+
 export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) => {
   const [customerName, setCustomerName] = useState('');
   const [isPdfLoading, setIsPdfLoading] = useState(false);
@@ -59,7 +63,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       ...prodCols,
       'Total Gross (USD)',
       'Total Gross (SAR)',
-      // Notes Removed
+      'VAT (SAR)',
+      'Grand Total (SAR)',
     ];
 
     const scheduleRows = data.yearlyResults.map(r => {
@@ -72,7 +77,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         ...pValues,
         r.grossUSD.toFixed(2),
         r.grossSAR.toFixed(0),
-        // Notes Removed
+        r.vatSAR.toFixed(0),
+        r.grandTotalSAR.toFixed(0),
       ];
     });
     
@@ -83,6 +89,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       ...totalProdValues,
       data.totalGrossUSD.toFixed(2),
       data.totalGrossSAR.toFixed(0),
+      data.totalVatSAR.toFixed(0),
+      data.totalGrandTotalSAR.toFixed(0),
     ];
 
     // 4. Summary Metrics
@@ -135,7 +143,44 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     document.body.removeChild(link);
   };
 
-  // Convert ArrayBuffer to Base64
+  // Helper to fetch image and convert to Base64 (PNG)
+  // This handles SVG to PNG conversion via Canvas automatically
+  const getBase64FromUrl = async (url: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      // Important: Allow cross-origin to avoid tainted canvas
+      img.crossOrigin = 'Anonymous';
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        // Scale up slightly for better print quality
+        canvas.width = img.width * 2;
+        canvas.height = img.height * 2;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.scale(2, 2);
+          ctx.drawImage(img, 0, 0);
+          try {
+            const dataURL = canvas.toDataURL('image/png');
+            resolve(dataURL);
+          } catch (e) {
+            reject(e);
+          }
+        } else {
+          reject(new Error("Canvas context failed"));
+        }
+      };
+      
+      img.onerror = (e) => {
+        console.error("Image load error", e);
+        reject(e);
+      };
+      
+      img.src = url;
+    });
+  };
+
+  // Convert ArrayBuffer to Base64 (For Fonts)
   const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
     let binary = '';
     const bytes = new Uint8Array(buffer);
@@ -155,24 +200,40 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     const docDate = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
     const refId = `REF-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`;
 
-    // --- Font Loading Strategy ---
-    // Try to fetch Fira Sans from Google Fonts
+    // --- 1. Load Resources ---
+    let wkLogoData = "";
+    let samirLogoData = "";
+    
     try {
-        const response = await fetch('https://fonts.gstatic.com/s/firasans/v17/va9E4kDNxMZdWfMOD5Vvl4jO.ttf');
-        if (!response.ok) throw new Error('Network response was not ok');
-        const fontBuffer = await response.arrayBuffer();
-        const fontBase64 = arrayBufferToBase64(fontBuffer);
-        
-        doc.addFileToVFS('FiraSans-Regular.ttf', fontBase64);
-        doc.addFont('FiraSans-Regular.ttf', 'FiraSans', 'normal');
-        doc.setFont('FiraSans');
+        // Load Fira Sans
+        const fontResponse = await fetch('https://fonts.gstatic.com/s/firasans/v17/va9E4kDNxMZdWfMOD5Vvl4jO.ttf');
+        if (fontResponse.ok) {
+           const fontBuffer = await fontResponse.arrayBuffer();
+           const fontBase64 = arrayBufferToBase64(fontBuffer);
+           doc.addFileToVFS('FiraSans-Regular.ttf', fontBase64);
+           doc.addFont('FiraSans-Regular.ttf', 'FiraSans', 'normal');
+           doc.setFont('FiraSans');
+        }
     } catch (error) {
-        console.warn("Could not fetch Fira Sans font, falling back to Helvetica.", error);
+        console.warn("Font loading failed, falling back", error);
         doc.setFont("helvetica");
     }
 
-    // Placeholder Base64 for a logo (Simple colorful box to simulate logo presence)
-    const logoData = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH5gIeEzgZ6b78TAAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAACxklEQVRo3u2aTUtCURSG33uvFq2ChFpE0CpoE9QmaBPUJmgTtAlqE7QJahO0CWoTtAmCamGQ5i+QlnP13hO6g9t7r849L/swMHj3Oec9555z77kCOTk5OTk5/x8lhw+FQsF5/8658H0/yLIs12g0+PF47O7t7f1Yw0Kh4DQaDUE+n3d3d3fFMAx3b2/v1y0LhYLTbDbF5eWlOzs7E5VKxd3f3/9xy0Kh4DSbTXFxcSGOj4/FwcGBODk5EcfHx+Li4kKs1+vC9/0ftSwUCk6j0RBnZ2f/WBaNRlF8JpPJpwyIoshZLBb/WBbL5fJTAyIIAmcymfxjWTCZTD41IIqiOIvF4h/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQBRFcRaLxR/Lgtls9qkBEQTBmUwmfywLJpPJpwZEURRnsVj8sSyYzWafGhBBEJzJZPLHsmAymXxqQG5ubpx2uy1833f39vbE1tZWyD/n5OTk5OQ05g8j25y0o/CjLAAAAABJRU5ErkJggg==";
+    try {
+        // Load WK Logo (SVG -> PNG)
+        wkLogoData = await getBase64FromUrl(WK_LOGO_URL);
+    } catch (e) {
+        console.warn("WK Logo failed to load", e);
+    }
+
+    if (config.channel !== ChannelType.DIRECT) {
+        try {
+            // Load Samir Logo
+            samirLogoData = await getBase64FromUrl(SAMIR_LOGO_URL);
+        } catch (e) {
+            console.warn("Samir Logo failed to load", e);
+        }
+    }
 
     const addFooter = (pageNum: number) => {
       doc.setFontSize(8);
@@ -182,40 +243,58 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       doc.text(`Page ${pageNum}`, 190, 285);
     };
 
+    // --- Header Render Function ---
+    const renderHeader = () => {
+       // Header Color Background
+       doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+       doc.rect(0, 0, 210, 30, 'F'); // Increased height slightly for logos
+       
+       // Add WK Logo (Left)
+       if (wkLogoData) {
+         const wkAspect = 50 / 15; // Approximate aspect ratio
+         doc.addImage(wkLogoData, 'PNG', 14, 7, 50, 16); 
+       } else {
+         // Fallback Text
+         doc.setFontSize(14);
+         doc.setTextColor(255, 255, 255);
+         doc.text("Wolters Kluwer", 14, 20);
+       }
+
+       // Add Samir Group Logo (Right) if Indirect
+       if (config.channel !== ChannelType.DIRECT && samirLogoData) {
+         doc.addImage(samirLogoData, 'PNG', 150, 7, 45, 16);
+       }
+    };
+
     // --- PAGE 1: COVER ---
     // Background bar
     doc.setFillColor(245, 245, 245);
-    doc.rect(0, 0, 210, 297, 'F');
+    doc.rect(0, 30, 210, 267, 'F'); 
     
-    // Header Color
+    renderHeader();
+    
+    // Large Title Block
     doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(0, 90, 210, 50, 'F');
-
-    // Logo
-    try {
-      doc.addImage(logoData, 'PNG', 100, 70, 10, 10);
-    } catch (e) {
-      console.warn("Could not load logo", e);
-    }
+    doc.rect(0, 100, 210, 50, 'F');
 
     // Title
     doc.setFontSize(32);
     doc.setTextColor(255, 255, 255);
-    doc.text("Wolters Kluwer", 105, 115, { align: 'center' });
+    doc.text("Wolters Kluwer", 105, 125, { align: 'center' });
 
     doc.setFontSize(18);
     doc.setTextColor(255, 255, 255);
-    doc.text("Budgetary Commercial Proposal", 105, 130, { align: 'center' });
+    doc.text("Budgetary Commercial Proposal", 105, 140, { align: 'center' });
 
     // Client Info Center
     doc.setTextColor(50, 50, 50);
     doc.setFontSize(14);
     if (customerName) {
-      doc.text(`Prepared for: ${customerName}`, 105, 160, { align: 'center' });
+      doc.text(`Prepared for: ${customerName}`, 105, 170, { align: 'center' });
     }
     doc.setFontSize(11);
-    doc.text(`Date: ${docDate}`, 105, 170, { align: 'center' });
-    doc.text(`Reference: ${refId}`, 105, 178, { align: 'center' });
+    doc.text(`Date: ${docDate}`, 105, 180, { align: 'center' });
+    doc.text(`Reference: ${refId}`, 105, 188, { align: 'center' });
 
     // Bottom Left Info
     doc.setFontSize(10);
@@ -225,12 +304,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
 
     // --- PAGE 2: CONFIDENTIALITY ---
     doc.addPage();
+    renderHeader();
     doc.setFillColor(255, 255, 255);
-    doc.rect(0, 0, 210, 297, 'F');
     
     doc.setFontSize(16);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.text("Confidentiality Notice", 14, 25);
+    doc.text("Confidentiality Notice", 14, 45); 
 
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
@@ -244,54 +323,93 @@ The pricing and terms outlined in this document are budgetary in nature and subj
 By accepting this document, the recipient agrees to keep its contents confidential and to use them solely for the purpose of evaluating the proposed business relationship.`;
 
     const splitText = doc.splitTextToSize(disclaimer, 180);
-    doc.text(splitText, 14, 40);
+    doc.text(splitText, 14, 60);
     
     addFooter(2);
 
     // --- PAGE 3: PRICING DETAILS & TERMS ---
     doc.addPage();
+    renderHeader();
     
     doc.setFontSize(16);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.text("Pricing Details", 14, 25);
+    doc.text("Pricing Details", 14, 45);
 
-    // Prepare table data
-    const tableHead = [['Year', ...config.selectedProducts.map(pid => {
-       const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-       return p?.shortName || pid;
-    }), 'Total (USD)', 'Total (SAR)']]; // Strictly Gross values
+    // --- Table Configuration based on Channel ---
+    let tableHead: string[][] = [];
+    let tableBody: string[][] = [];
+    
+    const isIndirect = config.channel !== ChannelType.DIRECT;
 
-    const tableBody = data.yearlyResults.map(r => {
-       const pValues = config.selectedProducts.map(pid => {
-          const bd = r.breakdown.find(x => x.id === pid);
-          return bd ? formatMoney(bd.gross, 'USD') : '-';
-       });
-       return [
-          `Year ${r.year}`,
-          ...pValues,
-          formatMoney(r.grossUSD, 'USD'),
-          config.channel === ChannelType.DIRECT ? '-' : formatMoney(r.grossSAR, 'SAR')
-       ];
-    });
+    if (isIndirect) {
+      // INDIRECT: Only SAR, with VAT
+      const prodCols = config.selectedProducts.map(pid => {
+         const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+         return `${p?.shortName || pid} (SAR)`;
+      });
+      tableHead = [['Year', ...prodCols, 'Total (SAR)', 'VAT (15%)', 'Grand Total (SAR)']];
+      
+      tableBody = data.yearlyResults.map(r => {
+        const pValues = config.selectedProducts.map(pid => {
+           const bd = r.breakdown.find(x => x.id === pid);
+           return bd ? formatMoney(bd.grossSAR, 'SAR') : '-';
+        });
+        return [
+           `Year ${r.year}`,
+           ...pValues,
+           formatMoney(r.grossSAR, 'SAR'),
+           formatMoney(r.vatSAR, 'SAR'),
+           formatMoney(r.grandTotalSAR, 'SAR'),
+        ];
+      });
 
-    const totalRow = [
-      'TOTAL',
-      ...config.selectedProducts.map(() => ''),
-      formatMoney(data.totalGrossUSD, 'USD'),
-      config.channel === ChannelType.DIRECT ? '-' : formatMoney(data.totalGrossSAR, 'SAR')
-    ];
-    tableBody.push(totalRow);
+      const totalRow = [
+        'TOTAL',
+        ...config.selectedProducts.map(() => ''),
+        formatMoney(data.totalGrossSAR, 'SAR'),
+        formatMoney(data.totalVatSAR, 'SAR'),
+        formatMoney(data.totalGrandTotalSAR, 'SAR'),
+      ];
+      tableBody.push(totalRow);
+
+    } else {
+      // DIRECT: USD
+      const prodCols = config.selectedProducts.map(pid => {
+         const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+         return `${p?.shortName || pid} (USD)`;
+      });
+      tableHead = [['Year', ...prodCols, 'Total (USD)']];
+
+      tableBody = data.yearlyResults.map(r => {
+        const pValues = config.selectedProducts.map(pid => {
+           const bd = r.breakdown.find(x => x.id === pid);
+           return bd ? formatMoney(bd.gross, 'USD') : '-';
+        });
+        return [
+           `Year ${r.year}`,
+           ...pValues,
+           formatMoney(r.grossUSD, 'USD'),
+        ];
+      });
+
+      const totalRow = [
+        'TOTAL',
+        ...config.selectedProducts.map(() => ''),
+        formatMoney(data.totalGrossUSD, 'USD'),
+      ];
+      tableBody.push(totalRow);
+    }
 
     // Use current active font family for table
     const currentFont = doc.getFont().fontName;
 
     autoTable(doc, {
-      startY: 35,
+      startY: 55, // Adjusted Y for header
       head: tableHead,
       body: tableBody,
       theme: 'grid',
       headStyles: { fillColor: primaryColor, textColor: 255, font: currentFont },
-      styles: { fontSize: 9, font: currentFont }, // Ensure custom font is used in table if loaded
+      styles: { fontSize: 9, font: currentFont }, 
       margin: { left: 14, right: 14 },
     });
 
@@ -338,7 +456,8 @@ By accepting this document, the recipient agrees to keep its contents confidenti
       // Simple pagination check
       if (finalY > 270) {
         doc.addPage();
-        finalY = 20;
+        renderHeader();
+        finalY = 55;
       }
       doc.text(`• ${term}`, 14, finalY);
       finalY += 6;
@@ -378,7 +497,7 @@ By accepting this document, the recipient agrees to keep its contents confidenti
           disabled={isPdfLoading}
           className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isPdfLoading ? 'bg-red-400' : 'bg-red-600 hover:bg-red-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500`}
         >
-          {isPdfLoading ? 'Downloading Font...' : 'Export PDF Quote'}
+          {isPdfLoading ? 'Processing...' : 'Export PDF Quote'}
         </button>
       </div>
     </div>

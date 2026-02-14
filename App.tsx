@@ -40,6 +40,7 @@ const App: React.FC = () => {
 
   // Check if we need split rates (if both UTD and LD are selected)
   const showSplitRates = selectedProductIds.includes('utd') && selectedProductIds.includes('ld');
+  const isIndirect = channel !== ChannelType.DIRECT;
 
   // Helper to generate rate array [0, val, val...]
   const generateRateArray = (val: number, count: number) => {
@@ -373,14 +374,25 @@ const App: React.FC = () => {
                         </th>
 
                         {/* Conditionally show SAR Total */}
-                        {channel !== ChannelType.DIRECT && (
+                        {isIndirect && (
                           <th className="px-4 py-3 text-center text-xs font-bold text-gray-800 uppercase bg-yellow-100 whitespace-nowrap">
                              Total (SAR)
                           </th>
                         )}
 
+                        {/* New VAT and Grand Total Columns for Indirect */}
+                        {isIndirect && (
+                          <>
+                             <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase bg-yellow-50 whitespace-nowrap">
+                               VAT (15%)
+                             </th>
+                             <th className="px-4 py-3 text-center text-xs font-bold text-gray-900 uppercase bg-yellow-200 whitespace-nowrap">
+                               Grand Total (SAR)
+                             </th>
+                          </>
+                        )}
+
                         <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Recognized<br/>Total (USD)</th>
-                        {/* Notes Column Removed */}
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
@@ -404,16 +416,27 @@ const App: React.FC = () => {
                            </td>
 
                            {/* Total SAR (if Indirect) */}
-                           {channel !== ChannelType.DIRECT && (
+                           {isIndirect && (
                              <td className="px-4 py-4 text-center text-sm font-bold text-gray-800 font-mono bg-yellow-50 whitespace-nowrap">
                                 {formatCurrency(r.grossSAR, 'SAR')}
                              </td>
                            )}
 
+                           {/* VAT and Grand Total */}
+                           {isIndirect && (
+                             <>
+                               <td className="px-4 py-4 text-center text-sm text-gray-600 font-mono bg-yellow-50/50">
+                                  {formatCurrency(r.vatSAR, 'SAR')}
+                               </td>
+                               <td className="px-4 py-4 text-center text-sm font-bold text-gray-900 font-mono bg-yellow-100">
+                                  {formatCurrency(r.grandTotalSAR, 'SAR')}
+                               </td>
+                             </>
+                           )}
+
                            <td className="px-4 py-4 text-center text-sm text-gray-600 font-mono">
                               {formatCurrency(r.netUSD, 'USD')}
                            </td>
-                           {/* Notes Data Removed */}
                         </tr>
                      ))}
                      <tr className="bg-gray-800 text-white">
@@ -430,10 +453,22 @@ const App: React.FC = () => {
                         </td>
 
                          {/* Total SAR */}
-                        {channel !== ChannelType.DIRECT && (
+                        {isIndirect && (
                            <td className="px-4 py-4 text-center text-sm font-bold font-mono text-yellow-300 whitespace-nowrap">
                               {formatCurrency(results.totalGrossSAR, 'SAR')}
                            </td>
+                        )}
+
+                        {/* VAT and Grand Total */}
+                        {isIndirect && (
+                           <>
+                              <td className="px-4 py-4 text-center text-sm font-mono text-gray-300">
+                                 {formatCurrency(results.totalVatSAR, 'SAR')}
+                              </td>
+                              <td className="px-4 py-4 text-center text-sm font-bold font-mono text-yellow-300">
+                                 {formatCurrency(results.totalGrandTotalSAR, 'SAR')}
+                              </td>
+                           </>
                         )}
 
                         <td className="px-4 py-4 text-center text-sm font-bold font-mono text-gray-300">
@@ -458,7 +493,7 @@ const App: React.FC = () => {
                </div>
                
                {/* Net Metrics (Only for Indirect Channels) */}
-               {channel !== ChannelType.DIRECT && (
+               {isIndirect && (
                  <>
                    <div className="bg-gray-100 p-4 shadow rounded-lg border-l-4 border-gray-500">
                       <div className="text-xs text-gray-500 uppercase font-sans">Net TCV</div>
@@ -486,7 +521,7 @@ const App: React.FC = () => {
             </div>
 
             {/* NEW: Net Revenue Breakdown Section with ACV and TCV */}
-            {channel !== ChannelType.DIRECT && selectedProductIds.length > 0 && (
+            {isIndirect && selectedProductIds.length > 0 && (
               <div className="bg-white p-4 shadow rounded-lg border border-gray-200 mb-4">
                 <h4 className="text-sm font-bold text-gray-800 mb-3 font-sans">Net Revenue Breakdown</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

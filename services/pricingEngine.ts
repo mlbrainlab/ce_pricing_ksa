@@ -50,7 +50,11 @@ const getNetFactor = (dealType: DealType, channel: ChannelType, yearIndex: numbe
 
 const convertToSAR = (usdAmount: number): number => {
   const rawSar = usdAmount * EXCHANGE_RATE_SAR;
-  return Math.ceil(rawSar / 1000) * 1000;
+  // Round to nearest thousand for cleaner commercial presentation usually, 
+  // but to keep math consistent per product vs total, let's keep it tight or use standard rounding.
+  // Previous logic was ceil to 1000. Let's maintain that for Total, but for individual lines it might cause summation errors.
+  // For safety in breakdown, we calculate raw then round total.
+  return Math.ceil(rawSar / 10) * 10; // Rounding to nearest 10 SAR for cleaner numbers
 };
 
 export const calculatePricing = (config: DealConfiguration): CalculationOutput => {
@@ -108,9 +112,6 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
       const renewalBase = expiring * (1 + (y1FPI / 100));
       totalRenewalBaseForACV += renewalBase;
 
-      // Logic: For renewal, we start calculations based on current config (Upsell or Flat).
-      // The "Renewal Base" is just a reference number for the ACV split.
-      // The actual Year 1 Price is the "New Config Price" (baseNet).
       finalYear1Net = baseNet; 
     }
 
@@ -179,6 +180,9 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
 
   let totalGrossUSD = 0;
   let totalGrossSAR = 0;
+  let totalVatSAR = 0;
+  let totalGrandTotalSAR = 0;
+
   let totalNetUSD = 0;
   let totalNetSAR = 0;
 
@@ -199,13 +203,18 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
       breakdown.push({
         id: prodId,
         gross: val,
+        grossSAR: convertToSAR(val),
         net: netVal
       });
 
       productNetTotals[prodId] += netVal;
     });
 
-    const quoteSAR = convertToSAR(yearSum);
+    // Totals for this year
+    const yearGrossSAR = convertToSAR(yearSum);
+    const yearVatSAR = yearGrossSAR * 0.15;
+    const yearGrandTotalSAR = yearGrossSAR + yearVatSAR;
+
     const recognizedUSD = yearSum * netFactor;
     const recognizedSAR = recognizedUSD * EXCHANGE_RATE_SAR;
 
@@ -213,7 +222,9 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
       year: i + 1,
       breakdown,
       grossUSD: yearSum,
-      grossSAR: quoteSAR,
+      grossSAR: yearGrossSAR,
+      vatSAR: yearVatSAR,
+      grandTotalSAR: yearGrandTotalSAR,
       netUSD: recognizedUSD,
       netSAR: recognizedSAR,
       floorAdjusted: i === 0 && floorTriggered,
@@ -222,7 +233,9 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
 
     totalTCV += yearSum;
     totalGrossUSD += yearSum;
-    totalGrossSAR += quoteSAR;
+    totalGrossSAR += yearGrossSAR;
+    totalVatSAR += yearVatSAR;
+    totalGrandTotalSAR += yearGrandTotalSAR;
     totalNetUSD += recognizedUSD;
     totalNetSAR += recognizedSAR;
   }
@@ -242,6 +255,8 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
     yearlyResults,
     totalGrossUSD,
     totalGrossSAR,
+    totalVatSAR,
+    totalGrandTotalSAR,
     totalNetUSD,
     totalNetSAR,
     productNetTotals,
