@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { CalculationOutput, DealConfiguration, ChannelType } from '../types';
 import { AVAILABLE_PRODUCTS } from '../constants';
 import jsPDF from 'jspdf';
@@ -9,44 +9,18 @@ interface ExportSectionProps {
   config: DealConfiguration;
 }
 
-// Logo URLs provided
+// Logo URLs
 const WK_LOGO_URL = "https://cdn.wolterskluwer.io/wk/jumpstart-v3-assets/0.x.x/logo/large.svg";
-// Replaced with a CORS-friendly placeholder to prevent network errors
-const SAMIR_LOGO_URL = "https://placehold.co/200x50/png?text=Partner+Logo"; 
+// Reverted to original URL
+const SAMIR_LOGO_URL = "https://samirgroup.com/wp-content/uploads/2021/05/logo.png"; 
 
 export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) => {
   const [customerName, setCustomerName] = useState('');
   const [repName, setRepName] = useState('');
   const [isPdfLoading, setIsPdfLoading] = useState(false);
-  const [fontsLoaded, setFontsLoaded] = useState(false);
+  
+  // Font data state (loaded on demand)
   const [fontData, setFontData] = useState<{ regular: string | null, bold: string | null }>({ regular: null, bold: null });
-
-  // Preload Fonts on Mount
-  useEffect(() => {
-    const loadFonts = async () => {
-      try {
-        const [regRes, boldRes] = await Promise.all([
-           fetch('https://fonts.gstatic.com/s/firasans/v17/va9E4kDNxMZdWfMOD5Vvl4jO.ttf'),
-           fetch('https://fonts.gstatic.com/s/firasans/v17/va9B4kDNxMZdWfMOD5VnSKze6.ttf')
-        ]);
-
-        if (regRes.ok && boldRes.ok) {
-           const regBuf = await regRes.arrayBuffer();
-           const boldBuf = await boldRes.arrayBuffer();
-           
-           setFontData({
-             regular: arrayBufferToBase64(regBuf),
-             bold: arrayBufferToBase64(boldBuf)
-           });
-        }
-      } catch (e) {
-        // Silent fallback to standard fonts
-      } finally {
-        setFontsLoaded(true);
-      }
-    };
-    loadFonts();
-  }, []);
 
   const formatMoney = (amount: number, currency: string) => {
     return currency === 'SAR' 
@@ -190,7 +164,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       const blob = await response.blob();
       
       if (blob.type.includes('svg') || url.toLowerCase().endsWith('.svg')) {
-         return new Promise((resolve) => { // Removed reject, fallback to empty
+         return new Promise((resolve) => { 
             const reader = new FileReader();
             reader.onload = () => {
                 const img = new Image();
@@ -216,7 +190,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
          });
       }
       
-      return new Promise((resolve) => { // Removed reject, fallback to empty
+      return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
         reader.onerror = () => resolve('');
@@ -265,13 +239,37 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     return window.btoa(binary);
   };
 
-  const handlePDFExport = async () => {
-    if (!fontsLoaded) {
-       alert("Fonts are still loading. Please wait a moment.");
-       return;
+  const ensureFontsLoaded = async () => {
+    if (fontData.regular && fontData.bold) return true;
+
+    try {
+      const [regRes, boldRes] = await Promise.all([
+          fetch('https://fonts.gstatic.com/s/firasans/v17/va9E4kDNxMZdWfMOD5Vvl4jO.ttf'),
+          fetch('https://fonts.gstatic.com/s/firasans/v17/va9B4kDNxMZdWfMOD5VnSKze6.ttf')
+      ]);
+
+      if (regRes.ok && boldRes.ok) {
+          const regBuf = await regRes.arrayBuffer();
+          const boldBuf = await boldRes.arrayBuffer();
+          
+          setFontData({
+            regular: arrayBufferToBase64(regBuf),
+            bold: arrayBufferToBase64(boldBuf)
+          });
+          return true;
+      }
+    } catch (e) {
+      console.warn("Font fetch failed, falling back to built-in fonts.");
     }
-    
+    return false;
+  };
+
+  const handlePDFExport = async () => {
     setIsPdfLoading(true);
+    
+    // 1. Ensure fonts are loaded (Fira Sans)
+    await ensureFontsLoaded();
+    
     const doc = new jsPDF();
     
     // Wolters Kluwer Blue
@@ -279,7 +277,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     const docDate = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
     const refId = `REF-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`;
 
-    // --- 1. Load Resources ---
+    // --- 2. Load Resources ---
     let wkLogoData = "";
     let samirLogoData = "";
     
@@ -328,17 +326,20 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
        // Add WK Logo (Left)
        if (wkLogoData) {
          doc.addImage(wkLogoData, 'PNG', xOffset, 10.5, 50, 9); 
-         xOffset += 55; // Move cursor
        } else {
          doc.setFontSize(14);
          doc.setTextColor(255, 255, 255);
          doc.text("Wolters Kluwer", xOffset, 20);
-         xOffset += 40;
        }
 
-       // Add Partner Logo (Next to WK) if Indirect
+       // Add Partner Logo (Right) if Indirect
+       // Page width 210, standard margin 14. Place image aligned to right margin.
+       // Assume logo width 50
        if (config.channel !== ChannelType.DIRECT && samirLogoData) {
-         doc.addImage(samirLogoData, 'PNG', xOffset, 10.5, 50, 9);
+         const logoW = 50;
+         const logoH = 10; // Adjusted height for ratio
+         const logoX = 210 - 14 - logoW; // Right align
+         doc.addImage(samirLogoData, 'PNG', logoX, 10, logoW, logoH);
        }
     };
 
@@ -748,10 +749,10 @@ By accepting this document, the recipient agrees to keep its contents confidenti
         </button>
         <button 
           onClick={handlePDFExport}
-          disabled={isPdfLoading || !fontsLoaded}
-          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isPdfLoading || !fontsLoaded ? 'bg-red-400' : 'bg-red-600 hover:bg-red-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500`}
+          disabled={isPdfLoading}
+          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isPdfLoading ? 'bg-red-400' : 'bg-red-600 hover:bg-red-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500`}
         >
-          {isPdfLoading ? 'Processing...' : (!fontsLoaded ? 'Loading Fonts...' : 'Export PDF Quote')}
+          {isPdfLoading ? 'Processing...' : 'Export PDF Quote'}
         </button>
       </div>
     </div>

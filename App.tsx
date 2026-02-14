@@ -161,7 +161,7 @@ const App: React.FC = () => {
           step="1" 
           value={value}
           onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
-          className={`w-24 text-sm rounded p-2 text-left bg-white dark:bg-gray-700 text-gray-900 dark:text-white border ${colorClass} dark:border-gray-600 focus:ring-2 focus:ring-blue-500 font-mono`}
+          className={`w-24 text-sm rounded p-2 text-left bg-white dark:bg-gray-700 text-gray-900 dark:text-white border ${colorClass} dark:border-gray-600 focus:ring-2 focus:ring-blue-500 font-sans tabular-nums`}
         />
         <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
            % applied to Years 2-{years}
@@ -250,7 +250,7 @@ const App: React.FC = () => {
                                <input
                                  type="number"
                                  min="0"
-                                 className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-orange-500 focus:border-orange-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono"
+                                 className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-orange-500 focus:border-orange-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
                                  value={input.expiringAmount || 0}
                                  onChange={(e) => handleInputChange(product.id, 'expiringAmount', parseFloat(e.target.value) || 0)}
                                />
@@ -292,7 +292,7 @@ const App: React.FC = () => {
                                <input
                                  type="number"
                                  min="0"
-                                 className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono"
+                                 className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
                                  value={input.count}
                                  onChange={(e) => handleInputChange(product.id, 'count', parseInt(e.target.value) || 0)}
                                />
@@ -307,7 +307,7 @@ const App: React.FC = () => {
                                min="0"
                                max="100"
                                disabled={showSplitRates && applyComboDiscount && product.id === 'ld'}
-                               className={`block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono ${showSplitRates && applyComboDiscount && product.id === 'ld' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                               className={`block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums ${showSplitRates && applyComboDiscount && product.id === 'ld' ? 'opacity-50 cursor-not-allowed' : ''}`}
                                value={input.baseDiscount}
                                onChange={(e) => handleInputChange(product.id, 'baseDiscount', parseFloat(e.target.value) || 0)}
                              />
@@ -377,7 +377,7 @@ const App: React.FC = () => {
                       type="number" min="1" max="7" 
                       value={years} 
                       onChange={(e) => setYears(parseInt(e.target.value))}
-                      className="mt-1 block w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono"
+                      className="mt-1 block w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
                     />
                  </div>
                  <div className="w-2/3">
@@ -427,7 +427,7 @@ const App: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 transition-colors">
              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
                 <h3 className="text-lg font-bold text-gray-800 dark:text-white">Commercial Schedule</h3>
-                <div className="text-xs font-mono text-gray-500 dark:text-gray-400">
+                <div className="text-xs font-sans tabular-nums text-gray-500 dark:text-gray-400">
                    1 USD = {3.76} SAR
                 </div>
              </div>
@@ -484,20 +484,20 @@ const App: React.FC = () => {
                            {selectedProductIds.map(pid => {
                              const pData = r.breakdown.find(d => d.id === pid);
                              return (
-                               <td key={pid} className="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-300 font-mono whitespace-nowrap">
+                               <td key={pid} className="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-300 font-sans tabular-nums whitespace-nowrap">
                                  {pData ? formatCurrency(pData.gross, 'USD') : '-'}
                                </td>
                              );
                            })}
 
                            {/* Total USD */}
-                           <td className="px-4 py-4 text-center text-sm font-bold text-blue-700 dark:text-blue-300 font-mono bg-blue-50 dark:bg-blue-900/20 whitespace-nowrap">
+                           <td className="px-4 py-4 text-center text-sm font-bold text-blue-700 dark:text-blue-300 font-sans tabular-nums bg-blue-50 dark:bg-blue-900/20 whitespace-nowrap">
                               {formatCurrency(r.grossUSD, 'USD')}
                            </td>
 
                            {/* Total SAR (if Indirect) */}
                            {isIndirect && (
-                             <td className="px-4 py-4 text-center text-sm font-bold text-gray-800 dark:text-gray-200 font-mono bg-yellow-50 dark:bg-yellow-900/20 whitespace-nowrap">
+                             <td className="px-4 py-4 text-center text-sm font-bold text-gray-800 dark:text-gray-200 font-sans tabular-nums bg-yellow-50 dark:bg-yellow-900/20 whitespace-nowrap">
                                 {formatCurrency(r.grossSAR, 'SAR')}
                              </td>
                            )}
@@ -505,16 +505,16 @@ const App: React.FC = () => {
                            {/* VAT and Grand Total */}
                            {isIndirect && (
                              <>
-                               <td className="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-400 font-mono bg-yellow-50/50 dark:bg-yellow-900/10 whitespace-nowrap">
+                               <td className="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-400 font-sans tabular-nums bg-yellow-50/50 dark:bg-yellow-900/10 whitespace-nowrap">
                                   {formatCurrency(r.vatSAR, 'SAR')}
                                </td>
-                               <td className="px-4 py-4 text-center text-sm font-bold text-gray-900 dark:text-gray-100 font-mono bg-yellow-100 dark:bg-yellow-900/40 whitespace-nowrap">
+                               <td className="px-4 py-4 text-center text-sm font-bold text-gray-900 dark:text-gray-100 font-sans tabular-nums bg-yellow-100 dark:bg-yellow-900/40 whitespace-nowrap">
                                   {formatCurrency(r.grandTotalSAR, 'SAR')}
                                </td>
                              </>
                            )}
 
-                           <td className="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-400 font-mono whitespace-nowrap">
+                           <td className="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-400 font-sans tabular-nums whitespace-nowrap">
                               {formatCurrency(r.netUSD, 'USD')}
                            </td>
                         </tr>
@@ -528,13 +528,13 @@ const App: React.FC = () => {
                         ))}
 
                         {/* Total USD */}
-                        <td className="px-4 py-4 text-center text-sm font-bold font-mono whitespace-nowrap">
+                        <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums whitespace-nowrap">
                            {formatCurrency(results.totalGrossUSD, 'USD')}
                         </td>
 
                          {/* Total SAR */}
                         {isIndirect && (
-                           <td className="px-4 py-4 text-center text-sm font-bold font-mono text-yellow-300 whitespace-nowrap">
+                           <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums text-yellow-300 whitespace-nowrap">
                               {formatCurrency(results.totalGrossSAR, 'SAR')}
                            </td>
                         )}
@@ -542,16 +542,16 @@ const App: React.FC = () => {
                         {/* VAT and Grand Total */}
                         {isIndirect && (
                            <>
-                              <td className="px-4 py-4 text-center text-sm font-mono text-gray-300 whitespace-nowrap">
+                              <td className="px-4 py-4 text-center text-sm font-sans tabular-nums text-gray-300 whitespace-nowrap">
                                  {formatCurrency(results.totalVatSAR, 'SAR')}
                               </td>
-                              <td className="px-4 py-4 text-center text-sm font-bold font-mono text-yellow-300 whitespace-nowrap">
+                              <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums text-yellow-300 whitespace-nowrap">
                                  {formatCurrency(results.totalGrandTotalSAR, 'SAR')}
                               </td>
                            </>
                         )}
 
-                        <td className="px-4 py-4 text-center text-sm font-bold font-mono text-gray-300 whitespace-nowrap">
+                        <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums text-gray-300 whitespace-nowrap">
                            {formatCurrency(results.totalNetUSD, 'USD')}
                         </td>
                      </tr>
@@ -614,11 +614,11 @@ const App: React.FC = () => {
                           <div className="text-xs font-bold text-gray-700 dark:text-gray-200 font-sans mb-2">{p?.shortName}</div>
                           <div className="flex justify-between items-center mb-1">
                              <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Net TCV</span>
-                             <span className="text-xs font-mono font-medium text-gray-900 dark:text-white">{formatCurrency(tcv, 'USD')}</span>
+                             <span className="text-xs font-sans tabular-nums font-medium text-gray-900 dark:text-white">{formatCurrency(tcv, 'USD')}</span>
                           </div>
                           <div className="flex justify-between items-center">
                              <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Net ACV</span>
-                             <span className="text-xs font-mono font-medium text-gray-900 dark:text-white">{formatCurrency(acv, 'USD')}</span>
+                             <span className="text-xs font-sans tabular-nums font-medium text-gray-900 dark:text-white">{formatCurrency(acv, 'USD')}</span>
                           </div>
                        </div>
                      );
