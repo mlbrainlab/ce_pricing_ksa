@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CalculationOutput, DealConfiguration, ChannelType } from '../types';
 import { AVAILABLE_PRODUCTS } from '../constants';
 import jsPDF from 'jspdf';
@@ -17,6 +17,38 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
   const [customerName, setCustomerName] = useState('');
   const [repName, setRepName] = useState('');
   const [isPdfLoading, setIsPdfLoading] = useState(false);
+  const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [fontData, setFontData] = useState<{ regular: string | null, bold: string | null }>({ regular: null, bold: null });
+
+  // Preload Fonts on Mount
+  useEffect(() => {
+    const loadFonts = async () => {
+      try {
+        const [regRes, boldRes] = await Promise.all([
+           fetch('https://fonts.gstatic.com/s/firasans/v17/va9E4kDNxMZdWfMOD5Vvl4jO.ttf'),
+           fetch('https://fonts.gstatic.com/s/firasans/v17/va9B4kDNxMZdWfMOD5VnSKze6.ttf')
+        ]);
+
+        if (regRes.ok && boldRes.ok) {
+           const regBuf = await regRes.arrayBuffer();
+           const boldBuf = await boldRes.arrayBuffer();
+           
+           setFontData({
+             regular: arrayBufferToBase64(regBuf),
+             bold: arrayBufferToBase64(boldBuf)
+           });
+        } else {
+           console.warn("Failed to fetch fonts, falling back to standard fonts.");
+        }
+      } catch (e) {
+        console.warn("Font fetch error, falling back to standard fonts.", e);
+      } finally {
+        // Always allow export, even if fonts failed (will fallback to Helvetica)
+        setFontsLoaded(true);
+      }
+    };
+    loadFonts();
+  }, []);
 
   const formatMoney = (amount: number, currency: string) => {
     return currency === 'SAR' 
@@ -236,6 +268,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
   };
 
   const handlePDFExport = async () => {
+    if (!fontsLoaded) {
+       alert("Fonts are still loading. Please wait a moment.");
+       return;
+    }
+    
     setIsPdfLoading(true);
     const doc = new jsPDF();
     
@@ -248,34 +285,17 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     let wkLogoData = "";
     let samirLogoData = "";
     
-    try {
-        // Load Fira Sans Regular (400)
-        const fontResponse = await fetch('https://fonts.gstatic.com/s/firasans/v17/va9E4kDNxMZdWfMOD5Vvl4jO.ttf');
-        // Load Fira Sans SemiBold (600) for Bold
-        const fontSemiBoldResponse = await fetch('https://fonts.gstatic.com/s/firasans/v17/va9B4kDNxMZdWfMOD5VnSKze6.ttf');
-
-        if (fontResponse.ok && fontSemiBoldResponse.ok) {
-           const fontBuffer = await fontResponse.arrayBuffer();
-           const fontSemiBoldBuffer = await fontSemiBoldResponse.arrayBuffer();
-           
-           const fontBase64 = arrayBufferToBase64(fontBuffer);
-           const fontSemiBoldBase64 = arrayBufferToBase64(fontSemiBoldBuffer);
-           
-           doc.addFileToVFS('FiraSans-Regular.ttf', fontBase64);
-           doc.addFileToVFS('FiraSans-SemiBold.ttf', fontSemiBoldBase64);
-           
-           doc.addFont('FiraSans-Regular.ttf', 'FiraSans', 'normal');
-           // Register SemiBold as 'bold' for automatic usage when fontStyle: 'bold' is set
-           doc.addFont('FiraSans-SemiBold.ttf', 'FiraSans', 'bold');
-           
-           doc.setFont('FiraSans');
-        } else {
-           throw new Error("One of the fonts failed to load");
-        }
-    } catch (error) {
-        console.warn("Font loading failed, falling back to Helvetica", error);
-        doc.setFont("helvetica");
+    // Determine Font to use
+    let fontName = 'helvetica';
+    if (fontData.regular && fontData.bold) {
+        doc.addFileToVFS('FiraSans-Regular.ttf', fontData.regular);
+        doc.addFileToVFS('FiraSans-SemiBold.ttf', fontData.bold);
+        doc.addFont('FiraSans-Regular.ttf', 'FiraSans', 'normal');
+        doc.addFont('FiraSans-SemiBold.ttf', 'FiraSans', 'bold');
+        fontName = 'FiraSans';
     }
+
+    doc.setFont(fontName);
 
     try {
         wkLogoData = await getBase64FromUrl(WK_LOGO_URL);
@@ -309,8 +329,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
 
        // Add WK Logo (Left)
        if (wkLogoData) {
-         // Vertically centered in 30 height bar. Logo H=9. Y = (30-9)/2 = 10.5
-         // Width 50 fixed.
          doc.addImage(wkLogoData, 'PNG', xOffset, 10.5, 50, 9); 
          xOffset += 55; // Move cursor
        } else {
@@ -322,7 +340,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
 
        // Add Samir Group Logo (Next to WK) if Indirect
        if (config.channel !== ChannelType.DIRECT && samirLogoData) {
-         // Same dimensions/alignment as WK
          doc.addImage(samirLogoData, 'PNG', xOffset, 10.5, 50, 9);
        }
     };
@@ -341,11 +358,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     // Title inside Blue Bar
     doc.setFontSize(32);
     doc.setTextColor(255, 255, 255);
-    doc.setFont('FiraSans', 'bold');
+    doc.setFont(fontName, 'bold');
     doc.text("Wolters Kluwer", 105, 125, { align: 'center' });
 
     doc.setFontSize(18);
-    doc.setFont('FiraSans', 'normal');
+    doc.setFont(fontName, 'normal');
     doc.text("Budgetary Commercial Proposal", 105, 140, { align: 'center' });
 
     // --- Product Info Section (Below Blue Bar) ---
@@ -357,24 +374,46 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     const hasLD = config.selectedProducts.includes('ld');
 
     if (hasUTD) {
+        const variant = config.productInputs['utd']?.variant || '';
+        let title = "UpToDate\u00AE"; // Default
+        if (variant === 'ANYWHERE') title = "UpToDate\u00AE Anywhere";
+        if (variant === 'UTDADV') title = "UpToDate\u00AE Advanced";
+        if (variant === 'UTDEE') title = "UpToDate\u00AE Enterprise";
+
         doc.setFontSize(22);
-        doc.setFont('FiraSans', 'bold');
-        doc.text("UpToDate", 105, currentY, { align: 'center' });
+        doc.setFont(fontName, 'bold');
+        doc.text(title, 105, currentY, { align: 'center' });
         currentY += 8;
         doc.setFontSize(12);
-        doc.setFont('FiraSans', 'normal');
+        doc.setFont(fontName, 'normal');
         doc.text("Clinical Decision Support Solution", 105, currentY, { align: 'center' });
         currentY += 20;
     }
 
     if (hasLD) {
+        const variant = config.productInputs['ld']?.variant || '';
+        // Variant mapping
+        // BASE PKG, EE-Combo -> Lexidrug(R)
+        // +FLINK, EE-Combo+FLINK -> Lexidrug(R) incl Formulink(TM)
+        // +FLINK+IPE, EE-Combo+FLINK+IPE -> Lexidrug(R) incl Formulink(TM) and IPE
+
+        let subHeading = "Drug Referential Solution";
+        
+        if (variant.includes('FLINK')) {
+            if (variant.includes('IPE')) {
+                subHeading = "including Formulink\u2122 and Integrated Patient Education";
+            } else {
+                subHeading = "including Formulink\u2122";
+            }
+        }
+
         doc.setFontSize(22);
-        doc.setFont('FiraSans', 'bold');
-        doc.text("Lexidrug", 105, currentY, { align: 'center' });
+        doc.setFont(fontName, 'bold');
+        doc.text("Lexidrug\u00AE", 105, currentY, { align: 'center' });
         currentY += 8;
         doc.setFontSize(12);
-        doc.setFont('FiraSans', 'normal');
-        doc.text("Drug Referential Solution", 105, currentY, { align: 'center' });
+        doc.setFont(fontName, 'normal');
+        doc.text(subHeading, 105, currentY, { align: 'center' });
         currentY += 15;
     }
 
@@ -382,7 +421,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     // Bottom Left Info (Footer Area of Page 1)
     doc.setFontSize(10);
     doc.setTextColor(50, 50, 50);
-    doc.setFont('FiraSans', 'normal');
+    doc.setFont(fontName, 'normal');
     doc.text(`Customer: ${customerName || 'N/A'}`, 14, 265);
     doc.text(`Prepared by: ${repName || 'N/A'}`, 14, 270);
     doc.text(`Date: ${docDate}`, 14, 275);
@@ -395,12 +434,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     
     doc.setFontSize(16);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setFont('FiraSans', 'bold');
+    doc.setFont(fontName, 'bold');
     doc.text("Confidentiality Notice", 14, 45); 
 
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
-    doc.setFont('FiraSans', 'normal');
+    doc.setFont(fontName, 'normal');
     
     const disclaimer = `This proposal and the information contained herein is proprietary and confidential information of Wolters Kluwer. 
 
@@ -421,7 +460,7 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     
     doc.setFontSize(16);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setFont('FiraSans', 'bold');
+    doc.setFont(fontName, 'bold');
     doc.text("Pricing Details", 14, 45);
 
     // --- Table Configuration based on Channel ---
@@ -540,7 +579,7 @@ By accepting this document, the recipient agrees to keep its contents confidenti
       tableBody.push(totalRow);
     }
 
-    // Use FiraSans
+    // Use FiraSans or Fallback
     autoTable(doc, {
       startY: 55, 
       head: tableHead,
@@ -549,13 +588,13 @@ By accepting this document, the recipient agrees to keep its contents confidenti
       headStyles: { 
           fillColor: primaryColor, 
           textColor: 255, 
-          font: 'FiraSans', 
+          font: fontName, 
           fontStyle: 'bold', 
           valign: 'middle' 
       },
       styles: { 
           fontSize: 9, 
-          font: 'FiraSans', 
+          font: fontName, 
           overflow: 'linebreak',
           cellPadding: 2
       }, 
@@ -613,10 +652,10 @@ By accepting this document, the recipient agrees to keep its contents confidenti
         const finalAnalysisText = analysisText.charAt(0).toUpperCase() + analysisText.slice(1);
         
         doc.setFontSize(10);
-        doc.setFont('FiraSans', 'italic');
+        doc.setFont(fontName, 'italic');
         const splitAnalysis = doc.splitTextToSize(finalAnalysisText, 180);
         doc.text(splitAnalysis, 14, finalY);
-        doc.setFont('FiraSans', 'normal');
+        doc.setFont(fontName, 'normal');
         finalY += (splitAnalysis.length * 5) + 10;
     }
 
@@ -624,13 +663,13 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     // --- Terms & Conditions ---
     doc.setFontSize(14);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setFont('FiraSans', 'bold');
+    doc.setFont(fontName, 'bold');
     doc.text("Terms & Conditions", 14, finalY);
     
     finalY += 8;
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
-    doc.setFont('FiraSans', 'normal');
+    doc.setFont(fontName, 'normal');
 
     const paymentTermText = config.channel === ChannelType.DIRECT
       ? "30 days from invoice date."
@@ -711,10 +750,10 @@ By accepting this document, the recipient agrees to keep its contents confidenti
         </button>
         <button 
           onClick={handlePDFExport}
-          disabled={isPdfLoading}
-          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isPdfLoading ? 'bg-red-400' : 'bg-red-600 hover:bg-red-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500`}
+          disabled={isPdfLoading || !fontsLoaded}
+          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isPdfLoading || !fontsLoaded ? 'bg-red-400' : 'bg-red-600 hover:bg-red-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500`}
         >
-          {isPdfLoading ? 'Processing...' : 'Export PDF Quote'}
+          {isPdfLoading ? 'Processing...' : (!fontsLoaded ? 'Loading Fonts...' : 'Export PDF Quote')}
         </button>
       </div>
     </div>

@@ -22,8 +22,8 @@ export const RECOGNITION_FACTORS = {
 };
 
 export const AVAILABLE_PRODUCTS: ProductDefinition[] = [
-  { id: 'utd', name: 'UTD (Unlimited Tax Database)', shortName: 'UTD', hasVariants: true, countLabel: 'HC' },
-  { id: 'ld', name: 'LXD (Legal Database)', shortName: 'LD', hasVariants: true, countLabel: 'BC' },
+  { id: 'utd', name: 'UTD', shortName: 'UTD', hasVariants: true, countLabel: 'HC' },
+  { id: 'ld', name: 'LXD', shortName: 'LD', hasVariants: true, countLabel: 'BC' },
 ];
 
 export const UTD_VARIANTS: Record<string, number> = {
@@ -37,4 +37,6 @@ export const LD_VARIANTS: Record<string, number> = {
   "+FLINK": 92,
   "+FLINK+IPE": 108,
   "EE-Combo": 66.25, // 0.25 * 265
+  "EE-Combo+FLINK": 78.25,
+  "EE-Combo+FLINK+IPE": 94.25,
 };

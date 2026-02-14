@@ -27,6 +27,10 @@ const App: React.FC = () => {
   const [method, setMethod] = useState<PricingMethod>(PricingMethod.MYFPI);
   const [applyWHT, setApplyWHT] = useState<boolean>(true); // Default true for KSA
   
+  // Combo Discount State
+  const [applyComboDiscount, setApplyComboDiscount] = useState<boolean>(false);
+  const [comboDiscountValue, setComboDiscountValue] = useState<number>(0);
+
   // Single Rate Values (Applied to Y2+)
   const [globalRateVal, setGlobalRateVal] = useState<number>(5);
   const [utdRateVal, setUtdRateVal] = useState<number>(8); // Default 8%
@@ -75,8 +79,10 @@ const App: React.FC = () => {
       rates, 
       productRates,
       applyWHT,
+      applyComboDiscount: showSplitRates ? applyComboDiscount : false,
+      comboDiscountValue: showSplitRates ? comboDiscountValue : 0,
     };
-  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, ldRateVal, showSplitRates, applyWHT]);
+  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, ldRateVal, showSplitRates, applyWHT, applyComboDiscount, comboDiscountValue]);
 
   // Results
   const results = useMemo(() => calculatePricing(config), [config]);
@@ -300,7 +306,8 @@ const App: React.FC = () => {
                                type="number"
                                min="0"
                                max="100"
-                               className="block w-full text-xs border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white text-gray-900 bg-gray-50 font-mono"
+                               disabled={showSplitRates && applyComboDiscount && product.id === 'ld'}
+                               className={`block w-full text-xs border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white text-gray-900 bg-gray-50 font-mono ${showSplitRates && applyComboDiscount && product.id === 'ld' ? 'opacity-50 cursor-not-allowed' : ''}`}
                                value={input.baseDiscount}
                                onChange={(e) => handleInputChange(product.id, 'baseDiscount', parseFloat(e.target.value) || 0)}
                              />
@@ -331,6 +338,37 @@ const App: React.FC = () => {
                     Apply WHT (Gross Up)
                   </label>
                </div>
+
+               {/* Combo Discount Checkbox (Conditional) */}
+               {showSplitRates && (
+                  <div className="flex items-center space-x-2 p-2 bg-blue-50 rounded border border-blue-100">
+                     <input 
+                       id="combo-discount-checkbox"
+                       type="checkbox"
+                       checked={applyComboDiscount}
+                       onChange={(e) => setApplyComboDiscount(e.target.checked)}
+                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                     />
+                     <div className="flex-1 flex items-center justify-between">
+                       <label htmlFor="combo-discount-checkbox" className="text-sm font-medium text-blue-900">
+                         Apply Combo Discount
+                       </label>
+                       {applyComboDiscount && (
+                         <div className="flex items-center">
+                           <input 
+                             type="number"
+                             min="0"
+                             max="100"
+                             value={comboDiscountValue}
+                             onChange={(e) => setComboDiscountValue(parseInt(e.target.value) || 0)}
+                             className="w-16 text-xs border border-blue-300 rounded p-1 text-center"
+                           />
+                           <span className="ml-1 text-xs text-blue-700">%</span>
+                         </div>
+                       )}
+                     </div>
+                  </div>
+               )}
 
                <div className="flex space-x-4">
                  <div className="w-1/3">
@@ -604,6 +642,9 @@ const App: React.FC = () => {
                 )}
                 {results.yearlyResults[0].floorAdjusted && (
                   <li><strong>Auto-Adjustment:</strong> Pricing was automatically raised to meet the minimum floor requirements.</li>
+                )}
+                {applyComboDiscount && (
+                   <li><strong>Combo Discount:</strong> LD base discount overridden to {comboDiscountValue}% due to combo selection.</li>
                 )}
                 {/* Monthly Cost Analysis */}
                 {monthlyCosts.length > 0 && (

@@ -58,7 +58,7 @@ const convertToSAR = (usdAmount: number): number => {
 };
 
 export const calculatePricing = (config: DealConfiguration): CalculationOutput => {
-  const { dealType, channel, selectedProducts, productInputs, years, method, rates, productRates, applyWHT } = config;
+  const { dealType, channel, selectedProducts, productInputs, years, method, rates, productRates, applyWHT, applyComboDiscount, comboDiscountValue } = config;
   
   // Define Floors based on WHT setting
   const activeStandardFloor = applyWHT ? (STANDARD_FLOOR_RAW / WHT_FACTOR) : STANDARD_FLOOR_RAW;
@@ -92,7 +92,13 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
       ? (inputs.count * listRate) 
       : (definition?.defaultBasePrice || 0);
 
-    let baseNet = baseGross * (1 - (inputs.baseDiscount / 100));
+    // Determine effective discount
+    let effectiveDiscount = inputs.baseDiscount;
+    if (prodId === 'ld' && applyComboDiscount && comboDiscountValue !== undefined && selectedProducts.includes('utd')) {
+       effectiveDiscount = comboDiscountValue;
+    }
+
+    let baseNet = baseGross * (1 - (effectiveDiscount / 100));
 
     // Apply WHT Gross Up if enabled
     if (applyWHT) {
