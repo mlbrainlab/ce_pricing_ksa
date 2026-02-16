@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { CalculationOutput, DealConfiguration, ChannelType } from '../types';
 import { AVAILABLE_PRODUCTS } from '../constants';
@@ -14,15 +15,15 @@ const WK_LOGO_URL = "https://cdn.wolterskluwer.io/wk/jumpstart-v3-assets/0.x.x/l
 // Using CORS proxy to ensure the image loads in the browser
 const SAMIR_LOGO_URL = "https://corsproxy.io/?https://samirgroup.com/wp-content/uploads/2021/05/logo.png"; 
 
-// Reliable Font URLs (GitHub Raw)
+// Reliable Font URLs (jsDelivr CDN for GitHub raw)
 const FONT_URLS = {
   Inter: {
-    regular: "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/static/Inter-Regular.ttf",
-    bold: "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/static/Inter-Bold.ttf"
+    regular: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/inter/static/Inter-Regular.ttf",
+    bold: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/inter/static/Inter-Bold.ttf"
   },
   FiraSans: {
-    regular: "https://raw.githubusercontent.com/google/fonts/main/ofl/firasans/FiraSans-Regular.ttf",
-    bold: "https://raw.githubusercontent.com/google/fonts/main/ofl/firasans/FiraSans-Bold.ttf"
+    regular: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/firasans/FiraSans-Regular.ttf",
+    bold: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/firasans/FiraSans-Bold.ttf"
   }
 };
 
@@ -33,8 +34,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
   const [repName, setRepName] = useState('');
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   
-  // Font State
-  const [selectedFont, setSelectedFont] = useState<FontType>('Inter');
+  // Font State - Default to FiraSans
+  const [selectedFont, setSelectedFont] = useState<FontType>('FiraSans');
   const [fontCache, setFontCache] = useState<Record<FontType, { regular: string | null, bold: string | null }>>({
     Inter: { regular: null, bold: null },
     FiraSans: { regular: null, bold: null }
@@ -70,11 +71,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
           console.log(`${selectedFont} loaded successfully.`);
         } else {
           console.error(`Failed to fetch ${selectedFont}: Status ${regRes.status}/${boldRes.status}`);
-          alert(`Error loading ${selectedFont}. Please try again or check internet connection.`);
+          // Don't alert immediately on load, just log. Alert only on PDF gen attempt if missing.
         }
       } catch (e) {
         console.error(`Exception loading ${selectedFont}:`, e);
-        alert(`Error loading ${selectedFont}.`);
       } finally {
         setIsFontLoading(false);
       }
@@ -175,7 +175,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
   const handlePDFExport = async () => {
     const currentFontData = fontCache[selectedFont];
     if (!currentFontData.regular || !currentFontData.bold) {
-      alert("Fonts are still loading. Please wait.");
+      alert("Fonts are not loaded. Please wait or check your connection.");
       return;
     }
 
@@ -226,6 +226,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
           // Full Blue Top Half
           doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
           doc.rect(0, 0, pageWidth, 150, 'F'); 
+          
+          // Proprietary & Confidential label
+          doc.setFontSize(10);
+          doc.setTextColor(255, 255, 255);
+          doc.setFont(fontName, 'bold');
+          doc.text("Proprietary & Confidential", pageWidth - 14, 28, { align: 'right' });
        } else {
           // Standard Header Bar
           doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -336,6 +342,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     doc.text(`Date: ${docDate}`, 14, 275);
     doc.text(`Ref: ${refId}`, 14, 280);
 
+    // Copyright Footer for Page 1
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`©${new Date().getFullYear()} UpToDate, Inc. and its affiliates and/or licensors. All rights reserved.`, 14, 290);
+
     // --- PAGE 2: CONFIDENTIALITY ---
     doc.addPage();
     renderHeader(false);
@@ -350,13 +361,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     doc.setTextColor(0, 0, 0);
     doc.setFont(fontName, 'normal');
     
-    const disclaimer = `This proposal and the information contained herein is proprietary and confidential information of Wolters Kluwer. 
-
-It is intended solely for the use of the individual or entity to whom it is addressed. This document contains sensitive commercial and technical information that should not be disclosed to any third party without the prior written consent of Wolters Kluwer.
-
-The pricing and terms outlined in this document are budgetary in nature and subject to final contract negotiation and execution.
-
-By accepting this document, the recipient agrees to keep its contents confidential and to use them solely for the purpose of evaluating the proposed business relationship.`;
+    const disclaimer = `The information contained within this Proposal is confidential and proprietary and may be used solely for the purpose of evaluating the potential license of offerings and/or services provided by the Wolters Kluwer Health, Inc. entities (sometimes collectively referred to as “Wolters Kluwer”) identified in this Proposal. This Proposal is non-binding on each party. Neither this Proposal, nor any oral or written communication concerning the matters covered by this Proposal, shall create any binding obligations on any party; only those obligations set forth in a separate written definitive agreement negotiated and executed by all parties in a form approved by each party shall be binding upon the parties. Any information contained within this Proposal may only be disclosed to directors, officers, employees, and agents of the recipient organization who need to know such information for the purpose of evaluating this Proposal. The information contained within this Proposal shall not be communicated to anyone outside of the recipient organization without the express written permission of Wolters Kluwer.`;
 
     const splitText = doc.splitTextToSize(disclaimer, 180);
     doc.text(splitText, 14, 60);
@@ -404,8 +409,10 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     if (isIndirect) {
       // INDIRECT
       const prodCols = config.selectedProducts.map(pid => {
-         const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-         return `${p?.shortName || pid} (SAR)`;
+         let label = pid;
+         if (pid === 'utd') label = 'UpToDate';
+         if (pid === 'ld') label = 'Lexidrug';
+         return `${label} (SAR)`;
       });
       tableHead = [['Year', ...prodCols, 'Total (SAR)', 'VAT (15%)', 'Grand Total\n(SAR)']];
       
@@ -443,8 +450,10 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     } else {
       // DIRECT
       const prodCols = config.selectedProducts.map(pid => {
-         const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-         return `${p?.shortName || pid} (USD)`;
+         let label = pid;
+         if (pid === 'utd') label = 'UpToDate';
+         if (pid === 'ld') label = 'Lexidrug';
+         return `${label} (USD)`;
       });
       tableHead = [['Year', ...prodCols, 'Total (USD)']];
 
@@ -506,14 +515,25 @@ By accepting this document, the recipient agrees to keep its contents confidenti
 
     let finalY = (doc as any).lastAutoTable.finalY + 10;
 
-    // --- Monthly Cost Analysis ---
+    // --- Monthly Cost Analysis (with Bold parts) ---
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
-
-    const analysisParts: string[] = [];
     
     const displayCurrency = isIndirect ? 'SAR' : 'USD';
     const getValue = (valUSD: number, valSAR: number) => isIndirect ? valSAR : valUSD;
+
+    const renderBoldLine = (startY: number, prefix: string, boldText: string, suffix: string) => {
+       doc.setFont(fontName, 'normal');
+       doc.text(prefix, 14, startY);
+       const w1 = doc.getTextWidth(prefix);
+       
+       doc.setFont(fontName, 'bold');
+       doc.text(boldText, 14 + w1, startY);
+       const w2 = doc.getTextWidth(boldText);
+       
+       doc.setFont(fontName, 'normal');
+       doc.text(suffix, 14 + w1 + w2, startY);
+    };
 
     if (config.selectedProducts.includes('utd')) {
         const count = config.productInputs['utd'].count || 1;
@@ -529,7 +549,9 @@ By accepting this document, the recipient agrees to keep its contents confidenti
         const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
         const monthlyPerUnit = acv / count / 12;
 
-        analysisParts.push(`Your UTD subscription costs ${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} monthly per physician`);
+        const valStr = `${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        renderBoldLine(finalY, "Your UTD subscription costs ", valStr, " monthly per physician.");
+        finalY += 6;
     }
 
     if (config.selectedProducts.includes('ld')) {
@@ -546,21 +568,12 @@ By accepting this document, the recipient agrees to keep its contents confidenti
         const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
         const monthlyPerUnit = acv / count / 12;
 
-        analysisParts.push(`your LD subscription costs ${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} monthly per bed`);
+        const valStr = `${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        renderBoldLine(finalY, "Your LXD subscription costs ", valStr, " monthly per bed.");
+        finalY += 6;
     }
 
-    if (analysisParts.length > 0) {
-        const analysisText = analysisParts.join(', and ') + '.';
-        const finalAnalysisText = analysisText.charAt(0).toUpperCase() + analysisText.slice(1);
-        
-        doc.setFontSize(10);
-        doc.setFont(fontName, 'italic');
-        const splitAnalysis = doc.splitTextToSize(finalAnalysisText, 180);
-        doc.text(splitAnalysis, 14, finalY);
-        doc.setFont(fontName, 'normal');
-        finalY += (splitAnalysis.length * 5) + 10;
-    }
-
+    finalY += 4; // Spacing before Terms
 
     // --- Terms & Conditions ---
     doc.setFontSize(14);
@@ -573,41 +586,45 @@ By accepting this document, the recipient agrees to keep its contents confidenti
     doc.setTextColor(0, 0, 0);
     doc.setFont(fontName, 'normal');
 
-    const paymentTermText = config.channel === ChannelType.DIRECT
-      ? "30 days from invoice date."
-      : "As per the entity's regulations.";
+    const terms: string[] = [];
 
-    const statsList = [];
-    if (config.selectedProducts.includes('utd')) {
-       statsList.push(`${config.productInputs['utd'].count} Physicians`);
-    }
-    if (config.selectedProducts.includes('ld')) {
-       statsList.push(`${config.productInputs['ld'].count} Active Beds`);
-    }
-    const statsString = statsList.length > 0 ? `Statistics: ${statsList.join(' & ')}` : '';
+    terms.push("The prices mentioned above are not final and subject to change in case of releasing an official RFP.");
 
-    const terms = [
-      `Price validity: 60 days.`,
-      `Subscription Duration: ${config.years} Years`,
-      `Payment terms: ${paymentTermText}`,
-      `EMR integration is free of charge over the course of the subscription even if the EMR changed.`,
-    ];
-    
-    if (statsString) {
-      terms.push(statsString);
+    if (config.years > 1) {
+        terms.push("The prices above are tied to a multi-year non-opt-out contract for the same number of years.");
     }
 
-    terms.push(`Refer to the technical proposal for access methods, licensed material and product description.`);
+    if (config.channel === ChannelType.DIRECT) {
+        terms.push("The price above is exempt from 15% VAT.");
+    }
+
+    terms.push("Upon renewing the subscription, a statistics recount will be executed, considering the standard price of the exit year.");
+    terms.push("The Internet access is a must for this subscription to be utilized.");
+    terms.push("This budgetary proposal is valid for 60-days.");
+    terms.push("Integrating UpToDate® or Lexidrug® with your EMR is included in the prices above, even if the EMR changed during the subscription.*");
 
     terms.forEach(term => {
-      if (finalY > 270) {
+      if (finalY > 260) {
         doc.addPage();
         renderHeader(false);
         finalY = 55;
       }
-      doc.text(`• ${term}`, 14, finalY);
-      finalY += 6;
+      const splitTerm = doc.splitTextToSize(`• ${term}`, 180);
+      doc.text(splitTerm, 14, finalY);
+      finalY += (splitTerm.length * 5) + 2;
     });
+
+    // Footnote
+    if (finalY > 260) {
+        doc.addPage();
+        renderHeader(false);
+        finalY = 55;
+    }
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    const footnote = "* Some EMR providers put additional charges to integrate our solutions, we’re neither responsible nor covering these costs. It has to be discussed with the EMR provider directly.";
+    const splitFootnote = doc.splitTextToSize(footnote, 180);
+    doc.text(splitFootnote, 14, finalY + 2);
 
     addFooter(3);
 

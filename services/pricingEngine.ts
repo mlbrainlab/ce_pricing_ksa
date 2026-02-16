@@ -1,3 +1,4 @@
+
 import { 
   DealConfiguration, 
   PricingResult, 
@@ -50,15 +51,11 @@ const getNetFactor = (dealType: DealType, channel: ChannelType, yearIndex: numbe
 
 const convertToSAR = (usdAmount: number): number => {
   const rawSar = usdAmount * EXCHANGE_RATE_SAR;
-  // Round to nearest thousand for cleaner commercial presentation usually, 
-  // but to keep math consistent per product vs total, let's keep it tight or use standard rounding.
-  // Previous logic was ceil to 1000. Let's maintain that for Total, but for individual lines it might cause summation errors.
-  // For safety in breakdown, we calculate raw then round total.
   return Math.ceil(rawSar / 10) * 10; // Rounding to nearest 10 SAR for cleaner numbers
 };
 
 export const calculatePricing = (config: DealConfiguration): CalculationOutput => {
-  const { dealType, channel, selectedProducts, productInputs, years, method, rates, productRates, applyWHT, applyComboDiscount, comboDiscountValue } = config;
+  const { dealType, channel, selectedProducts, productInputs, years, method, rates, productRates, applyWHT } = config;
   
   // Define Floors based on WHT setting
   const activeStandardFloor = applyWHT ? (STANDARD_FLOOR_RAW / WHT_FACTOR) : STANDARD_FLOOR_RAW;
@@ -93,10 +90,8 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
       : (definition?.defaultBasePrice || 0);
 
     // Determine effective discount
-    let effectiveDiscount = inputs.baseDiscount;
-    if (prodId === 'ld' && applyComboDiscount && comboDiscountValue !== undefined && selectedProducts.includes('utd')) {
-       effectiveDiscount = comboDiscountValue;
-    }
+    // If it's a combo scenario, the user now enters the combo discount directly into baseDiscount field in UI
+    const effectiveDiscount = inputs.baseDiscount;
 
     let baseNet = baseGross * (1 - (effectiveDiscount / 100));
 

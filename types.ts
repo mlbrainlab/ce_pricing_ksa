@@ -1,3 +1,4 @@
+
 export enum DealType {
   NEW_LOGO = 'New Logo',
   RENEWAL = 'Renewal',
@@ -60,8 +61,6 @@ export interface DealConfiguration {
   rates: number[]; // Global fallback
   productRates: Record<string, number[]>; // Per product rates
   applyWHT: boolean;
-  applyComboDiscount?: boolean;
-  comboDiscountValue?: number;
 }
 
 export interface CalculationOutput {

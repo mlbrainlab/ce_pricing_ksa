@@ -23,7 +23,7 @@ export const RECOGNITION_FACTORS = {
 
 export const AVAILABLE_PRODUCTS: ProductDefinition[] = [
   { id: 'utd', name: 'UTD', shortName: 'UTD', hasVariants: true, countLabel: 'HC' },
-  { id: 'ld', name: 'LXD', shortName: 'LD', hasVariants: true, countLabel: 'BC' },
+  { id: 'ld', name: 'LXD', shortName: 'LXD', hasVariants: true, countLabel: 'BC' },
 ];
 
 export const UTD_VARIANTS: Record<string, number> = {
