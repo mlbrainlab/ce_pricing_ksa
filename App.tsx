@@ -27,10 +27,6 @@ const App: React.FC = () => {
   const [method, setMethod] = useState<PricingMethod>(PricingMethod.MYFPI);
   const [applyWHT, setApplyWHT] = useState<boolean>(true); // Default true for KSA
   
-  // Combo Discount State
-  const [applyComboDiscount, setApplyComboDiscount] = useState<boolean>(false);
-  const [comboDiscountValue, setComboDiscountValue] = useState<number>(0);
-
   // Single Rate Values (Applied to Y2+)
   const [globalRateVal, setGlobalRateVal] = useState<number>(5);
   const [utdRateVal, setUtdRateVal] = useState<number>(8); // Default 8%
@@ -79,13 +75,28 @@ const App: React.FC = () => {
       rates, 
       productRates,
       applyWHT,
-      applyComboDiscount: showSplitRates ? applyComboDiscount : false,
-      comboDiscountValue: showSplitRates ? comboDiscountValue : 0,
     };
-  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, ldRateVal, showSplitRates, applyWHT, applyComboDiscount, comboDiscountValue]);
+  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, ldRateVal, showSplitRates, applyWHT]);
 
   // Results
   const results = useMemo(() => calculatePricing(config), [config]);
+
+  // Validation Logic for UTDEE
+  const utdEeWarning = useMemo(() => {
+    if (selectedProductIds.includes('utd')) {
+       const inputs = productInputs['utd'];
+       if (inputs.variant === 'UTDEE') {
+         // Check Year 1 Gross USD for UTD
+         // We can find it in yearlyResults[0].breakdown
+         const utdY1 = results.yearlyResults[0]?.breakdown.find(p => p.id === 'utd');
+         if (utdY1 && utdY1.gross < 50000) {
+           return "Warning: UTDEE deals under $50k/year require additional approval.";
+         }
+       }
+    }
+    return null;
+  }, [results, selectedProductIds, productInputs]);
+
 
   // Calculate Monthly Costs for Architect Notes
   const monthlyCosts = useMemo(() => {
@@ -123,7 +134,7 @@ const App: React.FC = () => {
 
         const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
         const monthlyPerUnit = acv / count / 12;
-        analysisParts.push(`LD: ${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /mo/bed`);
+        analysisParts.push(`LXD: ${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /mo/bed`);
     }
     return analysisParts;
   }, [config, results]);
@@ -137,13 +148,25 @@ const App: React.FC = () => {
   };
 
   const handleInputChange = (id: string, field: keyof ProductInput, value: string | number) => {
-    setProductInputs(prev => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        [field]: value
+    setProductInputs(prev => {
+      const prevInput = prev[id];
+      const newState = {
+        ...prev,
+        [id]: {
+          ...prevInput,
+          [field]: value
+        }
+      };
+
+      // Specific Logic: If UTD Variant becomes UTDEE, enforce min count 150
+      if (id === 'utd' && field === 'variant' && value === 'UTDEE') {
+         if (newState['utd'].count < 150) {
+            newState['utd'].count = 150;
+         }
       }
-    }));
+
+      return newState;
+    });
   };
 
   // Input Field Helper
@@ -215,13 +238,18 @@ const App: React.FC = () => {
                 const isSelected = selectedProductIds.includes(product.id);
                 const input = productInputs[product.id] || { count: 0, variant: '', baseDiscount: 0 };
                 
-                // Hint Logic: If UTD is selected & variant is UTDEE, and current product is LD and variant IS NOT EE-Combo
-                const showComboHint = 
-                  product.id === 'ld' && 
-                  isSelected &&
-                  selectedProductIds.includes('utd') && 
-                  productInputs['utd']?.variant === 'UTDEE' && 
-                  input.variant !== 'EE-Combo';
+                // Logic for disabling LXD variants if UTD is ANYWHERE or UTDADV
+                const isUTDSelected = selectedProductIds.includes('utd');
+                const currentUTDVariant = productInputs['utd']?.variant;
+                const isRestrictedUTD = isUTDSelected && (currentUTDVariant === 'ANYWHERE' || currentUTDVariant === 'UTDADV');
+                
+                // Logic for disabling Base Discount on LD if UTD EE + LD EE-Combo is selected
+                const isUTDEE = isUTDSelected && currentUTDVariant === 'UTDEE';
+                const isLDComboVariant = product.id === 'ld' && input.variant.includes('EE-Combo');
+                const shouldDisableLDDiscount = isUTDEE && isLDComboVariant;
+
+                // Rename discount label if split rates (Combo) are active for LD
+                const discountLabel = (product.id === 'ld' && isUTDSelected) ? 'Combo Discount %' : 'Base Discount %';
 
                 return (
                   <div key={product.id} className={`border rounded-md transition-colors ${isSelected ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-200 dark:border-gray-700'}`}>
@@ -269,20 +297,18 @@ const App: React.FC = () => {
                                  {product.id === 'utd' && Object.keys(UTD_VARIANTS).map(v => (
                                    <option key={v} value={v}>{v} (${UTD_VARIANTS[v]})</option>
                                  ))}
-                                 {product.id === 'ld' && Object.keys(LD_VARIANTS).map(v => (
-                                   <option key={v} value={v}>{v} (${LD_VARIANTS[v]})</option>
-                                 ))}
+                                 {product.id === 'ld' && Object.keys(LD_VARIANTS).map(v => {
+                                   const isComboOption = v.includes('EE-Combo');
+                                   // Disable combo options if UTD is ANYWHERE or ADVANCED
+                                   if (isRestrictedUTD && isComboOption) {
+                                      return <option key={v} value={v} disabled>{v} (Requires UTD EE)</option>;
+                                   }
+                                   return <option key={v} value={v}>{v} (${LD_VARIANTS[v]})</option>
+                                 })}
                                </select>
                              </div>
                            ) : (
                              <div className="col-span-2 text-xs text-gray-400 italic mt-1">Standard pricing applied</div>
-                           )}
-                           
-                           {/* Combo Hint */}
-                           {showComboHint && (
-                             <div className="col-span-2 text-[10px] text-blue-600 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 p-1.5 rounded border border-blue-200 dark:border-blue-800">
-                               <strong>Tip:</strong> UTD-EE is selected. "EE-Combo" variant is available for LD.
-                             </div>
                            )}
 
                            {/* Count Input (HC/BC) */}
@@ -301,13 +327,13 @@ const App: React.FC = () => {
 
                            {/* Discount Input */}
                            <div className={product.countLabel ? '' : 'col-span-2'}>
-                             <label className="block text-xs text-blue-700 dark:text-blue-300 mb-1">Base Discount %</label>
+                             <label className="block text-xs text-blue-700 dark:text-blue-300 mb-1">{discountLabel}</label>
                              <input
                                type="number"
                                min="0"
                                max="100"
-                               disabled={showSplitRates && applyComboDiscount && product.id === 'ld'}
-                               className={`block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums ${showSplitRates && applyComboDiscount && product.id === 'ld' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                               disabled={shouldDisableLDDiscount}
+                               className={`block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums ${shouldDisableLDDiscount ? 'opacity-50 cursor-not-allowed' : ''}`}
                                value={input.baseDiscount}
                                onChange={(e) => handleInputChange(product.id, 'baseDiscount', parseFloat(e.target.value) || 0)}
                              />
@@ -338,37 +364,6 @@ const App: React.FC = () => {
                     Apply WHT (Gross Up)
                   </label>
                </div>
-
-               {/* Combo Discount Checkbox (Conditional) */}
-               {showSplitRates && (
-                  <div className="flex items-center space-x-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800">
-                     <input 
-                       id="combo-discount-checkbox"
-                       type="checkbox"
-                       checked={applyComboDiscount}
-                       onChange={(e) => setApplyComboDiscount(e.target.checked)}
-                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
-                     />
-                     <div className="flex-1 flex items-center justify-between">
-                       <label htmlFor="combo-discount-checkbox" className="text-sm font-medium text-blue-900 dark:text-blue-200">
-                         Apply Combo Discount
-                       </label>
-                       {applyComboDiscount && (
-                         <div className="flex items-center">
-                           <input 
-                             type="number"
-                             min="0"
-                             max="100"
-                             value={comboDiscountValue}
-                             onChange={(e) => setComboDiscountValue(parseInt(e.target.value) || 0)}
-                             className="w-16 text-xs border border-blue-300 dark:border-blue-700 rounded p-1 text-center bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                           />
-                           <span className="ml-1 text-xs text-blue-700 dark:text-blue-300">%</span>
-                         </div>
-                       )}
-                     </div>
-                  </div>
-               )}
 
                <div className="flex space-x-4">
                  <div className="w-1/3">
@@ -427,9 +422,11 @@ const App: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 transition-colors">
              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
                 <h3 className="text-lg font-bold text-gray-800 dark:text-white">Commercial Schedule</h3>
-                <div className="text-xs font-sans tabular-nums text-gray-500 dark:text-gray-400">
-                   1 USD = {3.76} SAR
-                </div>
+                {isIndirect && (
+                  <div className="text-xs font-sans tabular-nums text-gray-500 dark:text-gray-400">
+                     1 USD = {3.76} SAR
+                  </div>
+                )}
              </div>
              
              <div className="overflow-x-auto">
@@ -629,7 +626,14 @@ const App: React.FC = () => {
           </div>
 
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-md p-4 transition-colors">
-             <h4 className="text-sm font-bold text-yellow-800 dark:text-yellow-200">Architect Notes</h4>
+             <div className="flex justify-between items-start">
+               <h4 className="text-sm font-bold text-yellow-800 dark:text-yellow-200">Architect Notes</h4>
+               {utdEeWarning && (
+                 <span className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded">
+                   {utdEeWarning}
+                 </span>
+               )}
+             </div>
              <ul className="mt-2 text-xs text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-1">
                 <li><strong>Base Calculation:</strong> UTD (HC × Rate) / LD (BC × Rate).</li>
                 <li><strong>WHT Adjustment:</strong> {applyWHT ? "Prices grossed up (divided by 0.95)." : "No WHT gross up applied."}</li>
@@ -642,9 +646,6 @@ const App: React.FC = () => {
                 )}
                 {results.yearlyResults[0].floorAdjusted && (
                   <li><strong>Auto-Adjustment:</strong> Pricing was automatically raised to meet the minimum floor requirements.</li>
-                )}
-                {applyComboDiscount && (
-                   <li><strong>Combo Discount:</strong> LD base discount overridden to {comboDiscountValue}% due to combo selection.</li>
                 )}
                 {/* Monthly Cost Analysis */}
                 {monthlyCosts.length > 0 && (
