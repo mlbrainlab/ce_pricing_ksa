@@ -55,7 +55,7 @@ const convertToSAR = (usdAmount: number): number => {
 };
 
 export const calculatePricing = (config: DealConfiguration): CalculationOutput => {
-  const { dealType, channel, selectedProducts, productInputs, years, method, rates, productRates, applyWHT } = config;
+  const { dealType, channel, selectedProducts, productInputs, years, method, rates, productRates, applyWHT, flatPricing } = config;
   
   // Define Floors based on WHT setting
   const activeStandardFloor = applyWHT ? (STANDARD_FLOOR_RAW / WHT_FACTOR) : STANDARD_FLOOR_RAW;
@@ -174,6 +174,19 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
     
     productSchedules[prodId] = schedule;
   });
+
+  // --- Step 3.5: Apply Flat Pricing (Flatten the curve) ---
+  if (flatPricing && years > 1) {
+    selectedProducts.forEach(prodId => {
+      const schedule = productSchedules[prodId];
+      // Calculate sum of projected years
+      const totalPeriodCost = schedule.reduce((acc, val) => acc + val, 0);
+      // Average it
+      const averageAnnual = totalPeriodCost / years;
+      // Overwrite schedule with flat values
+      productSchedules[prodId] = new Array(years).fill(averageAnnual);
+    });
+  }
 
   // --- Step 4: Aggregate and Format ---
   

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Layout } from './components/Layout';
 import { ExportSection } from './components/ExportSection';
@@ -26,6 +27,7 @@ const App: React.FC = () => {
   const [years, setYears] = useState<number>(3);
   const [method, setMethod] = useState<PricingMethod>(PricingMethod.MYFPI);
   const [applyWHT, setApplyWHT] = useState<boolean>(true); // Default true for KSA
+  const [flatPricing, setFlatPricing] = useState<boolean>(false); // New Flat Pricing Option
   
   // Single Rate Values (Applied to Y2+)
   const [globalRateVal, setGlobalRateVal] = useState<number>(5);
@@ -75,8 +77,9 @@ const App: React.FC = () => {
       rates, 
       productRates,
       applyWHT,
+      flatPricing
     };
-  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, ldRateVal, showSplitRates, applyWHT]);
+  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, ldRateVal, showSplitRates, applyWHT, flatPricing]);
 
   // Results
   const results = useMemo(() => calculatePricing(config), [config]);
@@ -352,17 +355,34 @@ const App: React.FC = () => {
             <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mb-4">3. Structure</h2>
             <div className="space-y-4">
                {/* WHT Checkbox */}
-               <div className="flex items-center">
-                  <input 
-                    id="wht-checkbox"
-                    type="checkbox" 
-                    checked={applyWHT} 
-                    onChange={(e) => setApplyWHT(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
-                  />
-                  <label htmlFor="wht-checkbox" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Apply WHT (Gross Up)
-                  </label>
+               <div className="flex items-center justify-between">
+                 <div className="flex items-center">
+                    <input 
+                      id="wht-checkbox"
+                      type="checkbox" 
+                      checked={applyWHT} 
+                      onChange={(e) => setApplyWHT(e.target.checked)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                    />
+                    <label htmlFor="wht-checkbox" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Apply WHT (Gross Up)
+                    </label>
+                 </div>
+                 {/* Flat Pricing Checkbox */}
+                 {years > 1 && (
+                   <div className="flex items-center">
+                      <input 
+                        id="flat-pricing-checkbox"
+                        type="checkbox" 
+                        checked={flatPricing} 
+                        onChange={(e) => setFlatPricing(e.target.checked)}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                      />
+                      <label htmlFor="flat-pricing-checkbox" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Flat Pricing
+                      </label>
+                   </div>
+                 )}
                </div>
 
                <div className="flex space-x-4">
@@ -435,7 +455,7 @@ const App: React.FC = () => {
                      <tr>
                         <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">Year</th>
                         
-                        {/* Dynamic Product Columns - Gross */}
+                        {/* Dynamic Product Columns - Gross USD */}
                         {selectedProductIds.map(pid => {
                            const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
                            return (
@@ -449,6 +469,16 @@ const App: React.FC = () => {
                         <th className="px-4 py-3 text-center text-xs font-bold text-gray-800 dark:text-gray-200 uppercase bg-gray-200 dark:bg-gray-600 whitespace-nowrap">
                            Total (USD)
                         </th>
+
+                        {/* Dynamic Product Columns - Gross SAR (Indirect only) */}
+                        {isIndirect && selectedProductIds.map(pid => {
+                            const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                            return (
+                              <th key={`${pid}-sar`} className="px-4 py-3 text-center text-xs font-bold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">
+                                {p?.shortName || p?.name} (SAR)
+                              </th>
+                            );
+                        })}
 
                         {/* Conditionally show SAR Total */}
                         {isIndirect && (
@@ -477,7 +507,7 @@ const App: React.FC = () => {
                         <tr key={r.year} className={i % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700/50'}>
                            <td className="px-4 py-4 text-center text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">Year {r.year}</td>
                            
-                           {/* Product Columns Data Gross */}
+                           {/* Product Columns Data Gross USD */}
                            {selectedProductIds.map(pid => {
                              const pData = r.breakdown.find(d => d.id === pid);
                              return (
@@ -491,6 +521,16 @@ const App: React.FC = () => {
                            <td className="px-4 py-4 text-center text-sm font-bold text-blue-700 dark:text-blue-300 font-sans tabular-nums bg-blue-50 dark:bg-blue-900/20 whitespace-nowrap">
                               {formatCurrency(r.grossUSD, 'USD')}
                            </td>
+
+                           {/* Product Columns Data Gross SAR (Indirect only) */}
+                           {isIndirect && selectedProductIds.map(pid => {
+                             const pData = r.breakdown.find(d => d.id === pid);
+                             return (
+                               <td key={`${pid}-sar`} className="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-300 font-sans tabular-nums whitespace-nowrap">
+                                 {pData ? formatCurrency(pData.grossSAR, 'SAR') : '-'}
+                               </td>
+                             );
+                           })}
 
                            {/* Total SAR (if Indirect) */}
                            {isIndirect && (
@@ -519,7 +559,7 @@ const App: React.FC = () => {
                      <tr className="bg-gray-800 dark:bg-gray-900 text-white">
                         <td className="px-4 py-4 text-center text-sm font-bold whitespace-nowrap">Total</td>
                         
-                        {/* Empty cells for breakdown columns */}
+                        {/* Empty cells for breakdown columns USD */}
                         {selectedProductIds.map(pid => (
                           <td key={pid}></td>
                         ))}
@@ -528,6 +568,11 @@ const App: React.FC = () => {
                         <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums whitespace-nowrap">
                            {formatCurrency(results.totalGrossUSD, 'USD')}
                         </td>
+
+                        {/* Empty cells for breakdown columns SAR */}
+                        {isIndirect && selectedProductIds.map(pid => (
+                          <td key={`${pid}-sar`}></td>
+                        ))}
 
                          {/* Total SAR */}
                         {isIndirect && (

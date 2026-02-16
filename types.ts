@@ -61,6 +61,7 @@ export interface DealConfiguration {
   rates: number[]; // Global fallback
   productRates: Record<string, number[]>; // Per product rates
   applyWHT: boolean;
+  flatPricing: boolean;
 }
 
 export interface CalculationOutput {
