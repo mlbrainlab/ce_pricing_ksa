@@ -587,6 +587,22 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     doc.setFont(fontName, 'normal');
 
     const terms: string[] = [];
+    
+    // Generate statistics string with full names
+    const statsParts: string[] = [];
+    config.selectedProducts.forEach(pid => {
+        const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+        const inp = config.productInputs[pid];
+        if(p && inp && inp.count > 0 && p.countLabel) {
+            let productName = p.name;
+            if (pid === 'utd') productName = 'UpToDate';
+            if (pid === 'ld') productName = 'Lexidrug';
+            statsParts.push(`${inp.count} ${p.countLabel} for ${productName}`);
+        }
+    });
+    if(statsParts.length > 0) {
+        terms.push(`This proposal is based on the following statistics: ${statsParts.join(', ')}.`);
+    }
 
     terms.push("The prices mentioned above are not final and subject to change in case of releasing an official RFP.");
 
