@@ -35,8 +35,8 @@ export const UTD_VARIANTS: Record<string, number> = {
 
 export const LD_VARIANTS: Record<string, number> = {
   "BASE PKG": 80,
-  "+FLINK": 92,
-  "+FLINK+IPE": 108,
+  "BASE PKG+FLINK": 92,
+  "BASE PKG+FLINK+IPE": 108,
   "EE-Combo": 66.25, // 0.25 * 265
   "EE-Combo+FLINK": 78.25,
   "EE-Combo+FLINK+IPE": 94.25,
