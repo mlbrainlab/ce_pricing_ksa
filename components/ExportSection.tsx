@@ -16,15 +16,18 @@ const WK_LOGO_URL = "https://cdn.wolterskluwer.io/wk/jumpstart-v3-assets/0.x.x/l
 // Using CORS proxy to ensure the image loads in the browser
 const SAMIR_LOGO_URL = "https://corsproxy.io/?https://samirgroup.com/wp-content/uploads/2021/05/logo.png"; 
 
-// Reliable Font URLs (jsDelivr CDN for GitHub raw)
+// Reliable Font URLs
 const FONT_URLS = {
   Inter: {
-    regular: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/inter/static/Inter-Regular.ttf",
-    bold: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/inter/static/Inter-Bold.ttf"
+    // Using raw GitHub links via raw.githubusercontent.com to ensure CORS headers are present for fetch()
+    // The input URL was https://github.com/.../raw/refs/heads/main/... which redirects to the raw content.
+    // We use the direct raw.githubusercontent.com structure to prevent potential CORS preflight issues with redirects.
+    regular: "https://raw.githubusercontent.com/zingrx/fonts_inter_ttf/refs/heads/main/ttf/Inter-Regular.ttf",
+    bold: "https://raw.githubusercontent.com/zingrx/fonts_inter_ttf/refs/heads/main/ttf/Inter-Bold.ttf"
   },
   FiraSans: {
-    regular: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/firasans/FiraSans-Regular.ttf",
-    bold: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/firasans/FiraSans-Bold.ttf"
+    regular: "https://raw.githubusercontent.com/google/fonts/main/ofl/firasans/FiraSans-Regular.ttf",
+    bold: "https://raw.githubusercontent.com/google/fonts/main/ofl/firasans/FiraSans-Bold.ttf"
   }
 };
 
@@ -36,13 +39,17 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [isExcelLoading, setIsExcelLoading] = useState(false);
   
-  // Font State - Default to FiraSans
-  const [selectedFont, setSelectedFont] = useState<FontType>('FiraSans');
+  // Font State - Default to Inter now that we have working URLs
+  const [selectedFont, setSelectedFont] = useState<FontType>('Inter');
   const [fontCache, setFontCache] = useState<Record<FontType, { regular: string | null, bold: string | null }>>({
     Inter: { regular: null, bold: null },
     FiraSans: { regular: null, bold: null }
   });
   const [isFontLoading, setIsFontLoading] = useState(false);
+
+  // PDF Options
+  const [showMonthlyCost, setShowMonthlyCost] = useState(true);
+  const [showTotals, setShowTotals] = useState(true);
 
   // Load font when selection changes
   useEffect(() => {
@@ -343,14 +350,18 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         });
         return [ `Year ${r.year}`, ...pValues, formatMoney(r.grossSAR, 'SAR'), formatMoney(r.vatSAR, 'SAR'), formatMoney(r.grandTotalSAR, 'SAR') ];
       });
-      const productTotalsSAR = config.selectedProducts.map(pid => {
-          const total = data.yearlyResults.reduce((sum, r) => {
-              const bd = r.breakdown.find(x => x.id === pid);
-              return sum + (bd ? bd.grossSAR : 0);
-          }, 0);
-          return formatMoney(total, 'SAR');
-      });
-      tableBody.push(['TOTAL', ...productTotalsSAR, formatMoney(data.totalGrossSAR, 'SAR'), formatMoney(data.totalVatSAR, 'SAR'), formatMoney(data.totalGrandTotalSAR, 'SAR')]);
+      
+      // Totals Row - Conditionally Added
+      if (showTotals) {
+          const productTotalsSAR = config.selectedProducts.map(pid => {
+              const total = data.yearlyResults.reduce((sum, r) => {
+                  const bd = r.breakdown.find(x => x.id === pid);
+                  return sum + (bd ? bd.grossSAR : 0);
+              }, 0);
+              return formatMoney(total, 'SAR');
+          });
+          tableBody.push(['TOTAL', ...productTotalsSAR, formatMoney(data.totalGrossSAR, 'SAR'), formatMoney(data.totalVatSAR, 'SAR'), formatMoney(data.totalGrandTotalSAR, 'SAR')]);
+      }
     } else {
       const prodCols = config.selectedProducts.map(pid => {
          let label = pid;
@@ -366,14 +377,18 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         });
         return [ `Year ${r.year}`, ...pValues, formatMoney(r.grossUSD, 'USD') ];
       });
-      const productTotalsUSD = config.selectedProducts.map(pid => {
-          const total = data.yearlyResults.reduce((sum, r) => {
-              const bd = r.breakdown.find(x => x.id === pid);
-              return sum + (bd ? bd.gross : 0);
-          }, 0);
-          return formatMoney(total, 'USD');
-      });
-      tableBody.push(['TOTAL', ...productTotalsUSD, formatMoney(data.totalGrossUSD, 'USD')]);
+      
+      // Totals Row - Conditionally Added
+      if (showTotals) {
+          const productTotalsUSD = config.selectedProducts.map(pid => {
+              const total = data.yearlyResults.reduce((sum, r) => {
+                  const bd = r.breakdown.find(x => x.id === pid);
+                  return sum + (bd ? bd.gross : 0);
+              }, 0);
+              return formatMoney(total, 'USD');
+          });
+          tableBody.push(['TOTAL', ...productTotalsUSD, formatMoney(data.totalGrossUSD, 'USD')]);
+      }
     }
 
     autoTable(doc, {
@@ -386,7 +401,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       columnStyles: columnStyles,
       margin: { left: 14, right: 14 },
       didParseCell: (data) => {
-        if (data.section === 'body' && data.row.index === tableBody.length - 1) { data.cell.styles.fontStyle = 'bold'; }
+        // Only bold the last row if showTotals is true
+        if (showTotals && data.section === 'body' && data.row.index === tableBody.length - 1) { 
+            data.cell.styles.fontStyle = 'bold'; 
+        }
       }
     });
 
@@ -407,38 +425,40 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
        doc.text(suffix, 14 + w1 + w2, startY);
     };
 
-    if (config.selectedProducts.includes('utd')) {
-        const count = config.productInputs['utd'].count || 1;
-        const totalGrossUSD = data.yearlyResults.reduce((sum, r) => {
-            const bd = r.breakdown.find(x => x.id === 'utd');
-            return sum + (bd ? bd.gross : 0);
-        }, 0);
-        const totalGrossSAR = data.yearlyResults.reduce((sum, r) => {
-            const bd = r.breakdown.find(x => x.id === 'utd');
-            return sum + (bd ? bd.grossSAR : 0);
-        }, 0);
-        const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
-        const monthlyPerUnit = acv / count / 12;
-        const valStr = `${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        renderBoldLine(finalY, "Your UTD subscription costs ", valStr, " monthly per physician.");
-        finalY += 6;
-    }
+    if (showMonthlyCost) {
+        if (config.selectedProducts.includes('utd')) {
+            const count = config.productInputs['utd'].count || 1;
+            const totalGrossUSD = data.yearlyResults.reduce((sum, r) => {
+                const bd = r.breakdown.find(x => x.id === 'utd');
+                return sum + (bd ? bd.gross : 0);
+            }, 0);
+            const totalGrossSAR = data.yearlyResults.reduce((sum, r) => {
+                const bd = r.breakdown.find(x => x.id === 'utd');
+                return sum + (bd ? bd.grossSAR : 0);
+            }, 0);
+            const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
+            const monthlyPerUnit = acv / count / 12;
+            const valStr = `${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            renderBoldLine(finalY, "Your UTD subscription costs ", valStr, " monthly per physician.");
+            finalY += 6;
+        }
 
-    if (config.selectedProducts.includes('ld')) {
-        const count = config.productInputs['ld'].count || 1;
-        const totalGrossUSD = data.yearlyResults.reduce((sum, r) => {
-            const bd = r.breakdown.find(x => x.id === 'ld');
-            return sum + (bd ? bd.gross : 0);
-        }, 0);
-        const totalGrossSAR = data.yearlyResults.reduce((sum, r) => {
-            const bd = r.breakdown.find(x => x.id === 'ld');
-            return sum + (bd ? bd.grossSAR : 0);
-        }, 0);
-        const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
-        const monthlyPerUnit = acv / count / 12;
-        const valStr = `${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        renderBoldLine(finalY, "Your LXD subscription costs ", valStr, " monthly per bed.");
-        finalY += 6;
+        if (config.selectedProducts.includes('ld')) {
+            const count = config.productInputs['ld'].count || 1;
+            const totalGrossUSD = data.yearlyResults.reduce((sum, r) => {
+                const bd = r.breakdown.find(x => x.id === 'ld');
+                return sum + (bd ? bd.gross : 0);
+            }, 0);
+            const totalGrossSAR = data.yearlyResults.reduce((sum, r) => {
+                const bd = r.breakdown.find(x => x.id === 'ld');
+                return sum + (bd ? bd.grossSAR : 0);
+            }, 0);
+            const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
+            const monthlyPerUnit = acv / count / 12;
+            const valStr = `${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            renderBoldLine(finalY, "Your LXD subscription costs ", valStr, " monthly per bed.");
+            finalY += 6;
+        }
     }
 
     finalY += 4; 
@@ -459,7 +479,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
             let productName = p.name;
             if (pid === 'utd') productName = 'UpToDate';
             if (pid === 'ld') productName = 'Lexidrug';
-            statsParts.push(`${inp.count} ${p.countLabel} for ${productName}`);
+            
+            // Text Replacement Logic: HC->clinicians, BC->active beds
+            let countLabelText = p.countLabel;
+            if (p.countLabel === 'HC') countLabelText = 'clinicians';
+            if (p.countLabel === 'BC') countLabelText = 'active beds';
+
+            statsParts.push(`${inp.count} ${countLabelText} for ${productName}`);
         }
     });
     if(statsParts.length > 0) terms.push(`This proposal is based on the following statistics: ${statsParts.join(', ')}.`);
@@ -829,6 +855,35 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
            </div>
         </div>
       </div>
+      
+      {/* PDF Export Options */}
+      <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-6 mb-4">
+        <div className="flex items-center">
+            <input 
+              id="pdf-monthly-cost"
+              type="checkbox" 
+              checked={showMonthlyCost} 
+              onChange={(e) => setShowMonthlyCost(e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+            />
+            <label htmlFor="pdf-monthly-cost" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300">
+              PDF: Show Monthly Unit Cost
+            </label>
+        </div>
+        <div className="flex items-center">
+            <input 
+              id="pdf-totals-row"
+              type="checkbox" 
+              checked={showTotals} 
+              onChange={(e) => setShowTotals(e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+            />
+            <label htmlFor="pdf-totals-row" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300">
+              PDF: Show Totals Row
+            </label>
+        </div>
+      </div>
+
       <div className="flex space-x-4">
         <button 
           onClick={handleExcelExport}
