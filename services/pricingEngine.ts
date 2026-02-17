@@ -55,7 +55,7 @@ const convertToSAR = (usdAmount: number): number => {
 };
 
 export const calculatePricing = (config: DealConfiguration): CalculationOutput => {
-  const { dealType, channel, selectedProducts, productInputs, years, method, rates, productRates, applyWHT, flatPricing } = config;
+  const { dealType, channel, selectedProducts, productInputs, years, method, rates, productRates, applyWHT, flatPricing, rounding } = config;
   
   // Define Floors based on WHT setting
   const activeStandardFloor = applyWHT ? (STANDARD_FLOOR_RAW / WHT_FACTOR) : STANDARD_FLOOR_RAW;
@@ -185,6 +185,28 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
       const averageAnnual = totalPeriodCost / years;
       // Overwrite schedule with flat values
       productSchedules[prodId] = new Array(years).fill(averageAnnual);
+    });
+  }
+
+  // --- Step 3.6: Apply Rounding ---
+  if (rounding) {
+    selectedProducts.forEach(prodId => {
+      const schedule = productSchedules[prodId];
+      for (let i = 0; i < years; i++) {
+        const val = schedule[i];
+        if (channel === ChannelType.DIRECT) {
+          // Direct: Round up to nearest 100 USD
+          // e.g. 10123 -> 10200
+          schedule[i] = Math.ceil(val / 10) * 10;
+        } else {
+          // Indirect: Round up to nearest 1000 SAR
+          // e.g. 10,000 USD * 3.76 = 37,600 SAR -> 38,000 SAR -> 10,106.38 USD
+          const rawSAR = val * EXCHANGE_RATE_SAR;
+          const roundedSAR = Math.ceil(rawSAR / 1000) * 1000;
+          schedule[i] = roundedSAR / EXCHANGE_RATE_SAR;
+        }
+      }
+      productSchedules[prodId] = schedule;
     });
   }
 
