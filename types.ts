@@ -25,10 +25,15 @@ export interface ProductDefinition {
 }
 
 export interface ProductInput {
-  count: number; // HC or BC
-  variant: string;
+  count: number; // HC or BC (Target Stats)
+  existingCount?: number; // Existing Stats (Renewal only)
+  variant: string; // Target Variant
+  existingVariant?: string; // Existing Variant (Renewal only)
   baseDiscount: number; // %
   expiringAmount?: number; // USD, for Renewal only
+  dph?: number; // Dollars Per Head (for UTD Renewal)
+  forceHeadcountOverride?: boolean; // If true, prioritize HC calculation if higher
+  changeInStats?: boolean; // For UTD EE Upsell (Switching/Changing stats)
 }
 
 export interface ProductYearlyData {
@@ -60,6 +65,7 @@ export interface DealConfiguration {
   method: PricingMethod;
   rates: number[]; // Global fallback
   productRates: Record<string, number[]>; // Per product rates
+  renewalUpliftRates: Record<string, number>; // New: Specific Uplift for Renewal Base
   applyWHT: boolean;
   flatPricing: boolean;
   rounding: boolean;

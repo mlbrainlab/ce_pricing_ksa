@@ -15,7 +15,8 @@ import {
   COMBO_FLOOR_LD_RAW, 
   AVAILABLE_PRODUCTS,
   UTD_VARIANTS,
-  LD_VARIANTS
+  LD_VARIANTS,
+  LXD_ADDONS
 } from '../constants';
 
 // Dynamic Net Factor Calculation based on Year index and Deal Type
@@ -55,7 +56,7 @@ const convertToSAR = (usdAmount: number): number => {
 };
 
 export const calculatePricing = (config: DealConfiguration): CalculationOutput => {
-  const { dealType, channel, selectedProducts, productInputs, years, method, rates, productRates, applyWHT, flatPricing, rounding } = config;
+  const { dealType, channel, selectedProducts, productInputs, years, method, rates, productRates, renewalUpliftRates, applyWHT, flatPricing, rounding } = config;
   
   // Define Floors based on WHT setting
   const activeStandardFloor = applyWHT ? (STANDARD_FLOOR_RAW / WHT_FACTOR) : STANDARD_FLOOR_RAW;
@@ -68,13 +69,13 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
   
   const year1ProductNets: Record<string, number> = {};
   
-  let totalRenewalBaseForACV = 0; // Sum of Expiring * (1+SpecificRate)
+  let totalRenewalBaseForACV = 0; 
   
   selectedProducts.forEach(prodId => {
     const inputs = productInputs[prodId] || { count: 0, variant: '', baseDiscount: 0, expiringAmount: 0 };
     const definition = AVAILABLE_PRODUCTS.find(p => p.id === prodId);
     
-    // 1. Calculate "New Config" Price
+    // NEW LOGO / STANDARD CALCULATION
     let listRate = 0;
     if (prodId === 'utd') {
       listRate = UTD_VARIANTS[inputs.variant] || 0;
@@ -84,15 +85,12 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
       listRate = definition?.defaultBasePrice || 0;
     }
     
-    const count = (prodId === 'utd' || prodId === 'ld') ? inputs.count : 1; 
+    const count = inputs.count; 
     const baseGross = (definition?.hasVariants || prodId === 'utd' || prodId === 'ld') 
-      ? (inputs.count * listRate) 
+      ? (count * listRate) 
       : (definition?.defaultBasePrice || 0);
 
-    // Determine effective discount
-    // If it's a combo scenario, the user now enters the combo discount directly into baseDiscount field in UI
     const effectiveDiscount = inputs.baseDiscount;
-
     let baseNet = baseGross * (1 - (effectiveDiscount / 100));
 
     // Apply WHT Gross Up if enabled
@@ -100,20 +98,121 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
       baseNet = baseNet / WHT_FACTOR;
     }
 
-    // 2. Renewal Logic Check
+    // RENEWAL & UPSELL LOGIC
     let finalYear1Net = baseNet;
 
     if (dealType === DealType.RENEWAL) {
       const expiring = inputs.expiringAmount || 0;
       
-      // Determine applicable rate for this product for Year 1 (Index 0)
-      const specificRates = productRates[prodId] || rates;
-      const y1FPI = specificRates[0] || 0;
+      // Use specific Renewal Uplift Rate for the base calculation
+      const upliftVal = renewalUpliftRates[prodId] || 0;
       
-      const renewalBase = expiring * (1 + (y1FPI / 100));
-      totalRenewalBaseForACV += renewalBase;
+      let actualY1Price = expiring;
+      let renewalBase = 0;
 
-      finalYear1Net = baseNet; 
+      const existing = inputs.existingVariant || inputs.variant; 
+      const target = inputs.variant;
+
+      // Calculate Standard Base (Expiring * (1 + Uplift Rate))
+      const standardBase = expiring * (1 + (upliftVal / 100));
+
+      if (prodId === 'utd') {
+         // UTD Logic
+         let pathBasedPrice = 0;
+         
+         // 1. Determine Path-Based Renewal Price (Baseline before Stats check)
+         if (existing === target) {
+            // Same Variant
+            if (existing === 'UTDEE') {
+                // Fixed 8% as per rules for UTDEE Renewal (usually upliftVal covers this if set to 8)
+                pathBasedPrice = expiring * 1.08;
+            } else {
+                pathBasedPrice = standardBase;
+            }
+         } else {
+            // Variant Upgrade
+            if (existing === 'ANYWHERE' && target === 'UTDADV') {
+                // "add the annual rate + 8%"
+                const uplift = (upliftVal + 8) / 100;
+                pathBasedPrice = expiring * (1 + uplift);
+                productNotes.push(`UTD: Upsell Anywhere -> Adv (Uplift + 8% applied)`);
+
+            } else if (existing === 'ANYWHERE' && target === 'UTDEE') {
+                // "change the annual rate to 11%"
+                pathBasedPrice = expiring * 1.11;
+                productNotes.push(`UTD: Upsell Anywhere -> EE (11% applied)`);
+
+            } else if (existing === 'UTDADV' && target === 'UTDEE') {
+                // "add the annual rate of 8% only"
+                pathBasedPrice = expiring * 1.08;
+                productNotes.push(`UTD: Upsell Adv -> EE (8% applied)`);
+            } else {
+                // Fallback for undefined paths
+                pathBasedPrice = standardBase;
+            }
+         }
+
+         // 2. Universal "Stats Change" Check
+         // "at any time... prioritize the new stats... if it's only higher"
+         if (inputs.changeInStats && baseNet > pathBasedPrice) {
+            actualY1Price = baseNet;
+            productNotes.push(`UTD: Stats Change Override ($${baseNet.toFixed(0)})`);
+         } else {
+            actualY1Price = pathBasedPrice;
+         }
+
+         // 3. Define Renewal Base
+         // Rule: If new headcount results in higher value (baseNet used), Renewal Base is Standard Base.
+         // If variants differ, Renewal Base is Standard Base.
+         // If variants match and NO override, Renewal Base absorbs calculation.
+         
+         const isHigherValueOverride = inputs.changeInStats && baseNet > pathBasedPrice;
+
+         if (existing === target && !isHigherValueOverride) {
+             renewalBase = actualY1Price; // Absorb entire price as base (Upsell = 0)
+         } else {
+             // Variant Changed OR Stats Change triggered higher price
+             renewalBase = standardBase;
+         }
+
+      } else if (prodId === 'ld') {
+         // LXD Upsell Logic (Add-ons)
+         
+         if (existing === target) {
+             actualY1Price = standardBase;
+             renewalBase = actualY1Price; // No Upsell
+         } else {
+             // Variant Change
+             let addOnPricePerBed = 0;
+             const isBase = existing.includes('BASE PKG');
+             const isFlink = existing.includes('FLINK') && !existing.includes('IPE');
+             const targetFlink = target.includes('FLINK') && !target.includes('IPE');
+             const targetFlinkIPE = target.includes('FLINK') && target.includes('IPE');
+
+             if (isBase && targetFlink) {
+                addOnPricePerBed = LXD_ADDONS.FLINK; // +$12
+                productNotes.push(`LXD: Upsell Base -> Formulink (+$12/bed)`);
+             } else if (isBase && targetFlinkIPE) {
+                addOnPricePerBed = LXD_ADDONS.FLINK_IPE; // +$28
+                productNotes.push(`LXD: Upsell Base -> Flink+IPE (+$28/bed)`);
+             } else if (isFlink && targetFlinkIPE) {
+                addOnPricePerBed = LXD_ADDONS.IPE; // +$16
+                productNotes.push(`LXD: Upsell Flink -> Flink+IPE (+$16/bed)`);
+             }
+             
+             let addOnTotal = 0;
+             if (addOnPricePerBed > 0) {
+                addOnTotal = count * addOnPricePerBed;
+                if (applyWHT) addOnTotal = addOnTotal / WHT_FACTOR;
+             }
+             
+             actualY1Price = standardBase + addOnTotal;
+             renewalBase = standardBase;
+         }
+      }
+
+      finalYear1Net = actualY1Price;
+      totalRenewalBaseForACV += renewalBase;
     }
 
     year1ProductNets[prodId] = finalYear1Net;
@@ -196,11 +295,9 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
         const val = schedule[i];
         if (channel === ChannelType.DIRECT) {
           // Direct: Round up to nearest 100 USD
-          // e.g. 10123 -> 10200
-          schedule[i] = Math.ceil(val / 10) * 10;
+          schedule[i] = Math.ceil(val / 100) * 100;
         } else {
           // Indirect: Round up to nearest 1000 SAR
-          // e.g. 10,000 USD * 3.76 = 37,600 SAR -> 38,000 SAR -> 10,106.38 USD
           const rawSAR = val * EXCHANGE_RATE_SAR;
           const roundedSAR = Math.ceil(rawSAR / 1000) * 1000;
           schedule[i] = roundedSAR / EXCHANGE_RATE_SAR;
@@ -284,6 +381,7 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
   
   if (dealType === DealType.RENEWAL) {
     // Upsell = Total ACV - Renewal Base ACV
+    // Note: If no variant change, totalRenewalBaseForACV = totalGrossUSD, so upsell = 0.
     upsellACV = Math.max(0, acvUSD - totalRenewalBaseForACV);
   }
 

@@ -30,31 +30,65 @@ const App: React.FC = () => {
   const [flatPricing, setFlatPricing] = useState<boolean>(false); 
   const [rounding, setRounding] = useState<boolean>(false); // New Rounding Option
   
-  // Single Rate Values (Applied to Y2+)
+  // Structure Rates (Multi-Year logic: FPI or Reverse Discount)
   const [globalRateVal, setGlobalRateVal] = useState<number>(5);
   const [utdRateVal, setUtdRateVal] = useState<number>(8); // Default 8%
   const [ldRateVal, setLdRateVal] = useState<number>(5);
 
+  // Renewal Uplift Rates (Specific to Renewal Base Calculation)
+  const [renewalUpliftGlobal, setRenewalUpliftGlobal] = useState<number>(5);
+  const [renewalUpliftUTD, setRenewalUpliftUTD] = useState<number>(8);
+  const [renewalUpliftLD, setRenewalUpliftLD] = useState<number>(5);
+
   // Product Inputs State
   const [productInputs, setProductInputs] = useState<Record<string, ProductInput>>({
-    'utd': { count: 100, variant: 'ANYWHERE', baseDiscount: 0, expiringAmount: 0 },
-    'ld': { count: 50, variant: 'BASE PKG', baseDiscount: 0, expiringAmount: 0 },
+    'utd': { count: 100, existingCount: 100, variant: 'ANYWHERE', existingVariant: 'ANYWHERE', baseDiscount: 0, expiringAmount: 0, dph: 0, forceHeadcountOverride: false, changeInStats: false },
+    'ld': { count: 50, existingCount: 50, variant: 'BASE PKG', existingVariant: 'BASE PKG', baseDiscount: 0, expiringAmount: 0, dph: 0, forceHeadcountOverride: false, changeInStats: false },
   });
 
   // Check if we need split rates (if both UTD and LD are selected)
   const showSplitRates = selectedProductIds.includes('utd') && selectedProductIds.includes('ld');
   const isIndirect = channel !== ChannelType.DIRECT;
 
-  // Helper to generate rate array [0, val, val...]
+  // EFFECT: Auto-Uncheck WHT when Renewal is selected
+  useEffect(() => {
+    if (dealType === DealType.RENEWAL) {
+      setApplyWHT(false);
+    } else {
+      setApplyWHT(true);
+    }
+  }, [dealType]);
+
+  // EFFECT: Set Default Rates when selection changes
+  useEffect(() => {
+    // Only apply defaults if one product is selected to avoid overwriting user preference aggressively
+    if (selectedProductIds.length === 1) {
+      if (selectedProductIds.includes('utd')) {
+        // Structure Rates
+        setGlobalRateVal(8);
+        setUtdRateVal(8);
+        // Uplift Rates
+        setRenewalUpliftGlobal(8);
+        setRenewalUpliftUTD(8);
+      } else if (selectedProductIds.includes('ld')) {
+        // Structure Rates
+        setGlobalRateVal(5);
+        setLdRateVal(5);
+        // Uplift Rates
+        setRenewalUpliftGlobal(5);
+        setRenewalUpliftLD(5);
+      }
+    }
+  }, [selectedProductIds]);
+
+  // Helper to generate rate array [val, val, val...]
   const generateRateArray = (val: number, count: number) => {
-    const arr = new Array(count).fill(val);
-    if (arr.length > 0) arr[0] = 0; // Year 1 is always base
-    return arr;
+    return new Array(count).fill(val);
   };
 
   // Derived Config
   const config: DealConfiguration = useMemo(() => {
-    // Generate arrays based on single input values
+    // Generate arrays based on single input values (Structure Rates)
     const rates = generateRateArray(globalRateVal, years);
     const utdRates = generateRateArray(utdRateVal, years);
     const ldRates = generateRateArray(ldRateVal, years);
@@ -68,6 +102,24 @@ const App: React.FC = () => {
       if (selectedProductIds.includes('ld')) productRates['ld'] = rates;
     }
 
+    // Renewal Uplifts
+    // If MYFPI is selected, we use the Structure Rate (FPI) as the Uplift Rate.
+    // If MYPP is selected, we use the explicit Renewal Uplift Rate inputs.
+    const useStructureRateForUplift = method === PricingMethod.MYFPI;
+
+    const currentGlobalUplift = useStructureRateForUplift ? globalRateVal : renewalUpliftGlobal;
+    const currentUtdUplift = useStructureRateForUplift ? utdRateVal : renewalUpliftUTD;
+    const currentLdUplift = useStructureRateForUplift ? ldRateVal : renewalUpliftLD;
+
+    const renewalUpliftRates: Record<string, number> = {};
+    if (showSplitRates) {
+        renewalUpliftRates['utd'] = currentUtdUplift;
+        renewalUpliftRates['ld'] = currentLdUplift;
+    } else {
+        if (selectedProductIds.includes('utd')) renewalUpliftRates['utd'] = currentGlobalUplift;
+        if (selectedProductIds.includes('ld')) renewalUpliftRates['ld'] = currentGlobalUplift;
+    }
+
     return {
       dealType,
       channel,
@@ -77,11 +129,12 @@ const App: React.FC = () => {
       method,
       rates, 
       productRates,
+      renewalUpliftRates,
       applyWHT,
       flatPricing,
       rounding
     };
-  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, ldRateVal, showSplitRates, applyWHT, flatPricing, rounding]);
+  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, ldRateVal, renewalUpliftGlobal, renewalUpliftUTD, renewalUpliftLD, showSplitRates, applyWHT, flatPricing, rounding]);
 
   // Results
   const results = useMemo(() => calculatePricing(config), [config]);
@@ -112,34 +165,38 @@ const App: React.FC = () => {
 
     if (config.selectedProducts.includes('utd')) {
         const count = config.productInputs['utd'].count || 1; 
-        const totalGrossUSD = results.yearlyResults.reduce((sum, r) => {
-            const bd = r.breakdown.find(x => x.id === 'utd');
-            return sum + (bd ? bd.gross : 0);
-        }, 0);
-        const totalGrossSAR = results.yearlyResults.reduce((sum, r) => {
-            const bd = r.breakdown.find(x => x.id === 'utd');
-            return sum + (bd ? bd.grossSAR : 0);
-        }, 0);
+        if (config.productInputs['utd'].count > 0) {
+            const totalGrossUSD = results.yearlyResults.reduce((sum, r) => {
+                const bd = r.breakdown.find(x => x.id === 'utd');
+                return sum + (bd ? bd.gross : 0);
+            }, 0);
+            const totalGrossSAR = results.yearlyResults.reduce((sum, r) => {
+                const bd = r.breakdown.find(x => x.id === 'utd');
+                return sum + (bd ? bd.grossSAR : 0);
+            }, 0);
 
-        const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
-        const monthlyPerUnit = acv / count / 12;
-        analysisParts.push(`UTD: ${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /mo/physician`);
+            const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
+            const monthlyPerUnit = acv / count / 12;
+            analysisParts.push(`UTD: ${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /mo/physician`);
+        }
     }
 
     if (config.selectedProducts.includes('ld')) {
         const count = config.productInputs['ld'].count || 1;
-        const totalGrossUSD = results.yearlyResults.reduce((sum, r) => {
-            const bd = r.breakdown.find(x => x.id === 'ld');
-            return sum + (bd ? bd.gross : 0);
-        }, 0);
-        const totalGrossSAR = results.yearlyResults.reduce((sum, r) => {
-            const bd = r.breakdown.find(x => x.id === 'ld');
-            return sum + (bd ? bd.grossSAR : 0);
-        }, 0);
+        if (config.productInputs['ld'].count > 0) {
+            const totalGrossUSD = results.yearlyResults.reduce((sum, r) => {
+                const bd = r.breakdown.find(x => x.id === 'ld');
+                return sum + (bd ? bd.gross : 0);
+            }, 0);
+            const totalGrossSAR = results.yearlyResults.reduce((sum, r) => {
+                const bd = r.breakdown.find(x => x.id === 'ld');
+                return sum + (bd ? bd.grossSAR : 0);
+            }, 0);
 
-        const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
-        const monthlyPerUnit = acv / count / 12;
-        analysisParts.push(`LXD: ${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /mo/bed`);
+            const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
+            const monthlyPerUnit = acv / count / 12;
+            analysisParts.push(`LXD: ${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /mo/bed`);
+        }
     }
     return analysisParts;
   }, [config, results]);
@@ -152,7 +209,7 @@ const App: React.FC = () => {
     );
   };
 
-  const handleInputChange = (id: string, field: keyof ProductInput, value: string | number) => {
+  const handleInputChange = (id: string, field: keyof ProductInput, value: string | number | boolean) => {
     setProductInputs(prev => {
       const prevInput = prev[id];
       const newState = {
@@ -169,16 +226,66 @@ const App: React.FC = () => {
             newState['utd'].count = 150;
          }
       }
+      
+      // Auto-check/uncheck Apply WHT if stats change is toggled
+      if (field === 'changeInStats') {
+         setApplyWHT(value === true);
+      }
+      
+      // Reset logic when Existing Variant changes
+      if (dealType === DealType.RENEWAL && field === 'existingVariant') {
+         // If existing changes, reset target variant to match existing initially
+         // to avoid invalid combinations.
+         // EXCEPTION: If Existing is UTDEE, Target must be UTDEE
+         if (value === 'UTDEE') {
+            newState[id].variant = 'UTDEE';
+            if (id === 'utd') {
+                setUtdRateVal(8); 
+                setRenewalUpliftUTD(8);
+            }
+         } else {
+            newState[id].variant = value as string;
+         }
+
+         // Also reset upgrade checkboxes
+         newState[id].changeInStats = false;
+         newState[id].forceHeadcountOverride = false;
+      }
 
       return newState;
     });
   };
 
+  // Helper to determine allowed Target Variants based on Existing
+  const getAllowedTargetVariants = (productId: string, existingVariant: string) => {
+      if (productId === 'utd') {
+          if (existingVariant === 'UTDEE') return ['UTDEE']; // Locked
+
+          // Anywhere -> Anywhere, Adv, EE
+          if (existingVariant === 'ANYWHERE') return ['ANYWHERE', 'UTDADV', 'UTDEE'];
+          // Adv -> Adv, EE
+          if (existingVariant === 'UTDADV') return ['UTDADV', 'UTDEE'];
+      }
+      if (productId === 'ld') {
+          // Base -> Base, Flink, Flink+IPE
+          if (existingVariant.includes('BASE PKG')) {
+              // Note: FLINK variants in constants are +FLINK
+              return ['BASE PKG', '+FLINK', '+FLINK+IPE'];
+          }
+          // Flink -> Flink, Flink+IPE
+          if (existingVariant === '+FLINK') return ['+FLINK', '+FLINK+IPE'];
+          // Flink+IPE -> Flink+IPE
+          if (existingVariant === '+FLINK+IPE') return ['+FLINK+IPE'];
+      }
+      return [existingVariant]; // Default
+  };
+
   // Input Field Helper
-  const renderSingleRateInput = (
+  const renderRateInput = (
     label: string, 
     value: number, 
     onChange: (val: number) => void,
+    suffixText: string = "Annual increase %",
     colorClass: string = "border-gray-300"
   ) => (
     <div className="mb-4">
@@ -192,7 +299,7 @@ const App: React.FC = () => {
           className={`w-24 text-sm rounded p-2 text-left bg-white dark:bg-gray-700 text-gray-900 dark:text-white border ${colorClass} dark:border-gray-600 focus:ring-2 focus:ring-blue-500 font-sans tabular-nums`}
         />
         <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
-           % applied to Years 2-{years}
+           {suffixText}
         </span>
       </div>
     </div>
@@ -256,6 +363,38 @@ const App: React.FC = () => {
                 // Rename discount label if split rates (Combo) are active for LD
                 const discountLabel = (product.id === 'ld' && isUTDSelected) ? 'Combo Discount %' : 'Base Discount %';
 
+                // RENEWAL SPECIFIC LOGIC
+                const isRenewal = dealType === DealType.RENEWAL;
+                const dphValue = input.dph || 0;
+                const usageValue = dphValue > 0 && input.expiringAmount ? (input.expiringAmount / dphValue) : 0;
+                
+                // --- Upsell Logic Checks ---
+                const existingVariant = input.existingVariant || input.variant;
+                const targetVariant = input.variant;
+
+                // UTD Stats Change Check (Enable for any UTD renewal)
+                const showStatsCheckbox = isRenewal && product.id === 'utd';
+
+                // LXD Addon Check
+                const isLXDAddonUpgrade = isRenewal && product.id === 'ld' && existingVariant !== targetVariant;
+                
+                // Logic to Enable Count Input
+                // Default: Disabled (0) for Renewal
+                let isCountDisabled = isRenewal;
+                if (isRenewal) {
+                    if (showStatsCheckbox && input.changeInStats) {
+                        isCountDisabled = false;
+                    }
+                    if (isLXDAddonUpgrade) {
+                        isCountDisabled = false;
+                    }
+                }
+
+                // Variants Filtering
+                const allowedTargetVariants = isRenewal 
+                   ? getAllowedTargetVariants(product.id, existingVariant) 
+                   : (product.id === 'utd' ? Object.keys(UTD_VARIANTS) : Object.keys(LD_VARIANTS));
+
                 return (
                   <div key={product.id} className={`border rounded-md transition-colors ${isSelected ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-200 dark:border-gray-700'}`}>
                     {/* Header Row */}
@@ -276,9 +415,9 @@ const App: React.FC = () => {
                       <div className="px-3 pb-3 pt-0 border-t border-blue-100 dark:border-blue-800 mt-1 grid grid-cols-1 gap-3">
                         <div className="grid grid-cols-2 gap-3 mt-2">
                            
-                           {/* Renewal: Expiring Amount */}
-                           {dealType === DealType.RENEWAL && (
-                             <div className="col-span-2">
+                           {/* Renewal: Expiring Amount (Primary) */}
+                           {isRenewal && (
+                             <div className="col-span-2 p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 rounded">
                                <label className="block text-xs text-orange-700 dark:text-orange-400 font-semibold mb-1">Expiring Amount (USD)</label>
                                <input
                                  type="number"
@@ -287,43 +426,121 @@ const App: React.FC = () => {
                                  value={input.expiringAmount || 0}
                                  onChange={(e) => handleInputChange(product.id, 'expiringAmount', parseFloat(e.target.value) || 0)}
                                />
+                               {/* Restored DPH Fields for UTD */}
+                               {product.id === 'utd' && (
+                                 <div className="grid grid-cols-2 gap-2 mt-2">
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500 dark:text-gray-400 uppercase">DPH</label>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          placeholder="0.00"
+                                          className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 border p-1 bg-white dark:bg-gray-700"
+                                          value={input.dph || ''}
+                                          onChange={(e) => handleInputChange(product.id, 'dph', parseFloat(e.target.value) || 0)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500 dark:text-gray-400 uppercase">Usage (Auto)</label>
+                                        <div className="text-xs p-1 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-500 font-sans tabular-nums">
+                                          {Math.round(usageValue).toLocaleString()}
+                                        </div>
+                                    </div>
+                                 </div>
+                               )}
                              </div>
                            )}
 
-                           {/* Variant Selector */}
+                           {/* Renewal: Existing Variant Selection */}
+                           {isRenewal && product.hasVariants && (
+                             <div className="col-span-2 grid grid-cols-2 gap-2">
+                               <div>
+                                   <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Existing Variant</label>
+                                   <select
+                                     className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-gray-500 border p-1 bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
+                                     value={input.existingVariant || input.variant}
+                                     onChange={(e) => handleInputChange(product.id, 'existingVariant', e.target.value)}
+                                   >
+                                      {product.id === 'utd' && Object.keys(UTD_VARIANTS).map(v => (
+                                         <option key={v} value={v}>{v}</option>
+                                      ))}
+                                      {product.id === 'ld' && Object.keys(LD_VARIANTS).map(v => {
+                                         if(v.includes('EE-Combo')) return null; 
+                                         return <option key={v} value={v}>{v}</option>;
+                                      })}
+                                   </select>
+                               </div>
+                               <div>
+                                   <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Existing Stats</label>
+                                   <input
+                                     type="number"
+                                     min="0"
+                                     className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-gray-500 border p-1 bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
+                                     value={input.existingCount || 0}
+                                     onChange={(e) => handleInputChange(product.id, 'existingCount', parseInt(e.target.value) || 0)}
+                                   />
+                               </div>
+                             </div>
+                           )}
+
+                           {/* Target Variant Selector */}
                            {product.hasVariants ? (
                              <div className="col-span-2">
-                               <label className="block text-xs text-blue-700 dark:text-blue-300 mb-1">Variant</label>
+                               <label className="block text-xs text-blue-700 dark:text-blue-300 mb-1">
+                                  {isRenewal ? "Target Upgrade Variant" : "Variant"}
+                               </label>
                                <select
                                  className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                  value={input.variant}
+                                 disabled={isRenewal && existingVariant === 'UTDEE' && product.id === 'utd'}
                                  onChange={(e) => handleInputChange(product.id, 'variant', e.target.value)}
                                >
-                                 {product.id === 'utd' && Object.keys(UTD_VARIANTS).map(v => (
-                                   <option key={v} value={v}>{v} (${UTD_VARIANTS[v]})</option>
-                                 ))}
-                                 {product.id === 'ld' && Object.keys(LD_VARIANTS).map(v => {
-                                   const isComboOption = v.includes('EE-Combo');
-                                   // Disable combo options if UTD is ANYWHERE or ADVANCED
-                                   if (isRestrictedUTD && isComboOption) {
+                                 {allowedTargetVariants.map(v => {
+                                   let price = 0;
+                                   if (product.id === 'utd') price = UTD_VARIANTS[v];
+                                   if (product.id === 'ld') price = LD_VARIANTS[v];
+                                   
+                                   // Specific filtering for Combo logic in New Logo context (unchanged)
+                                   if (!isRenewal && product.id === 'ld' && v.includes('EE-Combo') && isRestrictedUTD) {
                                       return <option key={v} value={v} disabled>{v} (Requires UTD EE)</option>;
                                    }
-                                   return <option key={v} value={v}>{v} (${LD_VARIANTS[v]})</option>
+
+                                   return <option key={v} value={v}>{v} (${price})</option>;
                                  })}
                                </select>
                              </div>
                            ) : (
                              <div className="col-span-2 text-xs text-gray-400 italic mt-1">Standard pricing applied</div>
                            )}
+                           
+                           {/* UTD EE Upgrade Checkbox */}
+                           {showStatsCheckbox && (
+                             <div className="col-span-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 p-2 rounded flex items-center">
+                                <input 
+                                  type="checkbox"
+                                  className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                                  checked={input.changeInStats || false}
+                                  onChange={(e) => handleInputChange(product.id, 'changeInStats', e.target.checked)}
+                                />
+                                <span className="ml-2 text-xs text-purple-700 dark:text-purple-300 font-medium">
+                                   Switching or changing stats?
+                                </span>
+                             </div>
+                           )}
 
                            {/* Count Input (HC/BC) */}
                            {product.countLabel && (
                              <div>
-                               <label className="block text-xs text-blue-700 dark:text-blue-300 mb-1">{product.countLabel}</label>
+                               <label className={`block text-xs mb-1 ${isCountDisabled ? 'text-gray-400' : 'text-blue-700 dark:text-blue-300'}`}>
+                                 {/* Rename label if stats change */}
+                                 {(showStatsCheckbox && input.changeInStats) ? "New Stats" : product.countLabel} 
+                                 {isCountDisabled && ' (Ignored)'}
+                               </label>
                                <input
                                  type="number"
                                  min="0"
-                                 className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
+                                 disabled={isCountDisabled}
+                                 className={`block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums ${isCountDisabled ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''}`}
                                  value={input.count}
                                  onChange={(e) => handleInputChange(product.id, 'count', parseInt(e.target.value) || 0)}
                                />
@@ -417,8 +634,25 @@ const App: React.FC = () => {
                     </div>
                  </div>
                </div>
+               
+               {/* Renewal Uplift Rate (Specific for Renewal Base) - Only show if MYPP */}
+               {dealType === DealType.RENEWAL && method === PricingMethod.MYPP && (
+                 <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
+                    <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+                      Renewal Uplift %
+                    </div>
+                    {showSplitRates ? (
+                      <>
+                        {renderRateInput("UTD Uplift", renewalUpliftUTD, setRenewalUpliftUTD, "Uplift %", "border-blue-200 dark:border-blue-800")}
+                        {renderRateInput("LD Uplift", renewalUpliftLD, setRenewalUpliftLD, "Uplift %", "border-green-200 dark:border-green-800")}
+                      </>
+                    ) : (
+                      renderRateInput("Uplift", renewalUpliftGlobal, setRenewalUpliftGlobal, "Uplift %")
+                    )}
+                 </div>
+               )}
 
-               {/* Single Rate Input Logic */}
+               {/* Single Rate Input Logic (Structure Rate) */}
                <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
                   <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
                     {method === PricingMethod.MYFPI ? 'Annual FPI %' : 'Annual Reverse Discount %'}
@@ -426,11 +660,11 @@ const App: React.FC = () => {
                   
                   {showSplitRates ? (
                     <>
-                      {renderSingleRateInput("UTD Rate", utdRateVal, setUtdRateVal, "border-blue-200 dark:border-blue-800")}
-                      {renderSingleRateInput("LD Rate", ldRateVal, setLdRateVal, "border-green-200 dark:border-green-800")}
+                      {renderRateInput("UTD Rate", utdRateVal, setUtdRateVal, "Annual %", "border-blue-200 dark:border-blue-800")}
+                      {renderRateInput("LD Rate", ldRateVal, setLdRateVal, "Annual %", "border-green-200 dark:border-green-800")}
                     </>
                   ) : (
-                    renderSingleRateInput("Rate", globalRateVal, setGlobalRateVal)
+                    renderRateInput("Rate", globalRateVal, setGlobalRateVal, "Annual %")
                   )}
                </div>
 
@@ -703,7 +937,7 @@ const App: React.FC = () => {
                    {channel !== ChannelType.DIRECT && dealType === DealType.NEW_LOGO && " (Y1 vs Y2+ margins applied)."}
                 </li>
                 {dealType === DealType.RENEWAL && (
-                  <li><strong>Renewal Split:</strong> Renewal Base calculated as sum of [Product Expiring × (1 + Product Y1 Rate)]. Upsell is the remainder of ACV.</li>
+                  <li><strong>Renewal Split:</strong> Renewal Base calculated as sum of [Product Expiring × (1 + Product Uplift Rate)]. Upsell is the remainder of ACV.</li>
                 )}
                 {results.yearlyResults[0].floorAdjusted && (
                   <li><strong>Auto-Adjustment:</strong> Pricing was automatically raised to meet the minimum floor requirements.</li>

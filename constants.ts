@@ -1,3 +1,4 @@
+
 import { ProductDefinition } from './types';
 
 export const WHT_FACTOR = 0.95;
@@ -39,4 +40,11 @@ export const LD_VARIANTS: Record<string, number> = {
   "EE-Combo": 66.25, // 0.25 * 265
   "EE-Combo+FLINK": 78.25,
   "EE-Combo+FLINK+IPE": 94.25,
+};
+
+// Add-on Costs per Bed (Net Additive)
+export const LXD_ADDONS = {
+  FLINK: 12,
+  IPE: 16,
+  FLINK_IPE: 28, // 12 + 16
 };
