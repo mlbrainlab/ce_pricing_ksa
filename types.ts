@@ -62,6 +62,7 @@ export interface DealConfiguration {
   productRates: Record<string, number[]>; // Per product rates
   applyWHT: boolean;
   flatPricing: boolean;
+  rounding: boolean;
 }
 
 export interface CalculationOutput {

@@ -27,7 +27,8 @@ const App: React.FC = () => {
   const [years, setYears] = useState<number>(3);
   const [method, setMethod] = useState<PricingMethod>(PricingMethod.MYFPI);
   const [applyWHT, setApplyWHT] = useState<boolean>(true); // Default true for KSA
-  const [flatPricing, setFlatPricing] = useState<boolean>(false); // New Flat Pricing Option
+  const [flatPricing, setFlatPricing] = useState<boolean>(false); 
+  const [rounding, setRounding] = useState<boolean>(false); // New Rounding Option
   
   // Single Rate Values (Applied to Y2+)
   const [globalRateVal, setGlobalRateVal] = useState<number>(5);
@@ -77,9 +78,10 @@ const App: React.FC = () => {
       rates, 
       productRates,
       applyWHT,
-      flatPricing
+      flatPricing,
+      rounding
     };
-  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, ldRateVal, showSplitRates, applyWHT, flatPricing]);
+  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, ldRateVal, showSplitRates, applyWHT, flatPricing, rounding]);
 
   // Results
   const results = useMemo(() => calculatePricing(config), [config]);
@@ -198,7 +200,7 @@ const App: React.FC = () => {
 
   return (
     <Layout>
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
         
         {/* Left Column: Configuration */}
         <div className="xl:col-span-1 space-y-6">
@@ -417,7 +419,7 @@ const App: React.FC = () => {
                </div>
 
                {/* Single Rate Input Logic */}
-               <div>
+               <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
                   <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
                     {method === PricingMethod.MYFPI ? 'Annual FPI %' : 'Annual Reverse Discount %'}
                   </div>
@@ -431,13 +433,27 @@ const App: React.FC = () => {
                     renderSingleRateInput("Rate", globalRateVal, setGlobalRateVal)
                   )}
                </div>
+
+               {/* Rounding Checkbox */}
+               <div className="flex items-center mt-4">
+                  <input 
+                    id="rounding-checkbox"
+                    type="checkbox" 
+                    checked={rounding} 
+                    onChange={(e) => setRounding(e.target.checked)}
+                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <label htmlFor="rounding-checkbox" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Round up prices?
+                  </label>
+               </div>
             </div>
           </div>
 
         </div>
 
         {/* Right Column: Output */}
-        <div className="xl:col-span-2 space-y-6">
+        <div className="xl:col-span-2 space-y-6 xl:sticky xl:top-24 h-fit">
           
           <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 transition-colors">
              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
