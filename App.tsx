@@ -587,21 +587,6 @@ const App: React.FC = () => {
                       Apply WHT (Gross Up)
                     </label>
                  </div>
-                 {/* Flat Pricing Checkbox */}
-                 {years > 1 && (
-                   <div className="flex items-center">
-                      <input 
-                        id="flat-pricing-checkbox"
-                        type="checkbox" 
-                        checked={flatPricing} 
-                        onChange={(e) => setFlatPricing(e.target.checked)}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
-                      />
-                      <label htmlFor="flat-pricing-checkbox" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Flat Pricing
-                      </label>
-                   </div>
-                 )}
                </div>
 
                <div className="flex space-x-4">
@@ -668,8 +653,24 @@ const App: React.FC = () => {
                   )}
                </div>
 
+               {/* Flat Pricing Checkbox (Moved Here) */}
+               {years > 1 && (
+                 <div className="flex items-center mt-4">
+                    <input 
+                      id="flat-pricing-checkbox"
+                      type="checkbox" 
+                      checked={flatPricing} 
+                      onChange={(e) => setFlatPricing(e.target.checked)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                    />
+                    <label htmlFor="flat-pricing-checkbox" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Flat Pricing
+                    </label>
+                 </div>
+               )}
+
                {/* Rounding Checkbox */}
-               <div className="flex items-center mt-4">
+               <div className="flex items-center mt-2">
                   <input 
                     id="rounding-checkbox"
                     type="checkbox" 
