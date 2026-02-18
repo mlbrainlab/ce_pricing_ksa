@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Layout } from './components/Layout';
 import { ExportSection } from './components/ExportSection';
 import { calculatePricing } from './services/pricingEngine';
+import { FormattedNumberInput } from './components/FormattedNumberInput';
 import { 
   DealType, 
   ChannelType, 
@@ -436,25 +437,21 @@ const App: React.FC = () => {
                            {isRenewal && (
                              <div className="col-span-2 p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 rounded">
                                <label className="block text-xs text-orange-700 dark:text-orange-400 font-semibold mb-1">Expiring Amount (USD)</label>
-                               <input
-                                 type="number"
-                                 min="0"
-                                 className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-orange-500 focus:border-orange-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
+                               <FormattedNumberInput
                                  value={input.expiringAmount || 0}
-                                 onChange={(e) => handleInputChange(product.id, 'expiringAmount', parseFloat(e.target.value) || 0)}
+                                 onChange={(val) => handleInputChange(product.id, 'expiringAmount', val)}
+                                 className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-orange-500 focus:border-orange-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
                                />
                                {/* Restored DPH Fields for UTD */}
                                {product.id === 'utd' && (
                                  <div className="grid grid-cols-2 gap-2 mt-2">
                                     <div>
                                         <label className="block text-[10px] text-gray-500 dark:text-gray-400 uppercase">DPH</label>
-                                        <input
-                                          type="number"
-                                          step="0.01"
+                                        <FormattedNumberInput
+                                          value={input.dph || 0}
+                                          onChange={(val) => handleInputChange(product.id, 'dph', val)}
                                           placeholder="0.00"
                                           className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 border p-1 bg-white dark:bg-gray-700"
-                                          value={input.dph || ''}
-                                          onChange={(e) => handleInputChange(product.id, 'dph', parseFloat(e.target.value) || 0)}
                                         />
                                     </div>
                                     <div>
@@ -489,12 +486,10 @@ const App: React.FC = () => {
                                </div>
                                <div>
                                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Existing Stats</label>
-                                   <input
-                                     type="number"
-                                     min="0"
-                                     className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-gray-500 border p-1 bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
+                                   <FormattedNumberInput
                                      value={input.existingCount || 0}
-                                     onChange={(e) => handleInputChange(product.id, 'existingCount', parseInt(e.target.value) || 0)}
+                                     onChange={(val) => handleInputChange(product.id, 'existingCount', val)}
+                                     className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-gray-500 border p-1 bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
                                    />
                                </div>
                              </div>
@@ -553,13 +548,11 @@ const App: React.FC = () => {
                                  {(showStatsCheckbox && input.changeInStats) ? "New Stats" : product.countLabel} 
                                  {isCountDisabled && ' (Ignored)'}
                                </label>
-                               <input
-                                 type="number"
-                                 min="0"
+                               <FormattedNumberInput
+                                 value={input.count}
+                                 onChange={(val) => handleInputChange(product.id, 'count', val)}
                                  disabled={isCountDisabled}
                                  className={`block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums ${isCountDisabled ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''}`}
-                                 value={input.count}
-                                 onChange={(e) => handleInputChange(product.id, 'count', parseInt(e.target.value) || 0)}
                                />
                              </div>
                            )}
