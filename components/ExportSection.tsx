@@ -13,15 +13,12 @@ interface ExportSectionProps {
 
 // Logo URLs
 const WK_LOGO_URL = "https://cdn.wolterskluwer.io/wk/jumpstart-v3-assets/0.x.x/logo/large.svg";
-// Using CORS proxy to ensure the image loads in the browser
-const SAMIR_LOGO_URL = "https://corsproxy.io/?https://samirgroup.com/wp-content/uploads/2021/05/logo.png"; 
+// Use wsrv.nl as a reliable image proxy/resizer that handles CORS headers correctly
+const SAMIR_LOGO_URL = "https://wsrv.nl/?url=samirgroup.com/wp-content/uploads/2021/05/logo.png&output=png";
 
 // Reliable Font URLs
 const FONT_URLS = {
   Inter: {
-    // Using raw GitHub links via raw.githubusercontent.com to ensure CORS headers are present for fetch()
-    // The input URL was https://github.com/.../raw/refs/heads/main/... which redirects to the raw content.
-    // We use the direct raw.githubusercontent.com structure to prevent potential CORS preflight issues with redirects.
     regular: "https://raw.githubusercontent.com/zingrx/fonts_inter_ttf/refs/heads/main/ttf/Inter-Regular.ttf",
     bold: "https://raw.githubusercontent.com/zingrx/fonts_inter_ttf/refs/heads/main/ttf/Inter-Bold.ttf"
   },
@@ -39,8 +36,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [isExcelLoading, setIsExcelLoading] = useState(false);
   
-  // Font State - Default to Inter now that we have working URLs
-  const [selectedFont, setSelectedFont] = useState<FontType>('Inter');
+  // Font State - Default to FiraSans as requested
+  const [selectedFont, setSelectedFont] = useState<FontType>('FiraSans');
   const [fontCache, setFontCache] = useState<Record<FontType, { regular: string | null, bold: string | null }>>({
     Inter: { regular: null, bold: null },
     FiraSans: { regular: null, bold: null }
@@ -181,7 +178,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
   };
 
   const handlePDFExport = async () => {
-    // ... (Existing PDF logic unchanged)
     const currentFontData = fontCache[selectedFont];
     if (!currentFontData.regular || !currentFontData.bold) {
       alert("Fonts are not loaded. Please wait or check your connection.");
@@ -193,16 +189,30 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     const primaryColor: [number, number, number] = [0, 122, 195]; 
     const docDate = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
     const refId = `REF-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`;
+    
     let wkLogoData = "";
     let samirLogoData = "";
+    
     doc.addFileToVFS('Custom-Regular.ttf', currentFontData.regular);
     doc.addFileToVFS('Custom-Bold.ttf', currentFontData.bold);
     doc.addFont('Custom-Regular.ttf', 'CustomFont', 'normal');
     doc.addFont('Custom-Bold.ttf', 'CustomFont', 'bold');
     const fontName = 'CustomFont';
     doc.setFont(fontName);
+    
+    // Load Logos
     try { wkLogoData = await getBase64FromUrl(WK_LOGO_URL); } catch (e) { console.log('WK Logo fail', e) }
-    if (config.channel !== ChannelType.DIRECT) { try { samirLogoData = await getBase64FromUrl(SAMIR_LOGO_URL); } catch (e) { console.log('Partner Logo fail', e) } }
+    
+    // Only load Samir logo if channel is NOT direct
+    if (config.channel !== ChannelType.DIRECT) { 
+        try { 
+            console.log('Fetching Samir Logo from:', SAMIR_LOGO_URL);
+            samirLogoData = await getBase64FromUrl(SAMIR_LOGO_URL); 
+            console.log('Samir Logo Data Length:', samirLogoData.length);
+        } catch (e) { 
+            console.log('Partner Logo fail', e);
+        } 
+    }
 
     const addFooter = (pageNum: number) => {
       doc.setFontSize(8);
@@ -236,6 +246,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
          doc.setTextColor(255, 255, 255);
          doc.text("Wolters Kluwer", xOffset, 20);
        }
+       
        if (config.channel !== ChannelType.DIRECT && samirLogoData) {
          const logoX = pageWidth - 14 - 50; 
          if (isCover) {
@@ -475,7 +486,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     config.selectedProducts.forEach(pid => {
         const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
         const inp = config.productInputs[pid];
-        if(p && inp && inp.count > 0 && p.countLabel) {
+        if(p && inp) {
             let productName = p.name;
             if (pid === 'utd') productName = 'UpToDate';
             if (pid === 'ld') productName = 'Lexidrug';
@@ -485,7 +496,19 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
             if (p.countLabel === 'HC') countLabelText = 'clinicians';
             if (p.countLabel === 'BC') countLabelText = 'active beds';
 
-            statsParts.push(`${inp.count} ${countLabelText} for ${productName}`);
+            // STATS LOGIC:
+            // If New Logo: Use Target (inp.count)
+            // If Renewal: 
+            //    If stats changed (checked): Use Target (inp.count)
+            //    If stats NOT changed: Use Existing (inp.existingCount)
+            let statsToPrint = inp.count;
+            if (config.dealType === DealType.RENEWAL && !inp.changeInStats) {
+                statsToPrint = inp.existingCount || 0;
+            }
+
+            if (statsToPrint > 0) {
+               statsParts.push(`${statsToPrint} ${countLabelText} for ${productName}`);
+            }
         }
     });
     if(statsParts.length > 0) terms.push(`This proposal is based on the following statistics: ${statsParts.join(', ')}.`);
@@ -903,4 +926,3 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     </div>
   );
 };
-    
