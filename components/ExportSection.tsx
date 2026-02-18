@@ -460,7 +460,68 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
 
-    // 1. Monthly Cost (Moved here)
+    // Order Requested: 1. Stats Line, 2. Designated Sites, 3. Monthly Cost
+
+    // 1. Stats Line (Moved to top)
+    const statsParts: string[] = [];
+    config.selectedProducts.forEach(pid => {
+        const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+        const inp = config.productInputs[pid];
+        if(p && inp) {
+            let productName = p.name;
+            if (pid === 'utd') productName = 'UpToDate';
+            if (pid === 'ld') productName = 'Lexidrug';
+            
+            // Text Replacement Logic: HC->clinicians, BC->active beds
+            let countLabelText = p.countLabel;
+            if (p.countLabel === 'HC') countLabelText = 'clinicians';
+            if (p.countLabel === 'BC') countLabelText = 'active beds';
+
+            // STATS LOGIC:
+            let statsToPrint = inp.count;
+            if (config.dealType === DealType.RENEWAL && !inp.changeInStats) {
+                statsToPrint = inp.existingCount || 0;
+            }
+
+            if (statsToPrint > 0) {
+               // Apply locale string formatting
+               statsParts.push(`${statsToPrint.toLocaleString('en-US')} ${countLabelText} for ${productName}`);
+            }
+        }
+    });
+    
+    if(statsParts.length > 0) {
+        doc.setFont(fontName, 'normal');
+        const statsText = `This proposal is based on the following statistics: ${statsParts.join(', ')}.`;
+        const splitStats = doc.splitTextToSize(statsText, 180);
+        doc.text(splitStats, 14, finalY);
+        finalY += (splitStats.length * 5) + 4;
+    }
+
+    // 2. Designated Sites (Moved to middle)
+    if (hasDesignatedSites && designatedSites.trim().length > 0) {
+        doc.setFont(fontName, 'bold');
+        doc.text("Sites included in the above pricing:", 14, finalY);
+        finalY += 6;
+        doc.setFont(fontName, 'normal');
+        
+        const sites = designatedSites.split('\n').filter(s => s.trim().length > 0);
+        sites.forEach((site, index) => {
+            const siteLine = `${index + 1}. ${site.trim()}`;
+            // Check page break
+            if (finalY > 265) {
+                doc.addPage();
+                renderHeader(false);
+                finalY = 55;
+            }
+            const splitSite = doc.splitTextToSize(siteLine, 180);
+            doc.text(splitSite, 14, finalY);
+            finalY += (splitSite.length * 5) + 1;
+        });
+        finalY += 4;
+    }
+
+    // 3. Monthly Cost (Moved to bottom)
     if (showMonthlyCost) {
         if (config.selectedProducts.includes('utd')) {
             const count = config.productInputs['utd'].count || 1;
@@ -502,64 +563,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         }
     }
 
-    // 2. Stats Line (Moved here)
-    const statsParts: string[] = [];
-    config.selectedProducts.forEach(pid => {
-        const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-        const inp = config.productInputs[pid];
-        if(p && inp) {
-            let productName = p.name;
-            if (pid === 'utd') productName = 'UpToDate';
-            if (pid === 'ld') productName = 'Lexidrug';
-            
-            // Text Replacement Logic: HC->clinicians, BC->active beds
-            let countLabelText = p.countLabel;
-            if (p.countLabel === 'HC') countLabelText = 'clinicians';
-            if (p.countLabel === 'BC') countLabelText = 'active beds';
-
-            // STATS LOGIC:
-            let statsToPrint = inp.count;
-            if (config.dealType === DealType.RENEWAL && !inp.changeInStats) {
-                statsToPrint = inp.existingCount || 0;
-            }
-
-            if (statsToPrint > 0) {
-               statsParts.push(`${statsToPrint} ${countLabelText} for ${productName}`);
-            }
-        }
-    });
-    
-    if(statsParts.length > 0) {
-        doc.setFont(fontName, 'normal');
-        const statsText = `This proposal is based on the following statistics: ${statsParts.join(', ')}.`;
-        const splitStats = doc.splitTextToSize(statsText, 180);
-        doc.text(splitStats, 14, finalY);
-        finalY += (splitStats.length * 5) + 4;
-    }
-
-    // 3. Designated Sites (New)
-    if (hasDesignatedSites && designatedSites.trim().length > 0) {
-        doc.setFont(fontName, 'bold');
-        doc.text("Sites included in the above pricing:", 14, finalY);
-        finalY += 6;
-        doc.setFont(fontName, 'normal');
-        
-        const sites = designatedSites.split('\n').filter(s => s.trim().length > 0);
-        sites.forEach((site, index) => {
-            const siteLine = `${index + 1}. ${site.trim()}`;
-            // Check page break
-            if (finalY > 265) {
-                doc.addPage();
-                renderHeader(false);
-                finalY = 55;
-            }
-            const splitSite = doc.splitTextToSize(siteLine, 180);
-            doc.text(splitSite, 14, finalY);
-            finalY += (splitSite.length * 5) + 1;
-        });
-        finalY += 4;
-    }
-
     // --- TERMS & CONDITIONS SECTION ---
     finalY += 4; 
     
@@ -580,7 +583,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     doc.setFont(fontName, 'normal');
     
     const terms: string[] = [];
-    // Note: Stats line removed from here
     
     terms.push("The prices mentioned above are not final and subject to change in case of releasing an official RFP.");
     if (config.years > 1) terms.push("The prices above are tied to a multi-year non-opt-out contract for the same number of years.");
@@ -1026,26 +1028,28 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
               PDF: Add EMR Integration term
             </label>
         </div>
-        <div className="flex items-center">
-            <input 
-              id="designated-sites-check"
-              type="checkbox" 
-              checked={hasDesignatedSites} 
-              onChange={(e) => handleSiteCheckboxChange(e.target.checked)}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
-            />
-            <label htmlFor="designated-sites-check" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
-               More than one designated site?
-            </label>
-            {hasDesignatedSites && (
-               <button 
-                 onClick={() => setIsSiteModalOpen(true)}
-                 className="ml-2 text-[10px] text-blue-600 underline hover:text-blue-800"
-               >
-                 (Edit Sites)
-               </button>
-            )}
-        </div>
+      </div>
+      
+      {/* Designated Sites Checkbox - Moved below options */}
+      <div className="flex items-center mb-6">
+          <input 
+            id="designated-sites-check"
+            type="checkbox" 
+            checked={hasDesignatedSites} 
+            onChange={(e) => handleSiteCheckboxChange(e.target.checked)}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+          />
+          <label htmlFor="designated-sites-check" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+              More than one designated site?
+          </label>
+          {hasDesignatedSites && (
+              <button 
+                onClick={() => setIsSiteModalOpen(true)}
+                className="ml-2 text-[10px] text-blue-600 underline hover:text-blue-800"
+              >
+                (Edit Sites)
+              </button>
+          )}
       </div>
 
       <div className="flex space-x-4">
