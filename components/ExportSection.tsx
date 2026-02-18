@@ -685,7 +685,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       data.yearlyResults.forEach((r, yearIdx) => {
           const rowData: any[] = [`Year ${r.year}`];
           
-          config.selectedProducts.forEach((pid, prodIdx) => {
+          config.selectedProducts.forEach((pid) => { // Removed unused prodIdx
               const bd = r.breakdown.find(x => x.id === pid);
               const val = isIndirect ? bd?.grossSAR : bd?.gross;
               rowData.push(val || 0);
@@ -699,7 +699,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
           const currentRowNumber = addedRow.number;
 
           if (!config.flatPricing && yearIdx > 0 && prevRowNumber > 0) {
-               config.selectedProducts.forEach((pid, prodIdx) => {
+               config.selectedProducts.forEach((_, prodIdx) => { // Replaced unused pid with _
                    const colIndex = prodIdx + 2; 
                    const colLetter = getColLetter(colIndex);
                    const rateColLetter = getColLetter(colIndex); 
@@ -903,3 +903,4 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     </div>
   );
 };
+    
