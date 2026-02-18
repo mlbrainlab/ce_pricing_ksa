@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Layout } from './components/Layout';
 import { ExportSection } from './components/ExportSection';
@@ -103,13 +102,10 @@ const App: React.FC = () => {
     }
 
     // Renewal Uplifts
-    // If MYFPI is selected, we use the Structure Rate (FPI) as the Uplift Rate.
-    // If MYPP is selected, we use the explicit Renewal Uplift Rate inputs.
-    const useStructureRateForUplift = method === PricingMethod.MYFPI;
-
-    const currentGlobalUplift = useStructureRateForUplift ? globalRateVal : renewalUpliftGlobal;
-    const currentUtdUplift = useStructureRateForUplift ? utdRateVal : renewalUpliftUTD;
-    const currentLdUplift = useStructureRateForUplift ? ldRateVal : renewalUpliftLD;
+    // Allow independent Uplift Rate (Y1) vs Annual Rate (Y2+) for MYFPI
+    const currentGlobalUplift = renewalUpliftGlobal;
+    const currentUtdUplift = renewalUpliftUTD;
+    const currentLdUplift = renewalUpliftLD;
 
     const renewalUpliftRates: Record<string, number> = {};
     if (showSplitRates) {
@@ -304,6 +300,13 @@ const App: React.FC = () => {
       </div>
     </div>
   );
+
+  // Label Logic for Annual Rate
+  const getAnnualRateLabel = () => {
+     if (method === PricingMethod.MYPP) return "Annual Reverse Discount %";
+     if (dealType === DealType.RENEWAL) return "Annual Increase % (Year 2+)";
+     return "Annual Increase %";
+  };
 
   return (
     <Layout>
@@ -620,11 +623,11 @@ const App: React.FC = () => {
                  </div>
                </div>
                
-               {/* Renewal Uplift Rate (Specific for Renewal Base) - Only show if MYPP */}
-               {dealType === DealType.RENEWAL && method === PricingMethod.MYPP && (
+               {/* Renewal Uplift Rate (Specific for Renewal Base) - Show for ALL Renewals */}
+               {dealType === DealType.RENEWAL && (
                  <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
                     <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-                      Renewal Uplift %
+                      Renewal Uplift % (Year 1)
                     </div>
                     {showSplitRates ? (
                       <>
@@ -640,7 +643,7 @@ const App: React.FC = () => {
                {/* Single Rate Input Logic (Structure Rate) */}
                <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
                   <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-                    {method === PricingMethod.MYFPI ? 'Annual FPI %' : 'Annual Reverse Discount %'}
+                    {getAnnualRateLabel()}
                   </div>
                   
                   {showSplitRates ? (
