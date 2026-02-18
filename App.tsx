@@ -30,6 +30,7 @@ const App: React.FC = () => {
   const [rounding, setRounding] = useState<boolean>(false); // New Rounding Option
   
   // Structure Rates (Multi-Year logic: FPI or Reverse Discount)
+  const [applyAnnualRate, setApplyAnnualRate] = useState<boolean>(false); // Toggle for Renewal MYFPI
   const [globalRateVal, setGlobalRateVal] = useState<number>(5);
   const [utdRateVal, setUtdRateVal] = useState<number>(8); // Default 8%
   const [ldRateVal, setLdRateVal] = useState<number>(5);
@@ -87,10 +88,18 @@ const App: React.FC = () => {
 
   // Derived Config
   const config: DealConfiguration = useMemo(() => {
-    // Generate arrays based on single input values (Structure Rates)
-    const rates = generateRateArray(globalRateVal, years);
-    const utdRates = generateRateArray(utdRateVal, years);
-    const ldRates = generateRateArray(ldRateVal, years);
+    // Determine effective structure rates based on toggle
+    const useAnnualRate = (dealType === DealType.RENEWAL && method === PricingMethod.MYFPI) ? applyAnnualRate : true;
+    
+    // Override values if disabled
+    const effGlobal = useAnnualRate ? globalRateVal : 0;
+    const effUtd = useAnnualRate ? utdRateVal : 0;
+    const effLd = useAnnualRate ? ldRateVal : 0;
+
+    // Generate arrays based on effective single input values (Structure Rates)
+    const rates = generateRateArray(effGlobal, years);
+    const utdRates = generateRateArray(effUtd, years);
+    const ldRates = generateRateArray(effLd, years);
 
     const productRates: Record<string, number[]> = {};
     if (showSplitRates) {
@@ -130,7 +139,7 @@ const App: React.FC = () => {
       flatPricing,
       rounding
     };
-  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, ldRateVal, renewalUpliftGlobal, renewalUpliftUTD, renewalUpliftLD, showSplitRates, applyWHT, flatPricing, rounding]);
+  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, ldRateVal, renewalUpliftGlobal, renewalUpliftUTD, renewalUpliftLD, showSplitRates, applyWHT, flatPricing, rounding, applyAnnualRate]);
 
   // Results
   const results = useMemo(() => calculatePricing(config), [config]);
@@ -307,6 +316,11 @@ const App: React.FC = () => {
      if (dealType === DealType.RENEWAL) return "Annual Increase % (Year 2+)";
      return "Annual Increase %";
   };
+
+  // Determine if rate inputs should be shown
+  const shouldShowAnnualRateInputs = (dealType === DealType.RENEWAL && method === PricingMethod.MYFPI) 
+    ? applyAnnualRate 
+    : true;
 
   return (
     <Layout>
@@ -640,19 +654,39 @@ const App: React.FC = () => {
                  </div>
                )}
 
-               {/* Single Rate Input Logic (Structure Rate) */}
+               {/* Annual Rate Logic */}
                <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
-                  <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-                    {getAnnualRateLabel()}
-                  </div>
-                  
-                  {showSplitRates ? (
-                    <>
-                      {renderRateInput("UTD Rate", utdRateVal, setUtdRateVal, "Annual %", "border-blue-200 dark:border-blue-800")}
-                      {renderRateInput("LD Rate", ldRateVal, setLdRateVal, "Annual %", "border-green-200 dark:border-green-800")}
-                    </>
-                  ) : (
-                    renderRateInput("Rate", globalRateVal, setGlobalRateVal, "Annual %")
+                  {/* Conditional Checkbox for Renewal MYFPI */}
+                  {dealType === DealType.RENEWAL && method === PricingMethod.MYFPI && (
+                     <div className="flex items-center mb-4">
+                        <input
+                           id="apply-annual-rate"
+                           type="checkbox"
+                           checked={applyAnnualRate}
+                           onChange={(e) => setApplyAnnualRate(e.target.checked)}
+                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                        />
+                        <label htmlFor="apply-annual-rate" className="ml-2 text-xs font-medium text-gray-700 dark:text-gray-300">
+                           Apply Annual Increase for Year 2+?
+                        </label>
+                     </div>
+                  )}
+
+                  {/* Render Inputs if condition met */}
+                  {shouldShowAnnualRateInputs && (
+                      <>
+                        <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+                            {getAnnualRateLabel()}
+                        </div>
+                        {showSplitRates ? (
+                            <>
+                              {renderRateInput("UTD Rate", utdRateVal, setUtdRateVal, "Annual %", "border-blue-200 dark:border-blue-800")}
+                              {renderRateInput("LD Rate", ldRateVal, setLdRateVal, "Annual %", "border-green-200 dark:border-green-800")}
+                            </>
+                          ) : (
+                            renderRateInput("Rate", globalRateVal, setGlobalRateVal, "Annual %")
+                        )}
+                      </>
                   )}
                </div>
 
