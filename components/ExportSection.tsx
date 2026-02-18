@@ -47,6 +47,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
   // PDF Options
   const [showMonthlyCost, setShowMonthlyCost] = useState(true);
   const [showTotals, setShowTotals] = useState(true);
+  const [showEmrIntegration, setShowEmrIntegration] = useState(true); // Default true for EMR term
+
+  // Sites Logic
+  const [hasDesignatedSites, setHasDesignatedSites] = useState(false);
+  const [designatedSites, setDesignatedSites] = useState('');
+  const [isSiteModalOpen, setIsSiteModalOpen] = useState(false);
 
   // Load font when selection changes
   useEffect(() => {
@@ -87,6 +93,14 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
 
     loadSelectedFont();
   }, [selectedFont]);
+
+  // Open modal if hasDesignatedSites is checked
+  const handleSiteCheckboxChange = (checked: boolean) => {
+    setHasDesignatedSites(checked);
+    if (checked) {
+      setIsSiteModalOpen(true);
+    }
+  };
 
   const formatMoney = (amount: number, currency: string) => {
     return currency === 'SAR' 
@@ -425,6 +439,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     const displayCurrency = isIndirect ? 'SAR' : 'USD';
     const getValue = (valUSD: number, valSAR: number) => isIndirect ? valSAR : valUSD;
 
+    // Helper for Bold/Regular mixed text line
     const renderBoldLine = (startY: number, prefix: string, boldText: string, suffix: string) => {
        doc.setFont(fontName, 'normal');
        doc.text(prefix, 14, startY);
@@ -436,6 +451,16 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
        doc.text(suffix, 14 + w1 + w2, startY);
     };
 
+    // --- OPERATING STATISTICS SECTION ---
+    doc.setFontSize(14);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFont(fontName, 'bold');
+    doc.text("Operating Statistics", 14, finalY);
+    finalY += 8;
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+
+    // 1. Monthly Cost (Moved here)
     if (showMonthlyCost) {
         if (config.selectedProducts.includes('utd')) {
             const count = config.productInputs['utd'].count || 1;
@@ -470,18 +495,14 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
             renderBoldLine(finalY, "Your LXD subscription costs ", valStr, " monthly per bed.");
             finalY += 6;
         }
+        
+        // Add a small gap after monthly costs if they exist
+        if (config.selectedProducts.includes('utd') || config.selectedProducts.includes('ld')) {
+            finalY += 4;
+        }
     }
 
-    finalY += 4; 
-    doc.setFontSize(14);
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setFont(fontName, 'bold');
-    doc.text("Terms & Conditions", 14, finalY);
-    finalY += 8;
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont(fontName, 'normal');
-    const terms: string[] = [];
+    // 2. Stats Line (Moved here)
     const statsParts: string[] = [];
     config.selectedProducts.forEach(pid => {
         const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
@@ -497,10 +518,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
             if (p.countLabel === 'BC') countLabelText = 'active beds';
 
             // STATS LOGIC:
-            // If New Logo: Use Target (inp.count)
-            // If Renewal: 
-            //    If stats changed (checked): Use Target (inp.count)
-            //    If stats NOT changed: Use Existing (inp.existingCount)
             let statsToPrint = inp.count;
             if (config.dealType === DealType.RENEWAL && !inp.changeInStats) {
                 statsToPrint = inp.existingCount || 0;
@@ -511,14 +528,71 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
             }
         }
     });
-    if(statsParts.length > 0) terms.push(`This proposal is based on the following statistics: ${statsParts.join(', ')}.`);
+    
+    if(statsParts.length > 0) {
+        doc.setFont(fontName, 'normal');
+        const statsText = `This proposal is based on the following statistics: ${statsParts.join(', ')}.`;
+        const splitStats = doc.splitTextToSize(statsText, 180);
+        doc.text(splitStats, 14, finalY);
+        finalY += (splitStats.length * 5) + 4;
+    }
+
+    // 3. Designated Sites (New)
+    if (hasDesignatedSites && designatedSites.trim().length > 0) {
+        doc.setFont(fontName, 'bold');
+        doc.text("Sites included in the above pricing:", 14, finalY);
+        finalY += 6;
+        doc.setFont(fontName, 'normal');
+        
+        const sites = designatedSites.split('\n').filter(s => s.trim().length > 0);
+        sites.forEach((site, index) => {
+            const siteLine = `${index + 1}. ${site.trim()}`;
+            // Check page break
+            if (finalY > 265) {
+                doc.addPage();
+                renderHeader(false);
+                finalY = 55;
+            }
+            const splitSite = doc.splitTextToSize(siteLine, 180);
+            doc.text(splitSite, 14, finalY);
+            finalY += (splitSite.length * 5) + 1;
+        });
+        finalY += 4;
+    }
+
+    // --- TERMS & CONDITIONS SECTION ---
+    finalY += 4; 
+    
+    // Check page break before starting new section
+    if (finalY > 250) {
+        doc.addPage();
+        renderHeader(false);
+        finalY = 55;
+    }
+
+    doc.setFontSize(14);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFont(fontName, 'bold');
+    doc.text("Terms & Conditions", 14, finalY);
+    finalY += 8;
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(fontName, 'normal');
+    
+    const terms: string[] = [];
+    // Note: Stats line removed from here
+    
     terms.push("The prices mentioned above are not final and subject to change in case of releasing an official RFP.");
     if (config.years > 1) terms.push("The prices above are tied to a multi-year non-opt-out contract for the same number of years.");
     if (config.channel === ChannelType.DIRECT) terms.push("The price above is exempt from 15% VAT.");
     terms.push("Upon renewing the subscription, a statistics recount will be executed, considering the standard price of the exit year.");
     terms.push("The Internet access is a must for this subscription to be utilized.");
     terms.push("This budgetary proposal is valid for 60-days.");
-    terms.push("Integrating UpToDate® or Lexidrug® with your EMR is included in the prices above, even if the EMR changed during the subscription.*");
+    
+    // Conditional EMR Term
+    if (showEmrIntegration) {
+        terms.push("Integrating UpToDate® or Lexidrug® with your EMR is included in the prices above, even if the EMR changed during the subscription.*");
+    }
 
     terms.forEach(term => {
       if (finalY > 260) {
@@ -536,11 +610,16 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         renderHeader(false);
         finalY = 55;
     }
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    const footnote = "* Some EMR providers put additional charges to integrate our solutions, we’re neither responsible nor covering these costs. It has to be discussed with the EMR provider directly.";
-    const splitFootnote = doc.splitTextToSize(footnote, 180);
-    doc.text(splitFootnote, 14, finalY + 2);
+    
+    // Conditional Footnote
+    if (showEmrIntegration) {
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        const footnote = "* Some EMR providers put additional charges to integrate our solutions, we’re neither responsible nor covering these costs. It has to be discussed with the EMR provider directly.";
+        const splitFootnote = doc.splitTextToSize(footnote, 180);
+        doc.text(splitFootnote, 14, finalY + 2);
+    }
+
     addFooter(3);
     const filename = customerName 
        ? `Quote_${customerName.replace(/\s+/g,'_')}_${config.dealType}_${new Date().toISOString().slice(0,10)}.pdf`
@@ -840,6 +919,36 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
 
   return (
     <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6">
+      
+      {/* Site Entry Modal */}
+      {isSiteModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6 border border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Designated Sites</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Enter the names of the sites included in this pricing (one per line). These will be listed in the PDF.
+            </p>
+            <textarea
+              className="w-full h-40 p-3 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="Site 1&#10;Site 2&#10;Site 3"
+              value={designatedSites}
+              onChange={(e) => setDesignatedSites(e.target.value)}
+            />
+            <div className="flex justify-end space-x-3 mt-4">
+              <button 
+                 onClick={() => {
+                   setIsSiteModalOpen(false);
+                   if(designatedSites.trim().length === 0) setHasDesignatedSites(false);
+                 }}
+                 className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Customer Name</label>
@@ -880,7 +989,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       </div>
       
       {/* PDF Export Options */}
-      <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-6 mb-4">
+      <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-6 mb-4 flex-wrap">
         <div className="flex items-center">
             <input 
               id="pdf-monthly-cost"
@@ -904,6 +1013,38 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
             <label htmlFor="pdf-totals-row" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300">
               PDF: Show Totals Row
             </label>
+        </div>
+        <div className="flex items-center">
+            <input 
+              id="pdf-emr-term"
+              type="checkbox" 
+              checked={showEmrIntegration} 
+              onChange={(e) => setShowEmrIntegration(e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+            />
+            <label htmlFor="pdf-emr-term" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300">
+              PDF: Add EMR Integration term
+            </label>
+        </div>
+        <div className="flex items-center">
+            <input 
+              id="designated-sites-check"
+              type="checkbox" 
+              checked={hasDesignatedSites} 
+              onChange={(e) => handleSiteCheckboxChange(e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+            />
+            <label htmlFor="designated-sites-check" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+               More than one designated site?
+            </label>
+            {hasDesignatedSites && (
+               <button 
+                 onClick={() => setIsSiteModalOpen(true)}
+                 className="ml-2 text-[10px] text-blue-600 underline hover:text-blue-800"
+               >
+                 (Edit Sites)
+               </button>
+            )}
         </div>
       </div>
 
