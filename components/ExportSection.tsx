@@ -870,7 +870,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
 
       if (config.dealType === DealType.RENEWAL) {
           sheet.addRow(['Renewal Base ACV (USD)', data.renewalBaseACV]).getCell(2).numFmt = '"$"#,##0.00';
+          if (config.channel !== ChannelType.DIRECT) {
+              sheet.addRow(['Net Renewal Base ACV (USD)', data.netRenewalBaseACV]).getCell(2).numFmt = '"$"#,##0.00';
+          }
           sheet.addRow(['Upsell ACV (USD)', data.upsellACV]).getCell(2).numFmt = '"$"#,##0.00';
+          if (config.channel !== ChannelType.DIRECT) {
+              sheet.addRow(['Net Upsell ACV (USD)', data.netUpsellACV]).getCell(2).numFmt = '"$"#,##0.00';
+          }
       }
 
       // Column Widths and Font Application

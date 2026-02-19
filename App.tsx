@@ -911,14 +911,33 @@ const App: React.FC = () => {
 
                {dealType === DealType.RENEWAL && (
                  <>
+                   {/* Renewal Base ACV (Gross) */}
                    <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-green-500 dark:border-green-400 transition-colors">
-                      <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Renewal ACV (Base)</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Renewal Base ACV</div>
                       <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(results.renewalBaseACV, 'USD')}</div>
                    </div>
+
+                   {/* Net Renewal Base ACV (New for Indirect) */}
+                   {isIndirect && (
+                      <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-green-500 dark:border-green-400 transition-colors">
+                          <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">Net Renewal Base</div>
+                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(results.netRenewalBaseACV, 'USD')}</div>
+                      </div>
+                   )}
+
+                   {/* Upsell ACV (Gross) */}
                    <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-orange-500 dark:border-orange-400 transition-colors">
                       <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Upsell ACV</div>
                       <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(results.upsellACV, 'USD')}</div>
                    </div>
+
+                   {/* Net Upsell ACV (New for Indirect) */}
+                   {isIndirect && (
+                      <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-orange-500 dark:border-orange-400 transition-colors">
+                          <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">Net Upsell</div>
+                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(results.netUpsellACV, 'USD')}</div>
+                      </div>
+                   )}
                  </>
                )}
             </div>
