@@ -1,4 +1,4 @@
-import React, { useState, useEffect, FocusEvent, ChangeEvent } from 'react';
+import React, { useState, useEffect, ChangeEvent } from 'react';
 
 interface FormattedNumberInputProps {
   value: number;
@@ -27,7 +27,7 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
     }
   }, [value, isFocused]);
 
-  const handleFocus = (e: FocusEvent<HTMLInputElement>) => {
+  const handleFocus = () => {
     setIsFocused(true);
     // Requirement: Remove the 0 default value automatically
     if (value === 0) {
