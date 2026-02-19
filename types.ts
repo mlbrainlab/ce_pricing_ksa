@@ -87,7 +87,9 @@ export interface CalculationOutput {
   acvUSD: number;
   netACV: number; 
   renewalBaseACV: number;
+  netRenewalBaseACV: number; // New: Net value of Renewal Base
   upsellACV: number;
+  netUpsellACV: number; // New: Net value of Upsell
   
   currencyToDisplay: 'USD' | 'SAR';
 }

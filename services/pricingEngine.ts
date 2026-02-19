@@ -385,6 +385,12 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
     upsellACV = Math.max(0, acvUSD - totalRenewalBaseForACV);
   }
 
+  // Calculate Net Splits
+  // For Renewal deals, net factor is constant across years for indirect channels
+  const renewalNetFactor = getNetFactor(dealType, channel, 0);
+  const netRenewalBaseACV = totalRenewalBaseForACV * renewalNetFactor;
+  const netUpsellACV = upsellACV * renewalNetFactor;
+
   return {
     yearlyResults,
     totalGrossUSD,
@@ -397,7 +403,9 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
     acvUSD,
     netACV,
     renewalBaseACV: totalRenewalBaseForACV,
+    netRenewalBaseACV,
     upsellACV,
+    netUpsellACV,
     currencyToDisplay: channel === ChannelType.DIRECT ? 'USD' : 'SAR',
   };
 };
