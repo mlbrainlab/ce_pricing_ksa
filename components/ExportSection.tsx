@@ -492,7 +492,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     
     if(statsParts.length > 0) {
         doc.setFont(fontName, 'normal');
-        const statsText = `This proposal is based on the following statistics: ${statsParts.join(', ')}.`;
+        const statsText = `This proposal is based on the following statistics for ${customerName}: ${statsParts.join(', ')}.`;
         const splitStats = doc.splitTextToSize(statsText, 180);
         doc.text(splitStats, 14, finalY);
         finalY += (splitStats.length * 5) + 4;
@@ -536,7 +536,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
             const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
             const monthlyPerUnit = acv / count / 12;
             const valStr = `${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-            renderBoldLine(finalY, "Your UTD subscription costs ", valStr, " monthly per physician.");
+            renderBoldLine(finalY, "Your UpToDate subscription costs ", valStr, " monthly per physician.");
             finalY += 6;
         }
 
@@ -553,7 +553,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
             const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
             const monthlyPerUnit = acv / count / 12;
             const valStr = `${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-            renderBoldLine(finalY, "Your LXD subscription costs ", valStr, " monthly per bed.");
+            renderBoldLine(finalY, "Your Lexidrug subscription costs ", valStr, " monthly per bed.");
             finalY += 6;
         }
         
