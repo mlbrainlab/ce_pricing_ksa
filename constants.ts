@@ -31,7 +31,16 @@ export const UTD_VARIANTS: Record<string, number> = {
   "ANYWHERE": 259,
   "UTDADV": 270,
   "UTDEE": 265,
+  "SM": 0, // Special bucket pricing
 };
+
+export const UTD_SM_BUCKETS = [
+  { min: 11, max: 49, price: 595 },
+  { min: 50, max: 99, price: 545 },
+  { min: 100, max: 199, price: 495 },
+  { min: 200, max: 299, price: 465 },
+  { min: 300, max: 499, price: 445 },
+];
 
 export const LD_VARIANTS: Record<string, number> = {
   "BASE PKG": 80,
@@ -40,6 +49,10 @@ export const LD_VARIANTS: Record<string, number> = {
   "EE-Combo": 66.25, // 0.25 * 265
   "EE-Combo+FLINK": 78.25,
   "EE-Combo+FLINK+IPE": 94.25,
+  "Seats": 300,
+  "Seats+FLINK": 330, // 300 + 10%
+  "Seats+IPE": 360,   // 300 + 20%
+  "Seats+FLINK+IPE": 390, // 300 + 30%
 };
 
 // Add-on Costs per Bed (Net Additive)

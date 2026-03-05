@@ -29,6 +29,7 @@ const App: React.FC = () => {
   const [applyWHT, setApplyWHT] = useState<boolean>(true); // Default true for KSA
   const [flatPricing, setFlatPricing] = useState<boolean>(false); 
   const [rounding, setRounding] = useState<boolean>(false); // New Rounding Option
+  const [notification, setNotification] = useState<string | null>(null); // Notification State
   
   // Structure Rates (Multi-Year logic: FPI or Reverse Discount)
   const [applyAnnualRate, setApplyAnnualRate] = useState<boolean>(false); // Toggle for Renewal MYFPI
@@ -230,7 +231,32 @@ const App: React.FC = () => {
       if (id === 'utd' && field === 'variant' && value === 'UTDEE') {
          if (newState['utd'].count < 150) {
             newState['utd'].count = 150;
+            setNotification("Headcount adjusted to 150 (Minimum for UTD EE)");
+            setTimeout(() => setNotification(null), 3000);
          }
+      }
+
+      // Specific Logic: If UTD Count drops below 150 and Variant is UTDEE, downgrade to UTDADV
+      if (id === 'utd' && field === 'count') {
+         const newCount = value as number;
+         if (newState['utd'].variant === 'UTDEE' && newCount < 150) {
+            newState['utd'].variant = 'UTDADV';
+            setNotification("Variant switched to UTD Advanced (UTD EE requires 150+ HC)");
+            setTimeout(() => setNotification(null), 3000);
+         }
+         // UTD SM Check
+         if (newState['utd'].variant === 'SM' && newCount > 499) {
+             setNotification("UTD SM is not applicable for > 499 seats.");
+             setTimeout(() => setNotification(null), 3000);
+         }
+      }
+
+      // UTD SM Variant Check
+      if (id === 'utd' && field === 'variant' && value === 'SM') {
+          if (newState['utd'].count > 499) {
+             setNotification("UTD SM is not applicable for > 499 seats.");
+             setTimeout(() => setNotification(null), 3000);
+          }
       }
       
       // Auto-check/uncheck Apply WHT if stats change is toggled
@@ -325,6 +351,12 @@ const App: React.FC = () => {
 
   return (
     <Layout>
+      {notification && (
+        <div className="fixed top-4 right-4 z-50 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded shadow-lg animate-fade-in-down">
+          <p className="font-bold">Notice</p>
+          <p>{notification}</p>
+        </div>
+      )}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
         
         {/* Left Column: Configuration */}
@@ -412,6 +444,9 @@ const App: React.FC = () => {
                 const allowedTargetVariants = isRenewal 
                    ? getAllowedTargetVariants(product.id, existingVariant) 
                    : (product.id === 'utd' ? Object.keys(UTD_VARIANTS) : Object.keys(LD_VARIANTS));
+
+                const isUTDSM = product.id === 'utd' && input.variant === 'SM';
+                const isLXDSeats = product.id === 'ld' && input.variant.includes('Seats');
 
                 return (
                   <div key={product.id} className={`border rounded-md transition-colors ${isSelected ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-200 dark:border-gray-700'}`}>
@@ -545,7 +580,7 @@ const App: React.FC = () => {
                              <div>
                                <label className={`block text-xs mb-1 ${isCountDisabled ? 'text-gray-400' : 'text-blue-700 dark:text-blue-300'}`}>
                                  {/* Rename label if stats change */}
-                                 {(showStatsCheckbox && input.changeInStats) ? "New Stats" : product.countLabel} 
+                                 {(isUTDSM || isLXDSeats) ? "Seats" : ((showStatsCheckbox && input.changeInStats) ? "New Stats" : product.countLabel)} 
                                  {isCountDisabled && ' (Ignored)'}
                                </label>
                                <FormattedNumberInput

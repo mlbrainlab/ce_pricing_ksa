@@ -16,7 +16,8 @@ import {
   AVAILABLE_PRODUCTS,
   UTD_VARIANTS,
   LD_VARIANTS,
-  LXD_ADDONS
+  LXD_ADDONS,
+  UTD_SM_BUCKETS
 } from '../constants';
 
 // Dynamic Net Factor Calculation based on Year index and Deal Type
@@ -78,7 +79,19 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
     // NEW LOGO / STANDARD CALCULATION
     let listRate = 0;
     if (prodId === 'utd') {
-      listRate = UTD_VARIANTS[inputs.variant] || 0;
+      if (inputs.variant === 'SM') {
+          const c = inputs.count;
+          if (c > 499) {
+              listRate = 0;
+              productNotes.push("UTD SM: Count > 499 not applicable");
+          } else {
+              const bucket = UTD_SM_BUCKETS.find(b => c >= b.min && c <= b.max);
+              listRate = bucket ? bucket.price : 0;
+              if (c > 0 && !bucket) productNotes.push("UTD SM: Count out of range");
+          }
+      } else {
+          listRate = UTD_VARIANTS[inputs.variant] || 0;
+      }
     } else if (prodId === 'ld') {
       listRate = LD_VARIANTS[inputs.variant] || 0;
     } else {
@@ -225,22 +238,101 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
 
   let floorTriggered = false;
   
+  // Helper to calculate Add-on Net Value for LXD
+  const getLXDAddonNet = (inputs: any, count: number, applyWHT: boolean) => {
+      const variant = inputs.variant || '';
+      let addOnRate = 0;
+      
+      const isSeats = variant.includes('Seats');
+
+      if (isSeats) {
+          // Percentage based add-ons on $300 base
+          const baseSeatPrice = 300;
+          if (variant.includes('FLINK') && variant.includes('IPE')) {
+              addOnRate = baseSeatPrice * 0.30; // 90
+          } else if (variant.includes('FLINK')) {
+              addOnRate = baseSeatPrice * 0.10; // 30
+          } else if (variant.includes('IPE')) {
+              addOnRate = baseSeatPrice * 0.20; // 60
+          }
+      } else {
+          // Standard Bed-based add-ons
+          // Note: LD_VARIANTS keys: "BASE PKG", "BASE PKG+FLINK", "BASE PKG+FLINK+IPE", "EE-Combo..."
+          // We need to detect if FLINK or IPE is present.
+          const hasFlink = variant.includes('FLINK');
+          const hasIPE = variant.includes('IPE');
+
+          if (hasFlink && hasIPE) {
+              addOnRate = LXD_ADDONS.FLINK_IPE;
+          } else if (hasFlink) {
+              addOnRate = LXD_ADDONS.FLINK;
+          } else if (hasIPE) {
+              addOnRate = LXD_ADDONS.IPE;
+          }
+      }
+
+      let addonGross = addOnRate * count;
+      let addonNet = addonGross * (1 - (inputs.baseDiscount / 100));
+      
+      if (applyWHT) {
+          addonNet = addonNet / WHT_FACTOR;
+      }
+      return addonNet;
+  };
+
   if (hasUTD && hasLD) {
-    if (year1ProductNets['ld'] < activeComboFloor) {
-      year1ProductNets['ld'] = activeComboFloor;
-      productNotes.push(`LD adjusted to Combo Floor`);
+    // Combo Logic for LD
+    // LD Floor is COMBO_FLOOR_LD_RAW (adjusted for WHT)
+    // Logic: Floor applies to Base. Add-ons are on top.
+    
+    const ldInputs = productInputs['ld'];
+    const ldCurrentNet = year1ProductNets['ld'];
+    const ldAddonNet = getLXDAddonNet(ldInputs, ldInputs.count, applyWHT);
+    const ldBaseNet = ldCurrentNet - ldAddonNet;
+
+    if (ldBaseNet < activeComboFloor) {
+      year1ProductNets['ld'] = activeComboFloor + ldAddonNet;
+      productNotes.push(`LD adjusted to Combo Floor (Base: ${activeComboFloor.toFixed(0)} + Addons)`);
       floorTriggered = true;
     }
+
+    // UTD Floor Logic (Standard Floor)
+    // Logic: If UTDADV, Floor = StandardFloor * 1.08
+    const utdInputs = productInputs['utd'];
+    let utdFloor = activeStandardFloor;
+    if (utdInputs.variant === 'UTDADV') {
+        utdFloor = utdFloor * 1.08;
+    }
+
+    if (year1ProductNets['utd'] < utdFloor) {
+        year1ProductNets['utd'] = utdFloor;
+        productNotes.push(`UTD adjusted to Floor (${utdInputs.variant === 'UTDADV' ? 'Standard + 8%' : 'Standard'})`);
+        floorTriggered = true;
+    }
+
   } else if (hasUTD) {
-    if (year1ProductNets['utd'] < activeStandardFloor) {
-      year1ProductNets['utd'] = activeStandardFloor;
-      productNotes.push(`UTD adjusted to Minimum Floor`);
+    // Single UTD
+    const utdInputs = productInputs['utd'];
+    let utdFloor = activeStandardFloor;
+    if (utdInputs.variant === 'UTDADV') {
+        utdFloor = utdFloor * 1.08;
+    }
+
+    if (year1ProductNets['utd'] < utdFloor) {
+      year1ProductNets['utd'] = utdFloor;
+      productNotes.push(`UTD adjusted to Minimum Floor (${utdInputs.variant === 'UTDADV' ? 'Standard + 8%' : 'Standard'})`);
       floorTriggered = true;
     }
   } else if (hasLD) {
-    if (year1ProductNets['ld'] < activeStandardFloor) {
-      year1ProductNets['ld'] = activeStandardFloor;
-      productNotes.push(`LD adjusted to Minimum Floor`);
+    // Single LD
+    const ldInputs = productInputs['ld'];
+    const ldCurrentNet = year1ProductNets['ld'];
+    const ldAddonNet = getLXDAddonNet(ldInputs, ldInputs.count, applyWHT);
+    const ldBaseNet = ldCurrentNet - ldAddonNet;
+
+    if (ldBaseNet < activeStandardFloor) {
+      year1ProductNets['ld'] = activeStandardFloor + ldAddonNet;
+      productNotes.push(`LD adjusted to Minimum Floor (Base: ${activeStandardFloor.toFixed(0)} + Addons)`);
       floorTriggered = true;
     }
   }
