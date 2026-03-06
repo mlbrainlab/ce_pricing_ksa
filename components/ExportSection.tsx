@@ -30,6 +30,12 @@ const FONT_URLS = {
 
 type FontType = 'Inter' | 'FiraSans';
 
+interface SiteBreakdownItem {
+  id: string; // unique id for list management
+  name: string;
+  counts: Record<string, number>; // productId -> count
+}
+
 export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) => {
   const [customerName, setCustomerName] = useState('');
   const [repName, setRepName] = useState('');
@@ -53,6 +59,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
   const [hasDesignatedSites, setHasDesignatedSites] = useState(false);
   const [designatedSites, setDesignatedSites] = useState('');
   const [isSiteModalOpen, setIsSiteModalOpen] = useState(false);
+  
+  // Site Breakdown Logic
+  const [isBreakdownPerSite, setIsBreakdownPerSite] = useState(false);
+  const [siteBreakdown, setSiteBreakdown] = useState<SiteBreakdownItem[]>([]);
 
   // Load font when selection changes
   useEffect(() => {
@@ -499,26 +509,84 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     }
 
     // 2. Designated Sites (Moved to middle)
-    if (hasDesignatedSites && designatedSites.trim().length > 0) {
-        doc.setFont(fontName, 'bold');
-        doc.text("Sites included in the above pricing:", 14, finalY);
-        finalY += 6;
-        doc.setFont(fontName, 'normal');
-        
-        const sites = designatedSites.split('\n').filter(s => s.trim().length > 0);
-        sites.forEach((site, index) => {
-            const siteLine = `${index + 1}. ${site.trim()}`;
-            // Check page break
-            if (finalY > 265) {
-                doc.addPage();
-                renderHeader(false);
-                finalY = 55;
-            }
-            const splitSite = doc.splitTextToSize(siteLine, 180);
-            doc.text(splitSite, 14, finalY);
-            finalY += (splitSite.length * 5) + 1;
-        });
-        finalY += 4;
+    if (hasDesignatedSites) {
+        if (isBreakdownPerSite && siteBreakdown.length > 0) {
+            // BREAKDOWN TABLE LOGIC
+            doc.setFont(fontName, 'bold');
+            doc.text("Price Breakdown per Site:", 14, finalY);
+            finalY += 6;
+            
+            // Table Headers
+            const siteHeaders = ['Site Name'];
+            config.selectedProducts.forEach(pid => {
+                const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                siteHeaders.push(`${p?.shortName || p?.name} Count`);
+            });
+            siteHeaders.push(`Est. Annual Cost (${displayCurrency})`);
+
+            const siteBody = siteBreakdown.map(site => {
+                const row = [site.name];
+                let siteTotalCost = 0;
+
+                config.selectedProducts.forEach(pid => {
+                    const count = site.counts[pid] || 0;
+                    row.push(count.toLocaleString());
+                    
+                    // Calculate Prorated Cost
+                    // (Site Count / Total Count) * Total Annual Net
+                    const totalCount = config.productInputs[pid]?.count || 1; // Avoid div by zero
+                    const productTotalNet = data.productNetTotals[pid] / config.years; // Average Annual Net
+                    
+                    if (totalCount > 0) {
+                        const siteProductCost = (count / totalCount) * productTotalNet;
+                        siteTotalCost += siteProductCost;
+                    }
+                });
+
+                // Convert to Display Currency
+                const displayCost = isIndirect ? (siteTotalCost * 3.76) : siteTotalCost; // Approx exchange for display
+                // Note: Using 3.76 hardcoded here or import from constants if available. 
+                // data.productNetTotals is in USD (Net).
+                // If isIndirect, we show SAR.
+                
+                row.push(formatMoney(displayCost, displayCurrency));
+                return row;
+            });
+
+            autoTable(doc, {
+                startY: finalY,
+                head: [siteHeaders],
+                body: siteBody,
+                theme: 'grid',
+                headStyles: { fillColor: [240, 240, 240], textColor: 0, font: fontName, fontStyle: 'bold' },
+                styles: { fontSize: 9, font: fontName, overflow: 'linebreak', cellPadding: 2 },
+                margin: { left: 14, right: 14 },
+            });
+            
+            finalY = (doc as any).lastAutoTable.finalY + 8;
+
+        } else if (designatedSites.trim().length > 0) {
+            // STANDARD LIST LOGIC
+            doc.setFont(fontName, 'bold');
+            doc.text("Sites included in the above pricing:", 14, finalY);
+            finalY += 6;
+            doc.setFont(fontName, 'normal');
+            
+            const sites = designatedSites.split('\n').filter(s => s.trim().length > 0);
+            sites.forEach((site, index) => {
+                const siteLine = `${index + 1}. ${site.trim()}`;
+                // Check page break
+                if (finalY > 265) {
+                    doc.addPage();
+                    renderHeader(false);
+                    finalY = 55;
+                }
+                const splitSite = doc.splitTextToSize(siteLine, 180);
+                doc.text(splitSite, 14, finalY);
+                finalY += (splitSite.length * 5) + 1;
+            });
+            finalY += 4;
+        }
     }
 
     // 3. Monthly Cost (Moved to bottom)
@@ -931,22 +999,135 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       {/* Site Entry Modal */}
       {isSiteModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6 border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6 border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Designated Sites</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              Enter the names of the sites included in this pricing (one per line). These will be listed in the PDF.
-            </p>
-            <textarea
-              className="w-full h-40 p-3 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="Site 1&#10;Site 2&#10;Site 3"
-              value={designatedSites}
-              onChange={(e) => setDesignatedSites(e.target.value)}
-            />
-            <div className="flex justify-end space-x-3 mt-4">
+            
+            <div className="mb-4">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                    <input 
+                        type="checkbox"
+                        checked={isBreakdownPerSite}
+                        onChange={(e) => {
+                            setIsBreakdownPerSite(e.target.checked);
+                            if (e.target.checked && siteBreakdown.length === 0) {
+                                // Initialize with one empty site
+                                setSiteBreakdown([{ id: Date.now().toString(), name: '', counts: {} }]);
+                            }
+                        }}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Price Breakdown per Site</span>
+                </label>
+            </div>
+
+            {!isBreakdownPerSite ? (
+                <>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    Enter the names of the sites included in this pricing (one per line). These will be listed in the PDF.
+                    </p>
+                    <textarea
+                    className="w-full h-40 p-3 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Site 1&#10;Site 2&#10;Site 3"
+                    value={designatedSites}
+                    onChange={(e) => setDesignatedSites(e.target.value)}
+                    />
+                </>
+            ) : (
+                <div className="space-y-4">
+                    {/* Stats Summary Header */}
+                    <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700 text-xs">
+                        <div className="font-semibold mb-2 text-gray-700 dark:text-gray-300">Stats Validation:</div>
+                        <div className="grid grid-cols-1 gap-2">
+                            {config.selectedProducts.map(pid => {
+                                const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                                const totalRequired = config.productInputs[pid]?.count || 0;
+                                const currentSum = siteBreakdown.reduce((sum, site) => sum + (site.counts[pid] || 0), 0);
+                                const diff = totalRequired - currentSum;
+                                const isMatch = diff === 0;
+                                
+                                return (
+                                    <div key={pid} className="flex justify-between items-center">
+                                        <span className="font-medium">{p?.name}:</span>
+                                        <div className="flex space-x-3">
+                                            <span>Total: {totalRequired}</span>
+                                            <span>Sum: {currentSum}</span>
+                                            <span className={isMatch ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+                                                {isMatch ? "Match" : `Diff: ${diff > 0 ? '-' : '+'}${Math.abs(diff)}`}
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Sites List */}
+                    <div className="space-y-2">
+                        {siteBreakdown.map((site, idx) => (
+                            <div key={site.id} className="flex items-start space-x-2 p-2 border border-gray-100 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                <div className="flex-grow grid grid-cols-1 gap-2">
+                                    <input 
+                                        type="text"
+                                        placeholder="Site Name"
+                                        value={site.name}
+                                        onChange={(e) => {
+                                            const newSites = [...siteBreakdown];
+                                            newSites[idx].name = e.target.value;
+                                            setSiteBreakdown(newSites);
+                                        }}
+                                        className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded p-1.5 bg-white dark:bg-gray-800"
+                                    />
+                                    <div className="flex flex-wrap gap-2">
+                                        {config.selectedProducts.map(pid => {
+                                            const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                                            return (
+                                                <div key={pid} className="flex items-center space-x-1">
+                                                    <label className="text-[10px] text-gray-500 uppercase">{p?.shortName || p?.name}:</label>
+                                                    <input 
+                                                        type="number"
+                                                        value={site.counts[pid] || ''}
+                                                        onChange={(e) => {
+                                                            const val = parseInt(e.target.value) || 0;
+                                                            const newSites = [...siteBreakdown];
+                                                            newSites[idx].counts[pid] = val;
+                                                            setSiteBreakdown(newSites);
+                                                        }}
+                                                        className="w-20 text-sm border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-800"
+                                                    />
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        const newSites = siteBreakdown.filter((_, i) => i !== idx);
+                                        setSiteBreakdown(newSites);
+                                    }}
+                                    className="text-red-500 hover:text-red-700 p-1"
+                                    title="Remove Site"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    <button 
+                        onClick={() => setSiteBreakdown([...siteBreakdown, { id: Date.now().toString(), name: '', counts: {} }])}
+                        className="w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded text-gray-500 hover:border-blue-500 hover:text-blue-500 text-sm font-medium transition-colors"
+                    >
+                        + Add Site
+                    </button>
+                </div>
+            )}
+
+            <div className="flex justify-end space-x-3 mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
               <button 
                  onClick={() => {
                    setIsSiteModalOpen(false);
-                   if(designatedSites.trim().length === 0) setHasDesignatedSites(false);
+                   if (!isBreakdownPerSite && designatedSites.trim().length === 0) setHasDesignatedSites(false);
+                   if (isBreakdownPerSite && siteBreakdown.length === 0) setHasDesignatedSites(false);
                  }}
                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700"
               >
