@@ -438,6 +438,10 @@ const App: React.FC = () => {
                     if (isLXDAddonUpgrade) {
                         isCountDisabled = false;
                     }
+                    // Enable count input for LXD renewal to allow stats change
+                    if (product.id === 'ld') {
+                        isCountDisabled = false;
+                    }
                 }
 
                 // Variants Filtering
