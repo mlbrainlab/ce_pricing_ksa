@@ -490,7 +490,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
             // STATS LOGIC:
             let statsToPrint = inp.count;
             if (config.dealType === DealType.RENEWAL && !inp.changeInStats) {
-                statsToPrint = inp.existingCount || 0;
+                // Fallback: If count changed but changeInStats wasn't set (LXD case), use count if different from existing
+                if (inp.count > 0 && inp.existingCount && inp.count !== inp.existingCount) {
+                    statsToPrint = inp.count;
+                } else {
+                    statsToPrint = inp.existingCount || 0;
+                }
             }
 
             if (statsToPrint > 0) {
