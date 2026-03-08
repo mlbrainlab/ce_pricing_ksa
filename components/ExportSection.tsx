@@ -12,9 +12,9 @@ interface ExportSectionProps {
 }
 
 // Logo URLs
-// const WK_LOGO_URL = "https://cdn.wolterskluwer.io/wk/jumpstart-v3-assets/0.x.x/logo/large.svg";
+const WK_LOGO_URL = "https://wsrv.nl/?url=cdn.wolterskluwer.io/wk/jumpstart-v3-assets/0.x.x/logo/large.svg&output=png";
 // Use wsrv.nl as a reliable image proxy/resizer that handles CORS headers correctly
-// const SAMIR_LOGO_URL = "https://wsrv.nl/?url=samirgroup.com/wp-content/uploads/2021/05/logo.png&output=png";
+const SAMIR_LOGO_URL = "https://wsrv.nl/?url=samirgroup.com/wp-content/uploads/2021/05/logo.png&output=png";
 
 // Reliable Font URLs
 const FONT_URLS = {
@@ -132,18 +132,29 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     let finalY = 60;
 
     const renderHeader = (_isFirstPage: boolean) => {
+        // Blue Header Background
+        doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        if (_isFirstPage) {
+            doc.rect(0, 0, 210, 135, 'F'); // Large blue background for first page
+        } else {
+            doc.rect(0, 0, 210, 32, 'F'); // Standard header for other pages
+        }
+
         try {
-            // doc.addImage(WK_LOGO_URL, 'SVG', 14, 10, 40, 10);
+            // Add WK Logo
+            doc.addImage(WK_LOGO_URL, 'PNG', 14, 10, 40, 10);
+            
+            // Add Samir Logo if Indirect
+            if (isIndirect) {
+                doc.addImage(SAMIR_LOGO_URL, 'PNG', 160, 8, 35, 14);
+            }
         } catch (e) {
             console.warn("Logo load error", e);
         }
         
-        doc.setFontSize(10);
-        doc.setTextColor(100, 100, 100);
-        doc.text("Wolters Kluwer Health", 14, 25);
-        
-        doc.setDrawColor(200, 200, 200);
-        doc.line(14, 28, 196, 28);
+        doc.setFontSize(12);
+        doc.setTextColor(255, 255, 255);
+        // doc.text("Wolters Kluwer Health", 14, 25); // Removed as requested
     };
 
     const addFooter = (pageNumber: number) => {
@@ -162,75 +173,14 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     renderHeader(true);
     doc.setFontSize(18);
     doc.setFont(fontName, 'normal');
+    doc.setTextColor(255, 255, 255); // White text for title on blue background
     const proposalTitle = config.dealType === DealType.RENEWAL 
         ? "Budgetary Commercial Proposal [Renewal]" 
         : "Budgetary Commercial Proposal";
     doc.text(proposalTitle, 105, 115, { align: 'center' });
   // ...
 
-  // Update Designated Sites Logic in PDF
-    // 2. Designated Sites (Moved to middle)
-    if (hasDesignatedSites) {
-        if (isBreakdownPerSite && siteBreakdown.length > 0) {
-            // BREAKDOWN TABLE LOGIC
-            doc.setFont(fontName, 'bold');
-            doc.text("Price Breakdown per Site:", 14, finalY);
-            finalY += 6;
-            
-            // Table Headers
-            const siteHeaders = ['Site Name'];
-            config.selectedProducts.forEach(pid => {
-                const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-                siteHeaders.push(`${p?.shortName || p?.name} Count`);
-            });
-            
-            if (!showSitesOnly) {
-                siteHeaders.push(`Est. Annual Cost (${displayCurrency})`);
-            }
-
-            const siteBody = siteBreakdown.map(site => {
-                const row = [site.name];
-                let siteTotalCost = 0;
-
-                config.selectedProducts.forEach(pid => {
-                    const count = site.counts[pid] || 0;
-                    row.push(count.toLocaleString());
-                    
-                    // Calculate Prorated Cost
-                    if (!showSitesOnly) {
-                        const totalCount = config.productInputs[pid]?.count || 1; 
-                        const productTotalNet = data.productNetTotals[pid] / config.years; 
-                        
-                        if (totalCount > 0) {
-                            const siteProductCost = (count / totalCount) * productTotalNet;
-                            siteTotalCost += siteProductCost;
-                        }
-                    }
-                });
-
-                if (!showSitesOnly) {
-                    const displayCost = isIndirect ? (siteTotalCost * 3.76) : siteTotalCost; 
-                    row.push(formatMoney(displayCost, displayCurrency));
-                }
-                return row;
-            });
-
-            autoTable(doc, {
-                startY: finalY,
-                head: [siteHeaders],
-                body: siteBody,
-                theme: 'grid',
-                headStyles: { fillColor: [240, 240, 240], textColor: 0, font: fontName, fontStyle: 'bold' },
-                styles: { fontSize: 9, font: fontName, overflow: 'linebreak', cellPadding: 2 },
-                margin: { left: 14, right: 14 },
-            });
-            
-            finalY = (doc as any).lastAutoTable.finalY + 8;
-
-        } else if (designatedSites.trim().length > 0) {
-            // ... (existing standard list logic)
-        }
-    }
+    // Removed duplicate Designated Sites logic
 
     let currentY = 170;
     doc.setTextColor(60, 60, 60);
@@ -278,7 +228,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     doc.text(`©${new Date().getFullYear()} UpToDate, Inc. and its affiliates and/or licensors. All rights reserved.`, 14, 290);
 
     doc.addPage();
-    renderHeader(false);
+    // Header rendered in loop at end
     doc.setFillColor(255, 255, 255);
     doc.setFontSize(16);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -290,10 +240,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     const disclaimer = `The information contained within this Proposal is confidential and proprietary and may be used solely for the purpose of evaluating the potential license of offerings and/or services provided by the Wolters Kluwer Health, Inc. entities (sometimes collectively referred to as “Wolters Kluwer”) identified in this Proposal. This Proposal is non-binding on each party. Neither this Proposal, nor any oral or written communication concerning the matters covered by this Proposal, shall create any binding obligations on any party; only those obligations set forth in a separate written definitive agreement negotiated and executed by all parties in a form approved by each party shall be binding upon the parties. Any information contained within this Proposal may only be disclosed to directors, officers, employees, and agents of the recipient organization who need to know such information for the purpose of evaluating this Proposal. The information contained within this Proposal shall not be communicated to anyone outside of the recipient organization without the express written permission of Wolters Kluwer.`;
     const splitText = doc.splitTextToSize(disclaimer, 180);
     doc.text(splitText, 14, 60);
-    addFooter(2);
+    // Footer added dynamically at the end
 
     doc.addPage();
-    renderHeader(false);
+    // Header rendered in loop at end
     doc.setFontSize(16);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFont(fontName, 'bold');
@@ -375,7 +325,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       headStyles: { fillColor: primaryColor, textColor: 255, font: fontName, fontStyle: 'bold', valign: 'middle' },
       styles: { fontSize: 9, font: fontName, overflow: 'linebreak', cellPadding: 2 }, 
       columnStyles: columnStyles,
-      margin: { left: 14, right: 14 },
+      margin: { top: 35, left: 14, right: 14 },
       didParseCell: (data) => {
         // Only bold the last row if showTotals is true
         if (showTotals && data.section === 'body' && data.row.index === tableBody.length - 1) { 
@@ -427,17 +377,14 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
             let countLabelText = p.countLabel;
             if (p.countLabel === 'HC') countLabelText = 'clinicians';
             if (p.countLabel === 'BC') countLabelText = 'active beds';
+            
+            // Override for Lexidrug Seats variant
+            if (pid === 'ld' && inp.variant && inp.variant.includes('Seats')) {
+                countLabelText = 'seats';
+            }
 
             // STATS LOGIC:
-            let statsToPrint = inp.count;
-            if (config.dealType === DealType.RENEWAL && !inp.changeInStats) {
-                // Fallback: If count changed but changeInStats wasn't set (LXD case), use count if different from existing
-                if (inp.count > 0 && inp.existingCount && inp.count !== inp.existingCount) {
-                    statsToPrint = inp.count;
-                } else {
-                    statsToPrint = inp.existingCount || 0;
-                }
-            }
+            const statsToPrint = inp.count > 0 ? inp.count : (inp.existingCount || 0);
 
             if (statsToPrint > 0) {
                // Apply locale string formatting
@@ -507,32 +454,51 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
                 theme: 'grid',
                 headStyles: { fillColor: [240, 240, 240], textColor: 0, font: fontName, fontStyle: 'bold' },
                 styles: { fontSize: 9, font: fontName, overflow: 'linebreak', cellPadding: 2 },
-                margin: { left: 14, right: 14 },
+                margin: { top: 35, left: 14, right: 14 },
             });
             
             finalY = (doc as any).lastAutoTable.finalY + 8;
 
         } else if (designatedSites.trim().length > 0) {
-            // STANDARD LIST LOGIC
+            // STANDARD LIST LOGIC - Two Column Table
             doc.setFont(fontName, 'bold');
             doc.text("Sites included in the above pricing:", 14, finalY);
             finalY += 6;
-            doc.setFont(fontName, 'normal');
             
             const sites = designatedSites.split('\n').filter(s => s.trim().length > 0);
-            sites.forEach((site, index) => {
-                const siteLine = `${index + 1}. ${site.trim()}`;
-                // Check page break
-                if (finalY > 265) {
-                    doc.addPage();
-                    renderHeader(false);
-                    finalY = 55;
+            const tableBody = [];
+            for (let i = 0; i < sites.length; i += 2) {
+                const row = [
+                    `${i + 1}. ${sites[i].trim()}`,
+                    sites[i + 1] ? `${i + 2}. ${sites[i + 1].trim()}` : ''
+                ];
+                tableBody.push(row);
+            }
+
+            autoTable(doc, {
+                startY: finalY,
+                body: tableBody,
+                theme: 'plain', // Clean look
+                styles: { 
+                    fontSize: 9, 
+                    font: fontName, 
+                    cellPadding: 3,
+                    lineColor: [220, 220, 220], // Light grey borders
+                    lineWidth: 0.1,
+                },
+                columnStyles: {
+                    0: { cellWidth: 90 },
+                    1: { cellWidth: 90 }
+                },
+                margin: { top: 35, left: 14, right: 14 },
+                didDrawCell: (data) => {
+                    // Draw border for every cell to ensure grid look
+                    doc.setDrawColor(220, 220, 220);
+                    doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height);
                 }
-                const splitSite = doc.splitTextToSize(siteLine, 180);
-                doc.text(splitSite, 14, finalY);
-                finalY += (splitSite.length * 5) + 1;
             });
-            finalY += 4;
+            
+            finalY = (doc as any).lastAutoTable.finalY + 8;
         }
     }
 
@@ -584,7 +550,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     // Check page break before starting new section
     if (finalY > 250) {
         doc.addPage();
-        renderHeader(false);
+        // Header rendered in loop at end
         finalY = 55;
     }
 
@@ -614,7 +580,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     terms.forEach(term => {
       if (finalY > 260) {
         doc.addPage();
-        renderHeader(false);
+        // Header rendered in loop at end
         finalY = 55;
       }
       const splitTerm = doc.splitTextToSize(`• ${term}`, 180);
@@ -624,7 +590,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
 
     if (finalY > 260) {
         doc.addPage();
-        renderHeader(false);
+        // Header rendered in loop at end
         finalY = 55;
     }
     
@@ -637,7 +603,16 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         doc.text(splitFootnote, 14, finalY + 2);
     }
 
-    addFooter(3);
+    // Add Headers and Footers to all pages (except Page 1 which has custom layout)
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        if (i > 1) {
+            renderHeader(false);
+            addFooter(i);
+        }
+    }
+
     const filename = customerName 
        ? `Quote_${customerName.replace(/\s+/g,'_')}_${config.dealType}_${new Date().toISOString().slice(0,10)}.pdf`
        : `Quote_${config.dealType}_${new Date().toISOString().slice(0,10)}.pdf`;
@@ -941,7 +916,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
   };
 
   const handleSiteCheckboxChange = (checked: boolean) => {
-    setIsBreakdownPerSite(checked);
+    setHasDesignatedSites(checked);
+    if (checked) {
+      setIsSiteModalOpen(true);
+    }
   };
 
   return (
