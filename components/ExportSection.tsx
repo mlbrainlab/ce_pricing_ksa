@@ -39,11 +39,13 @@ interface SiteBreakdownItem {
 export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) => {
   const [customerName, setCustomerName] = useState('');
   const [repName, setRepName] = useState('');
+  const [repPhone, setRepPhone] = useState('');
+  const [repEmail, setRepEmail] = useState('');
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [isExcelLoading, setIsExcelLoading] = useState(false);
   
   // Font State - Default to FiraSans as requested
-  const [selectedFont, setSelectedFont] = useState<FontType>('FiraSans');
+  const [selectedFont] = useState<FontType>('FiraSans');
   const [fontCache, setFontCache] = useState<Record<FontType, { regular: string | null, bold: string | null }>>({
     Inter: { regular: null, bold: null },
     FiraSans: { regular: null, bold: null }
@@ -219,10 +221,25 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     doc.setFontSize(10);
     doc.setTextColor(50, 50, 50);
     doc.setFont(fontName, 'normal');
-    doc.text(`Customer: ${customerName || 'N/A'}`, 14, 265);
-    doc.text(`Prepared by: ${repName || 'N/A'}`, 14, 270);
-    doc.text(`Date: ${docDate}`, 14, 275);
-    doc.text(`Ref: ${refId}`, 14, 280);
+    let currentFooterY = 250;
+    doc.text(`Customer: ${customerName || 'N/A'}`, 14, currentFooterY);
+    currentFooterY += 5;
+    doc.text(`Prepared by: ${repName || 'N/A'}`, 14, currentFooterY);
+    currentFooterY += 5;
+    
+    if (repEmail) {
+        doc.text(`Email: ${repEmail}`, 14, currentFooterY);
+        currentFooterY += 5;
+    }
+    if (repPhone) {
+        doc.text(`Phone: ${repPhone}`, 14, currentFooterY);
+        currentFooterY += 5;
+    }
+    
+    doc.text(`Date: ${docDate}`, 14, currentFooterY);
+    currentFooterY += 5;
+    doc.text(`Ref: ${refId}`, 14, currentFooterY);
+    
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
     doc.text(`©${new Date().getFullYear()} UpToDate, Inc. and its affiliates and/or licensors. All rights reserved.`, 14, 290);
@@ -1103,7 +1120,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         <div>
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Customer Name</label>
           <input 
@@ -1120,25 +1137,39 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
             type="text" 
             placeholder="Enter Rep Name"
             value={repName}
-            onChange={(e) => setRepName(e.target.value)}
+            onChange={(e) => {
+                const val = e.target.value;
+                setRepName(val);
+                // Auto-populate email
+                const clean = val.trim().toLowerCase().replace(/\s+/g, '.');
+                if (clean) {
+                    setRepEmail(`${clean}@wolterskluwer.com`);
+                } else {
+                    setRepEmail('');
+                }
+            }}
             className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 font-sans"
           />
         </div>
         <div>
-           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">PDF Font</label>
-           <div className="flex items-center space-x-2">
-             <select
-               value={selectedFont}
-               onChange={(e) => setSelectedFont(e.target.value as FontType)}
-               className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white font-sans"
-             >
-               <option value="Inter">Inter (Sans)</option>
-               <option value="FiraSans">Fira Sans</option>
-             </select>
-             {isFontLoading && (
-               <span className="text-xs text-blue-500 animate-pulse">Loading...</span>
-             )}
-           </div>
+           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Rep Email</label>
+           <input 
+             type="email" 
+             placeholder="first.last@wolterskluwer.com"
+             value={repEmail}
+             onChange={(e) => setRepEmail(e.target.value)}
+             className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 font-sans"
+           />
+        </div>
+        <div>
+           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Rep Phone</label>
+           <input 
+             type="tel" 
+             placeholder="+966..."
+             value={repPhone}
+             onChange={(e) => setRepPhone(e.target.value)}
+             className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 font-sans"
+           />
         </div>
       </div>
       
