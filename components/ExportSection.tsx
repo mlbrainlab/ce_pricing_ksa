@@ -232,7 +232,14 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         currentFooterY += 5;
     }
     if (repPhone) {
-        doc.text(`Phone: ${repPhone}`, 14, currentFooterY);
+        // Format Saudi Phone: +966 xx xxx xxxx
+        let formattedPhone = repPhone;
+        const digits = repPhone.replace(/\D/g, '');
+        if ((digits.startsWith('05') && digits.length === 10) || (digits.startsWith('5') && digits.length === 9)) {
+             const core = digits.startsWith('05') ? digits.substring(1) : digits;
+             formattedPhone = `+966 ${core.substring(0, 2)} ${core.substring(2, 5)} ${core.substring(5, 9)}`;
+        }
+        doc.text(`Phone: ${formattedPhone}`, 14, currentFooterY);
         currentFooterY += 5;
     }
     
@@ -585,6 +592,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     terms.push("The prices mentioned above are not final and subject to change in case of releasing an official RFP.");
     if (config.years > 1) terms.push("The prices above are tied to a multi-year non-opt-out contract for the same number of years.");
     if (config.channel === ChannelType.DIRECT) terms.push("The price above is exempt from 15% VAT.");
+    
+    if (config.years > 1 && config.channel === ChannelType.DIRECT) {
+        terms.push("Payment of the above prices will be made against annual invoices issued each year, with payment due 30 days from the activation start date.");
+    }
+
     terms.push("Upon renewing the subscription, a statistics recount will be executed, considering the standard price of the exit year.");
     terms.push("The Internet access is a must for this subscription to be utilized.");
     terms.push("This budgetary proposal is valid for 60-days.");
