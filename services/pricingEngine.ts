@@ -189,94 +189,92 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
          }
 
       } else if (prodId === 'ld') {
-         // LXD Upsell Logic
+         // LXD Upsell Logic - REVISED based on Scenarios
          
-         // 1. Calculate Derived Rate from Expiring Amount and Existing Stats
-         let derivedExpiringRate = 0;
+         // 1. Calculate Expiring Rate
+         let expiringRate = 0;
          if (inputs.existingCount && inputs.existingCount > 0) {
-             derivedExpiringRate = expiring / inputs.existingCount;
+             expiringRate = expiring / inputs.existingCount;
          }
 
-         // 2. Calculate Base Price for New Stats
-         // The Base Price is always the Derived Rate * New Stats * (1 + Uplift)
-         // This represents the cost of the "Existing Variant" at the "New Stats" level
-         const newStats = inputs.count > 0 ? inputs.count : (inputs.existingCount || 0);
-         let basePriceAtNewStats = 0;
-         
-         if (derivedExpiringRate > 0) {
-             basePriceAtNewStats = derivedExpiringRate * newStats * (1 + (upliftVal / 100));
-         } else {
-             basePriceAtNewStats = standardBase; // Fallback
-         }
-
-         // 3. Calculate Add-on Costs (Upsell)
-         let addOnPricePerUnit = 0;
+         // 2. Determine Add-on Rate based on Variant Change
+         let addOnRate = 0;
          const isSeats = existing.includes('Seats');
          
          if (isSeats) {
-             // Seat Based Logic
-             const baseSeatPrice = 300; // Standard List Price for Seats Base
-             // Logic: FLINK is 10%, IPE is 20%
-             
-             // Check what was added
+             // Seat Based Logic (Percentage)
+             const baseSeatPrice = 300; 
              const existingHasFlink = existing.includes('FLINK');
              const existingHasIPE = existing.includes('IPE');
              const targetHasFlink = target.includes('FLINK');
              const targetHasIPE = target.includes('IPE');
 
-             // Calculate incremental cost
              if (!existingHasFlink && targetHasFlink) {
-                 addOnPricePerUnit += (baseSeatPrice * 0.10); // +30
+                 addOnRate += (baseSeatPrice * 0.10); // +30
                  productNotes.push(`LXD: Upsell +Formulink (Seats)`);
              }
              if (!existingHasIPE && targetHasIPE) {
-                 addOnPricePerUnit += (baseSeatPrice * 0.20); // +60
+                 addOnRate += (baseSeatPrice * 0.20); // +60
                  productNotes.push(`LXD: Upsell +IPE (Seats)`);
              }
          } else {
-             // Bed Based Logic
+             // Bed Based Logic (Fixed Dollar Amounts)
+             // Check for specific transitions or just presence
+             // Scenarios imply additive logic:
+             // Base -> Flink: +12
+             // Base -> Flink+IPE: +28
+             // Flink -> Flink+IPE: +16
+             
              const existingHasFlink = existing.includes('FLINK');
              const existingHasIPE = existing.includes('IPE');
              const targetHasFlink = target.includes('FLINK');
              const targetHasIPE = target.includes('IPE');
 
              if (!existingHasFlink && targetHasFlink) {
-                 addOnPricePerUnit += LXD_ADDONS.FLINK; // +12
+                 addOnRate += LXD_ADDONS.FLINK; // +12
                  productNotes.push(`LXD: Upsell +Formulink (Beds)`);
              }
-             // Note: IPE implies Flink usually, but strictly per requirements:
-             // If moving from Base -> Flink+IPE, we add both (12+16=28)
-             // If moving from Flink -> Flink+IPE, we add IPE (16)
              
              if (!existingHasIPE && targetHasIPE) {
-                 addOnPricePerUnit += LXD_ADDONS.IPE; // +16
+                 addOnRate += LXD_ADDONS.IPE; // +16
                  productNotes.push(`LXD: Upsell +IPE (Beds)`);
              }
          }
 
-         let addOnTotal = 0;
-         if (addOnPricePerUnit > 0) {
-            addOnTotal = newStats * addOnPricePerUnit;
-            if (applyWHT) addOnTotal = addOnTotal / WHT_FACTOR;
+         // 3. Calculate Components
+         // A. Renewal Base (Existing Sites * Expiring Rate * Uplift)
+         // Note: The scenarios show Renewal Amount = Expiring Amount * 1.05
+         const renewalAmount = expiring * (1 + (upliftVal / 100));
+         
+         // B. Upsell on Existing (Existing Sites * Add-on Rate)
+         const existingCount = inputs.existingCount || 0;
+         let upsellOnExisting = existingCount * addOnRate;
+         if (applyWHT) upsellOnExisting = upsellOnExisting / WHT_FACTOR;
+
+         // C. New Sites Cost (New Sites * (Expiring Rate + Add-on Rate))
+         // Note: New Sites do NOT pay Uplift in Year 1
+         const newSitesCount = Math.max(0, inputs.count - existingCount);
+         let newSitesCost = 0;
+         
+         if (newSitesCount > 0) {
+             // Rate for New Sites = Expiring Rate + Add-on Rate
+             // (No Uplift applied to Expiring Rate portion)
+             const newSiteRate = expiringRate + addOnRate;
+             newSitesCost = newSitesCount * newSiteRate;
+             if (applyWHT) newSitesCost = newSitesCost / WHT_FACTOR;
+             
+             productNotes.push(`LXD: New Sites (${newSitesCount}) @ ${newSiteRate.toFixed(2)} (No Uplift)`);
          }
 
-         // 4. Final Price & Renewal Base
-         actualY1Price = basePriceAtNewStats + addOnTotal;
+         // 4. Total Year 1
+         actualY1Price = renewalAmount + upsellOnExisting + newSitesCost;
          
-         // Renewal Base is the price of the OLD variant at the OLD stats (Standard Base)
-         // BUT if stats changed, the "Base" portion of the new price (basePriceAtNewStats) is higher than Standard Base.
-         // The difference (basePriceAtNewStats - StandardBase) is due to Stats Increase.
-         // The difference (addOnTotal) is due to Variant Upgrade.
-         
-         // Requirement: "The addition of FLINK and/or IPE is the upsell value."
-         // Implication: Stats increase is ALSO upsell? Usually yes.
-         // Renewal Base = Standard Base (Expiring * Uplift).
-         // Everything else is Upsell.
-         
-         renewalBase = standardBase;
-         
-         if (newStats > (inputs.existingCount || 0)) {
-             productNotes.push(`LXD: Stats Increase (${inputs.existingCount} -> ${newStats})`);
+         // Renewal Base for ACV Calculation
+         // Strictly the "Renewal Amount" part (Expiring * Uplift)
+         renewalBase = renewalAmount;
+
+         if (upsellOnExisting > 0) {
+             productNotes.push(`LXD: Upsell on Existing ($${upsellOnExisting.toFixed(0)})`);
          }
       }
 
