@@ -630,7 +630,84 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         const footnote = "* Some EMR providers put additional charges to integrate our solutions, we’re neither responsible nor covering these costs. It has to be discussed with the EMR provider directly.";
         const splitFootnote = doc.splitTextToSize(footnote, 180);
         doc.text(splitFootnote, 14, finalY + 2);
+        finalY += (splitFootnote.length * 4) + 6;
+    } else {
+        finalY += 6;
     }
+
+    // --- TECHNICAL SPECIFICATIONS SECTION ---
+    if (finalY > 240) {
+        doc.addPage();
+        // Header rendered in loop at end
+        finalY = 55;
+    }
+
+    doc.setFontSize(14);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFont(fontName, 'bold');
+    doc.text("Technical Specifications", 14, finalY);
+    finalY += 8;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(fontName, 'normal');
+    const tsBody = "Full technical specifications for the products above can be found in the below links. Check section II: Licensed Materials for more details.";
+    const splitTsBody = doc.splitTextToSize(tsBody, 180);
+    doc.text(splitTsBody, 14, finalY);
+    finalY += (splitTsBody.length * 5) + 4;
+
+    const techSpecs = [];
+    const utdVariant = hasUTD ? config.productInputs['utd']?.variant : null;
+    const lxdVariant = hasLD ? config.productInputs['ld']?.variant : null;
+
+    if (hasUTD) {
+       techSpecs.push({ name: "AI is less a revolution", url: "https://clinicaleffectiveness.seismic.com/Link/Content/DCDWDMVp7c7Rd82MR7D6qmqgh7Vj" });
+       
+       if (utdVariant === 'UTDEE') {
+           if (hasLD) {
+               if (lxdVariant?.includes('FLINK') && lxdVariant?.includes('IPE')) {
+                   techSpecs.push({ name: "TS_UTD PRO FLINK+IPE", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtZUXeskXsITPadJQRrdQhtuNZ2RDkEWAE1Bl7BCJSMgnhauADmOlYVesjiWw7dfVJ" });
+               } else if (lxdVariant?.includes('FLINK')) {
+                   techSpecs.push({ name: "TS_UTD PRO FLINK", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtGZjdQPLUSSIGNWLFpJk1KeLMVDDS9qT7P4gJNtGXD2___WecaRRtQkMZI2aabVnixTWUE8xU7" });
+               } else {
+                   techSpecs.push({ name: "TS_UTD PRO", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtAcmsDDuk3S7LGxDrktOrDv3ot___ZTAjaSBXQYSKn2k4oPLUSSIGNxLC7yyS0HWudcZHB2Yuj" });
+               }
+           } else {
+               techSpecs.push({ name: "Enterprise Overview", url: "https://clinicaleffectiveness.seismic.com/Link/Content/DCRVMVjqfHp8M8CMjVpfjBFRTR8G" });
+               techSpecs.push({ name: "TS_UTD Enterprise", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMt8IbgN8n0uDSOBiyENPLUSSIGN4ro6TzG28oYDl81xTREOMKK34Z3wZLXGTRVR4kesIPLUSSIGNLugr" });
+           }
+       } else if (utdVariant === 'ANYWHERE') {
+           techSpecs.push({ name: "TS_UTD ANYWHERE", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtTiPjiZ___2NsX8OtyK6sZSznVFmyFFsg4kgMUFuVqKXRKZIMQdKikAY7xPnOGAiMGq" });
+       } else if (utdVariant === 'UTDADV') {
+           techSpecs.push({ name: "TS_UTD ADV", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtcIzCVYJxWoPVidQjIsK5Nsfab1MH9ZkAonZcZkjoYhSgh5HAfnPLUSSIGN0UW2XhnMRkMrh" });
+       }
+
+       techSpecs.push({ name: "UTD Facts-at-a-glance", url: "https://clinicaleffectiveness.seismic.com/Link/Content/DCGjC4R7T78TjGHW7QcPmMH8HHcB" });
+    }
+
+    if (hasLD && (utdVariant !== 'UTDEE')) {
+        if (lxdVariant?.includes('FLINK') && lxdVariant?.includes('IPE')) {
+            techSpecs.push({ name: "TS_LXD FLINK+IPE", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMt4VgDwBbSHbScqX___9fVqHlKhXWnm2Fae55SMM7fc9tUrmJtoGCyc19xa___3YGozWh___" });
+        } else if (lxdVariant?.includes('FLINK')) {
+            techSpecs.push({ name: "TS_LXD FLINK", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtgLqWFPdYXbhE14___Mu53BeKKXWoLf___4MSQSPVb7vmVoXjICTCkDzs5YJPLUSSIGNWDmL3s6___" });
+        } else {
+            techSpecs.push({ name: "TS_LXD", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtB9PLUSSIGNXU4wChIjFDE15Pr5xxrFlXHbAJp3PLUSSIGNh3P42mH1hAaeOLSTiZVVPVaI0P0yPgct" });
+        }
+    }
+
+    doc.setTextColor(0, 0, 255); // Blue for links
+    techSpecs.forEach(spec => {
+        if (finalY > 260) {
+            doc.addPage();
+            finalY = 55;
+        }
+        doc.textWithLink(`• ${spec.name}`, 14, finalY, { url: spec.url });
+        // Underline the link
+        const textWidth = doc.getTextWidth(`• ${spec.name}`);
+        doc.setDrawColor(0, 0, 255);
+        doc.line(14, finalY + 1, 14 + textWidth, finalY + 1);
+        finalY += 6;
+    });
 
     // Add Headers and Footers to all pages (except Page 1 which has custom layout)
     const pageCount = doc.getNumberOfPages();
