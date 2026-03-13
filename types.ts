@@ -69,6 +69,8 @@ export interface DealConfiguration {
   applyWHT: boolean;
   flatPricing: boolean;
   rounding: boolean;
+  useStartDate?: boolean;
+  startMonthYear?: string;
 }
 
 export interface CalculationOutput {

@@ -6,15 +6,22 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import ExcelJS from 'exceljs';
 
+import { SAMIR_WHITE_LOGO_BASE64 } from '../samirLogo';
+import { WK_LOGO_BASE64 } from '../wkLogo';
+
 interface ExportSectionProps {
   data: CalculationOutput;
   config: DealConfiguration;
+  useStartDate: boolean;
+  setUseStartDate: (val: boolean) => void;
+  startMonthYear: string;
+  setStartMonthYear: (val: string) => void;
 }
 
 // Logo URLs
-const WK_LOGO_URL = "https://wsrv.nl/?url=cdn.wolterskluwer.io/wk/jumpstart-v3-assets/0.x.x/logo/large.svg&output=png";
+// WK_LOGO_URL is now imported as a base64 string from wkLogo.ts
 // Use wsrv.nl as a reliable image proxy/resizer that handles CORS headers correctly
-const SAMIR_LOGO_URL = "https://wsrv.nl/?url=samirgroup.com/wp-content/uploads/2021/05/logo.png&output=png";
+// SAMIR_LOGO_URL is now imported as a base64 string from samirLogo.ts
 
 // Reliable Font URLs
 const FONT_URLS = {
@@ -36,7 +43,14 @@ interface SiteBreakdownItem {
   counts: Record<string, number>; // productId -> count
 }
 
-export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) => {
+export const ExportSection: React.FC<ExportSectionProps> = ({ 
+  data, 
+  config,
+  useStartDate,
+  setUseStartDate,
+  startMonthYear,
+  setStartMonthYear
+}) => {
   const [customerName, setCustomerName] = useState('');
   const [repName, setRepName] = useState('');
   const [repPhone, setRepPhone] = useState('');
@@ -61,6 +75,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
   const [hasDesignatedSites, setHasDesignatedSites] = useState(false);
   const [designatedSites, setDesignatedSites] = useState('');
   const [isSiteModalOpen, setIsSiteModalOpen] = useState(false);
+  const [isStartDateModalOpen, setIsStartDateModalOpen] = useState(false);
   
   // Site Breakdown Logic
   const [isBreakdownPerSite, setIsBreakdownPerSite] = useState(false);
@@ -143,12 +158,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         }
 
         try {
-            // Add WK Logo
-            doc.addImage(WK_LOGO_URL, 'PNG', 14, 10, 40, 10);
+            // Add WK Logo - Made slightly smaller than before (using white base64 version)
+            doc.addImage(WK_LOGO_BASE64, 'PNG', 14, 10, 50, 12.5);
             
-            // Add Samir Logo if Indirect
+            // Add Samir Logo if Indirect (using white base64 version)
             if (isIndirect) {
-                doc.addImage(SAMIR_LOGO_URL, 'PNG', 160, 8, 35, 14);
+                doc.addImage(SAMIR_WHITE_LOGO_BASE64, 'PNG', 160, 10, 30, 12);
             }
         } catch (e) {
             console.warn("Logo load error", e);
@@ -164,7 +179,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
         doc.text(`Page ${pageNumber}`, 196, pageHeight - 10, { align: 'right' });
-        doc.text("Confidential - Wolters Kluwer Health", 14, pageHeight - 10);
+        doc.text(`©${new Date().getFullYear()} UpToDate, Inc. and its affiliates and/or licensors. All rights reserved.`, 14, pageHeight - 14);
     };
 
     const formatMoney = (amount: number, currency: string) => {
@@ -173,13 +188,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
 
     // Initial Header
     renderHeader(true);
-    doc.setFontSize(18);
-    doc.setFont(fontName, 'normal');
+    doc.setFontSize(26);
+    doc.setFont(fontName, 'bold');
     doc.setTextColor(255, 255, 255); // White text for title on blue background
     const proposalTitle = config.dealType === DealType.RENEWAL 
-        ? "Budgetary Commercial Proposal [Renewal]" 
-        : "Budgetary Commercial Proposal";
-    doc.text(proposalTitle, 105, 115, { align: 'center' });
+        ? "BUDGETARY COMMERCIAL\nPROPOSAL [RENEWAL]" 
+        : "BUDGETARY COMMERCIAL\nPROPOSAL";
+    doc.text(proposalTitle, 105, 95, { align: 'center' });
   // ...
 
     // Removed duplicate Designated Sites logic
@@ -246,10 +261,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     doc.text(`Date: ${docDate}`, 14, currentFooterY);
     currentFooterY += 5;
     doc.text(`Ref: ${refId}`, 14, currentFooterY);
-    
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`©${new Date().getFullYear()} UpToDate, Inc. and its affiliates and/or licensors. All rights reserved.`, 14, 290);
 
     doc.addPage();
     // Header rendered in loop at end
@@ -272,6 +283,29 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFont(fontName, 'bold');
     doc.text("Pricing Details", 14, 45);
+
+    const getYearLabel = (yearIndex: number) => {
+        if (useStartDate && startMonthYear) {
+            const [yearStr, monthStr] = startMonthYear.split('-');
+            const startYear = parseInt(yearStr);
+            const startMonth = parseInt(monthStr);
+            
+            const start = new Date(startYear + yearIndex, startMonth - 1, 1);
+            const end = new Date(start);
+            end.setFullYear(end.getFullYear() + 1);
+            end.setDate(end.getDate() - 1);
+            
+            const formatD = (d: Date) => {
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                const day = d.getDate().toString().padStart(2, '0');
+                const month = monthNames[d.getMonth()];
+                return `${month} ${day}, ${d.getFullYear()}`;
+            };
+            
+            return `Year ${yearIndex + 1}:\n${formatD(start)} to ${formatD(end)}`;
+        }
+        return `Year ${yearIndex + 1}`;
+    };
 
     let tableHead: string[][] = [];
     let tableBody: string[][] = [];
@@ -298,7 +332,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
            const bd = r.breakdown.find(x => x.id === pid);
            return bd ? formatMoney(bd.grossSAR, 'SAR') : '-';
         });
-        return [ `Year ${r.year}`, ...pValues, formatMoney(r.grossSAR, 'SAR'), formatMoney(r.vatSAR, 'SAR'), formatMoney(r.grandTotalSAR, 'SAR') ];
+        return [ getYearLabel(r.year - 1), ...pValues, formatMoney(r.grossSAR, 'SAR'), formatMoney(r.vatSAR, 'SAR'), formatMoney(r.grandTotalSAR, 'SAR') ];
       });
       
       // Totals Row - Conditionally Added
@@ -325,7 +359,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
            const bd = r.breakdown.find(x => x.id === pid);
            return bd ? formatMoney(bd.gross, 'USD') : '-';
         });
-        return [ `Year ${r.year}`, ...pValues, formatMoney(r.grossUSD, 'USD') ];
+        return [ getYearLabel(r.year - 1), ...pValues, formatMoney(r.grossUSD, 'USD') ];
       });
       
       // Totals Row - Conditionally Added
@@ -347,7 +381,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       body: tableBody,
       theme: 'grid',
       headStyles: { fillColor: primaryColor, textColor: 255, font: fontName, fontStyle: 'bold', valign: 'middle' },
-      styles: { fontSize: 9, font: fontName, overflow: 'linebreak', cellPadding: 2 }, 
+      styles: { fontSize: 9, font: fontName, overflow: 'linebreak', cellPadding: 2, valign: 'middle', halign: 'left' }, 
       columnStyles: columnStyles,
       margin: { top: 35, left: 14, right: 14 },
       didParseCell: (data) => {
@@ -381,8 +415,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFont(fontName, 'bold');
     doc.text("Operating Statistics", 14, finalY);
-    finalY += 8;
-    doc.setFontSize(10);
+    finalY += 6;
+    doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
 
     // Order Requested: 1. Stats Line, 2. Designated Sites, 3. Monthly Cost
@@ -422,7 +456,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         const statsText = `This proposal is based on the following statistics for ${customerName}: ${statsParts.join(', ')}.`;
         const splitStats = doc.splitTextToSize(statsText, 180);
         doc.text(splitStats, 14, finalY);
-        finalY += (splitStats.length * 5) + 4;
+        finalY += (splitStats.length * 4) + 1.5;
     }
 
     // 2. Designated Sites (Moved to middle)
@@ -476,18 +510,18 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
                 head: [siteHeaders],
                 body: siteBody,
                 theme: 'grid',
-                headStyles: { fillColor: [240, 240, 240], textColor: 0, font: fontName, fontStyle: 'bold' },
-                styles: { fontSize: 9, font: fontName, overflow: 'linebreak', cellPadding: 2 },
+                headStyles: { fillColor: [240, 240, 240], textColor: 0, font: fontName, fontStyle: 'bold', valign: 'middle' },
+                styles: { fontSize: 9, font: fontName, overflow: 'linebreak', cellPadding: 2, valign: 'middle', halign: 'left' },
                 margin: { top: 35, left: 14, right: 14 },
             });
             
-            finalY = (doc as any).lastAutoTable.finalY + 8;
+            finalY = (doc as any).lastAutoTable.finalY + 6;
 
         } else if (designatedSites.trim().length > 0) {
             // STANDARD LIST LOGIC - Two Column Table
             doc.setFont(fontName, 'bold');
             doc.text("Sites included in the above pricing:", 14, finalY);
-            finalY += 6;
+            finalY += 5;
             
             const sites = designatedSites.split('\n').filter(s => s.trim().length > 0);
             const tableBody = [];
@@ -522,7 +556,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
                 }
             });
             
-            finalY = (doc as any).lastAutoTable.finalY + 8;
+            finalY = (doc as any).lastAutoTable.finalY + 6;
         }
     }
 
@@ -542,7 +576,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
             const monthlyPerUnit = acv / count / 12;
             const valStr = `${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             renderBoldLine(finalY, "Your UpToDate subscription costs ", valStr, " monthly per physician.");
-            finalY += 6;
+            finalY += 5;
         }
 
         if (config.selectedProducts.includes('ld')) {
@@ -559,17 +593,17 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
             const monthlyPerUnit = acv / count / 12;
             const valStr = `${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             renderBoldLine(finalY, "Your Lexidrug subscription costs ", valStr, " monthly per bed.");
-            finalY += 6;
+            finalY += 5;
         }
         
         // Add a small gap after monthly costs if they exist
         if (config.selectedProducts.includes('utd') || config.selectedProducts.includes('ld')) {
-            finalY += 4;
+            finalY += 2;
         }
     }
 
     // --- TERMS & CONDITIONS SECTION ---
-    finalY += 4; 
+    finalY += 2; 
     
     // Check page break before starting new section
     if (finalY > 250) {
@@ -582,8 +616,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFont(fontName, 'bold');
     doc.text("Terms & Conditions", 14, finalY);
-    finalY += 8;
-    doc.setFontSize(10);
+    finalY += 6;
+    doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
     doc.setFont(fontName, 'normal');
     
@@ -614,7 +648,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       }
       const splitTerm = doc.splitTextToSize(`• ${term}`, 180);
       doc.text(splitTerm, 14, finalY);
-      finalY += (splitTerm.length * 5) + 2;
+      finalY += (splitTerm.length * 4) + 1.5;
     });
 
     if (finalY > 260) {
@@ -629,39 +663,41 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         doc.setTextColor(100, 100, 100);
         const footnote = "* Some EMR providers put additional charges to integrate our solutions, we’re neither responsible nor covering these costs. It has to be discussed with the EMR provider directly.";
         const splitFootnote = doc.splitTextToSize(footnote, 180);
-        doc.text(splitFootnote, 14, finalY + 2);
-        finalY += (splitFootnote.length * 4) + 6;
+        const pageHeight = doc.internal.pageSize.height || 297;
+        doc.text(splitFootnote, 14, pageHeight - 22);
     } else {
-        finalY += 6;
+        finalY += 4;
     }
 
     // --- TECHNICAL SPECIFICATIONS SECTION ---
-    if (finalY > 240) {
+    if (finalY > 245) {
         doc.addPage();
         // Header rendered in loop at end
         finalY = 55;
+    } else {
+        finalY += 10; // Add padding above Technical Specifications
     }
 
     doc.setFontSize(14);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFont(fontName, 'bold');
     doc.text("Technical Specifications", 14, finalY);
-    finalY += 8;
+    finalY += 6;
     
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
     doc.setFont(fontName, 'normal');
     const tsBody = "Full technical specifications for the products above can be found in the below links. Check section II: Licensed Materials for more details.";
     const splitTsBody = doc.splitTextToSize(tsBody, 180);
     doc.text(splitTsBody, 14, finalY);
-    finalY += (splitTsBody.length * 5) + 4;
+    finalY += (splitTsBody.length * 4) + 3;
 
     const techSpecs = [];
     const utdVariant = hasUTD ? config.productInputs['utd']?.variant : null;
     const lxdVariant = hasLD ? config.productInputs['ld']?.variant : null;
 
     if (hasUTD) {
-       techSpecs.push({ name: "AI is less a revolution", url: "https://clinicaleffectiveness.seismic.com/Link/Content/DCDWDMVp7c7Rd82MR7D6qmqgh7Vj" });
+       techSpecs.push({ name: "AI is less a revolution", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMt5i2DUCp6zhZlJG0ufaPLUSSIGN36DQnF01FSaK12p8J3u2___dWYq8PLUSSIGN5mQgaRFxL3mOqKYo___n" });
        
        if (utdVariant === 'UTDEE') {
            if (hasLD) {
@@ -682,7 +718,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
            techSpecs.push({ name: "TS_UTD ADV", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtcIzCVYJxWoPVidQjIsK5Nsfab1MH9ZkAonZcZkjoYhSgh5HAfnPLUSSIGN0UW2XhnMRkMrh" });
        }
 
-       techSpecs.push({ name: "UTD Facts-at-a-glance", url: "https://clinicaleffectiveness.seismic.com/Link/Content/DCGjC4R7T78TjGHW7QcPmMH8HHcB" });
+       techSpecs.push({ name: "UTD Facts-at-a-glance", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtTG3c8ANMBhZRuFWZyPLUSSIGNbZadPLUSSIGNWRqxIsdRKRbxLt1m8oMBdYYMOn8grPVgEz2RpGQbG" });
     }
 
     if (hasLD && (utdVariant !== 'UTDEE')) {
@@ -695,28 +731,55 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         }
     }
 
-    doc.setTextColor(0, 0, 255); // Blue for links
-    techSpecs.forEach(spec => {
-        if (finalY > 260) {
+    const tsSpecs = techSpecs.filter(s => s.name.startsWith('TS_'));
+    const otherSpecs = techSpecs.filter(s => !s.name.startsWith('TS_'));
+
+    const renderLinks = (specs: any[]) => {
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 255); // Blue for links
+        specs.forEach(spec => {
+            if (finalY > 265) {
+                doc.addPage();
+                finalY = 55;
+            }
+            doc.textWithLink(`• ${spec.name}`, 14, finalY, { url: spec.url });
+            // Underline the link
+            const textWidth = doc.getTextWidth(`• ${spec.name}`);
+            doc.setDrawColor(0, 0, 255);
+            doc.line(14, finalY + 1, 14 + textWidth, finalY + 1);
+            finalY += 5;
+        });
+    };
+
+    if (tsSpecs.length > 0) {
+        renderLinks(tsSpecs);
+        finalY += 4;
+    }
+
+    if (otherSpecs.length > 0) {
+        if (finalY > 255) {
             doc.addPage();
             finalY = 55;
         }
-        doc.textWithLink(`• ${spec.name}`, 14, finalY, { url: spec.url });
-        // Underline the link
-        const textWidth = doc.getTextWidth(`• ${spec.name}`);
-        doc.setDrawColor(0, 0, 255);
-        doc.line(14, finalY + 1, 14 + textWidth, finalY + 1);
+        doc.setFontSize(14);
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.setFont(fontName, 'bold');
+        doc.text("Overview Documents", 14, finalY);
         finalY += 6;
-    });
+        
+        doc.setFontSize(9);
+        doc.setFont(fontName, 'normal');
+        renderLinks(otherSpecs);
+    }
 
-    // Add Headers and Footers to all pages (except Page 1 which has custom layout)
+    // Add Headers and Footers to all pages
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
         if (i > 1) {
             renderHeader(false);
-            addFooter(i);
         }
+        addFooter(i);
     }
 
     const filename = customerName 
@@ -882,8 +945,31 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
       const startRowIndex = sheet.rowCount + 1;
       let prevRowNumber = 0;
 
+      const getYearLabelExcel = (yearIndex: number) => {
+          if (useStartDate && startMonthYear) {
+              const [yearStr, monthStr] = startMonthYear.split('-');
+              const startYear = parseInt(yearStr);
+              const startMonth = parseInt(monthStr);
+              
+              const start = new Date(startYear + yearIndex, startMonth - 1, 1);
+              const end = new Date(start);
+              end.setFullYear(end.getFullYear() + 1);
+              end.setDate(end.getDate() - 1);
+              
+              const formatD = (d: Date) => {
+                  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                  const day = d.getDate().toString().padStart(2, '0');
+                  const month = monthNames[d.getMonth()];
+                  return `${month} ${day}, ${d.getFullYear()}`;
+              };
+              
+              return `Year ${yearIndex + 1}:\n${formatD(start)} to ${formatD(end)}`;
+          }
+          return `Year ${yearIndex + 1}`;
+      };
+
       data.yearlyResults.forEach((r, yearIdx) => {
-          const rowData: any[] = [`Year ${r.year}`];
+          const rowData: any[] = [getYearLabelExcel(r.year - 1)];
           
           config.selectedProducts.forEach((pid) => { // Removed unused prodIdx
               const bd = r.breakdown.find(x => x.id === pid);
@@ -939,6 +1025,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
           for (let c = 2; c <= scheduleHeaders.length; c++) {
               addedRow.getCell(c).numFmt = currencyFmt;
           }
+          addedRow.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
           
           prevRowNumber = currentRowNumber;
       });
@@ -1031,6 +1118,32 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
   return (
     <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6">
       
+      {/* Start Date Modal */}
+      {isStartDateModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-sm w-full p-6 border border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Select Start Date</h3>
+            <div className="mb-6">
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Start Month & Year</label>
+              <input 
+                type="month" 
+                value={startMonthYear}
+                onChange={(e) => setStartMonthYear(e.target.value)}
+                className="block w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans"
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setIsStartDateModalOpen(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Site Entry Modal */}
       {isSiteModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50">
@@ -1302,26 +1415,52 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ data, config }) =>
         </div>
       </div>
       
-      {/* Designated Sites Checkbox - Moved below options */}
-      <div className="flex items-center mb-6">
-          <input 
-            id="designated-sites-check"
-            type="checkbox" 
-            checked={hasDesignatedSites} 
-            onChange={(e) => handleSiteCheckboxChange(e.target.checked)}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
-          />
-          <label htmlFor="designated-sites-check" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
-              More than one designated site?
-          </label>
-          {hasDesignatedSites && (
-              <button 
-                onClick={() => setIsSiteModalOpen(true)}
-                className="ml-2 text-[10px] text-blue-600 underline hover:text-blue-800"
-              >
-                (Edit Sites)
-              </button>
-          )}
+      {/* Designated Sites and Start Date Checkboxes */}
+      <div className="flex flex-wrap items-center gap-6 mb-6">
+          <div className="flex items-center">
+              <input 
+                id="designated-sites-check"
+                type="checkbox" 
+                checked={hasDesignatedSites} 
+                onChange={(e) => handleSiteCheckboxChange(e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+              />
+              <label htmlFor="designated-sites-check" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+                  More than one designated site?
+              </label>
+              {hasDesignatedSites && (
+                  <button 
+                    onClick={() => setIsSiteModalOpen(true)}
+                    className="ml-2 text-[10px] text-blue-600 underline hover:text-blue-800"
+                  >
+                    (Edit Sites)
+                  </button>
+              )}
+          </div>
+
+          <div className="flex items-center">
+              <input 
+                id="start-date-checkbox" 
+                type="checkbox" 
+                checked={useStartDate} 
+                onChange={(e) => {
+                  setUseStartDate(e.target.checked);
+                  if (e.target.checked) setIsStartDateModalOpen(true);
+                }}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+              />
+              <label htmlFor="start-date-checkbox" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+                Include Start Date
+              </label>
+              {useStartDate && (
+                  <button 
+                    onClick={() => setIsStartDateModalOpen(true)}
+                    className="ml-2 text-[10px] text-blue-600 underline hover:text-blue-800"
+                  >
+                    (Edit Date)
+                  </button>
+              )}
+          </div>
       </div>
 
       <div className="flex space-x-4">
