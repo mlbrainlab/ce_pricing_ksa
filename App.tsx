@@ -31,6 +31,10 @@ const App: React.FC = () => {
   const [rounding, setRounding] = useState<boolean>(false); // New Rounding Option
   const [notification, setNotification] = useState<string | null>(null); // Notification State
   
+  // Start Date State
+  const [useStartDate, setUseStartDate] = useState<boolean>(false);
+  const [startMonthYear, setStartMonthYear] = useState<string>(new Date().toISOString().slice(0, 7));
+  
   // Structure Rates (Multi-Year logic: FPI or Reverse Discount)
   const [applyAnnualRate, setApplyAnnualRate] = useState<boolean>(false); // Toggle for Renewal MYFPI
   const [globalRateVal, setGlobalRateVal] = useState<number>(5);
@@ -139,9 +143,11 @@ const App: React.FC = () => {
       renewalUpliftRates,
       applyWHT,
       flatPricing,
-      rounding
+      rounding,
+      useStartDate,
+      startMonthYear
     };
-  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, ldRateVal, renewalUpliftGlobal, renewalUpliftUTD, renewalUpliftLD, showSplitRates, applyWHT, flatPricing, rounding, applyAnnualRate]);
+  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, ldRateVal, renewalUpliftGlobal, renewalUpliftUTD, renewalUpliftLD, showSplitRates, applyWHT, flatPricing, rounding, applyAnnualRate, useStartDate, startMonthYear]);
 
   // Results
   const results = useMemo(() => calculatePricing(config), [config]);
@@ -154,8 +160,8 @@ const App: React.FC = () => {
          // Check Year 1 Gross USD for UTD
          // We can find it in yearlyResults[0].breakdown
          const utdY1 = results.yearlyResults[0]?.breakdown.find(p => p.id === 'utd');
-         if (utdY1 && utdY1.gross < 50000) {
-           return "Warning: UTDEE deals under $50k/year require additional approval.";
+         if (utdY1 && utdY1.gross < 30000) {
+           return "Warning: UTDEE deals under $30k/year require additional approval.";
          }
        }
     }
@@ -227,27 +233,12 @@ const App: React.FC = () => {
         }
       };
 
-      // Specific Logic: If UTD Variant becomes UTDEE, enforce min count 150
+      // Specific Logic: If UTD Variant becomes UTDEE, enforce min count 90
       if (id === 'utd' && field === 'variant' && value === 'UTDEE') {
-         if (newState['utd'].count < 150) {
-            newState['utd'].count = 150;
-            setNotification("Headcount adjusted to 150 (Minimum for UTD EE)");
+         if (newState['utd'].count < 90) {
+            newState['utd'].count = 90;
+            setNotification("Headcount adjusted to 90 (Minimum for UTD EE)");
             setTimeout(() => setNotification(null), 3000);
-         }
-      }
-
-      // Specific Logic: If UTD Count drops below 150 and Variant is UTDEE, downgrade to UTDADV
-      if (id === 'utd' && field === 'count') {
-         const newCount = value as number;
-         if (newState['utd'].variant === 'UTDEE' && newCount < 150) {
-            newState['utd'].variant = 'UTDADV';
-            setNotification("Variant switched to UTD Advanced (UTD EE requires 150+ HC)");
-            setTimeout(() => setNotification(null), 3000);
-         }
-         // UTD SM Check
-         if (newState['utd'].variant === 'SM' && newCount > 499) {
-             setNotification("UTD SM is not applicable for > 499 seats.");
-             setTimeout(() => setNotification(null), 3000);
          }
       }
 
@@ -284,6 +275,31 @@ const App: React.FC = () => {
          newState[id].forceHeadcountOverride = false;
       }
 
+      return newState;
+    });
+  };
+
+  const handleInputBlur = (id: string, field: keyof ProductInput) => {
+    setProductInputs(prev => {
+      const prevInput = prev[id];
+      const newState = { 
+        ...prev,
+        [id]: { ...prevInput }
+      };
+
+      if (id === 'utd' && field === 'count') {
+         const currentCount = prevInput.count;
+         if (prevInput.variant === 'UTDEE' && currentCount < 90) {
+            newState['utd'].variant = 'UTDADV';
+            setNotification("Variant switched to UTD Advanced (UTD EE requires 90+ HC)");
+            setTimeout(() => setNotification(null), 3000);
+         }
+         if (prevInput.variant === 'SM' && currentCount > 499) {
+             newState['utd'].variant = 'UTDADV'; // Fallback to ADV
+             setNotification("Variant switched to UTD Advanced (UTD SM is not applicable for > 499 seats)");
+             setTimeout(() => setNotification(null), 3000);
+         }
+      }
       return newState;
     });
   };
@@ -590,6 +606,7 @@ const App: React.FC = () => {
                                <FormattedNumberInput
                                  value={input.count}
                                  onChange={(val) => handleInputChange(product.id, 'count', val)}
+                                 onBlur={() => handleInputBlur(product.id, 'count')}
                                  disabled={isCountDisabled}
                                  className={`block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums ${isCountDisabled ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''}`}
                                />
@@ -1047,7 +1064,14 @@ const App: React.FC = () => {
              </ul>
           </div>
 
-          <ExportSection data={results} config={config} />
+          <ExportSection 
+            data={results} 
+            config={config} 
+            useStartDate={useStartDate}
+            setUseStartDate={setUseStartDate}
+            startMonthYear={startMonthYear}
+            setStartMonthYear={setStartMonthYear}
+          />
         </div>
       </div>
     </Layout>

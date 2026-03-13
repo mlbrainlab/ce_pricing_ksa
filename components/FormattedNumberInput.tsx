@@ -3,6 +3,7 @@ import React, { useState, useEffect, ChangeEvent } from 'react';
 interface FormattedNumberInputProps {
   value: number;
   onChange: (val: number) => void;
+  onBlur?: () => void;
   className?: string;
   disabled?: boolean;
   min?: number;
@@ -12,6 +13,7 @@ interface FormattedNumberInputProps {
 export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
   value,
   onChange,
+  onBlur,
   className = "",
   disabled = false,
   placeholder = "0"
@@ -40,6 +42,9 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
 
   const handleBlur = () => {
     setIsFocused(false);
+    if (onBlur) {
+      onBlur();
+    }
   };
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
