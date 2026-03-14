@@ -159,11 +159,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
         try {
             // Add WK Logo - Made slightly smaller than before (using white base64 version)
-            doc.addImage(WK_LOGO_BASE64, 'PNG', 14, 10, 50, 12.5);
+            doc.addImage(WK_LOGO_BASE64, 'PNG', 14, 10, 58, 10, 'WK_LOGO', 'FAST');
             
             // Add Samir Logo if Indirect (using white base64 version)
             if (isIndirect) {
-                doc.addImage(SAMIR_WHITE_LOGO_BASE64, 'PNG', 160, 10, 30, 12);
+                doc.addImage(SAMIR_WHITE_LOGO_BASE64, 'PNG', 140, 10, 58, 10, 'SAMIR_LOGO', 'FAST');
             }
         } catch (e) {
             console.warn("Logo load error", e);
