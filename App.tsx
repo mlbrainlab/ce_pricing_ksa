@@ -24,7 +24,8 @@ const formatCurrency = (amount: number, currency: 'USD' | 'SAR') => {
 // Initialize PostHog outside the component so it runs immediately
 if (typeof window !== 'undefined') {
   posthog.init('phc_CxbCQgNgpx8NLdaWIQcW92rCssMtanf6RZXGTeab0iC', {
-    api_host: 'https://eu.i.posthog.com',
+    api_host: '/ingest', // Use the proxy endpoint to bypass adblockers
+    ui_host: 'https://eu.posthog.com', // Keep the UI host pointing to PostHog
     autocapture: true,
     capture_pageview: true, // Enable automatic pageview capture
     capture_pageleave: true // Track when users leave
