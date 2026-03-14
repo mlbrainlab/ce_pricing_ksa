@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import posthog from 'posthog-js';
+import Login from './components/Login';
 import { Layout } from './components/Layout';
 import { ExportSection } from './components/ExportSection';
 import { calculatePricing } from './services/pricingEngine';
@@ -20,6 +22,37 @@ const formatCurrency = (amount: number, currency: 'USD' | 'SAR') => {
 };
 
 const App: React.FC = () => {
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    // Initialize PostHog
+    posthog.init('phc_CxbCQgNgpx8NLdaWIQcW92rCssMtanf6RZXGTeab0iC', {
+      api_host: 'https://eu.i.posthog.com',
+      autocapture: true,
+      capture_pageview: false // We'll handle this manually or let autocapture do it
+    });
+
+    // Check if user is already authenticated for the current month
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const authMonth = localStorage.getItem('wk_auth_month');
+    const authName = localStorage.getItem('wk_auth_name');
+
+    if (authMonth === currentMonth && authName) {
+      setIsAuthenticated(true);
+      posthog.identify(authName);
+    }
+  }, []);
+
+  const handleLogin = (name: string) => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    localStorage.setItem('wk_auth_month', currentMonth);
+    localStorage.setItem('wk_auth_name', name);
+    setIsAuthenticated(true);
+    posthog.identify(name);
+    posthog.capture('user_logged_in', { name });
+  };
+
   // Deal State
   const [dealType, setDealType] = useState<DealType>(DealType.NEW_LOGO);
   const [channel, setChannel] = useState<ChannelType>(ChannelType.DIRECT);
@@ -364,6 +397,10 @@ const App: React.FC = () => {
   const shouldShowAnnualRateInputs = (dealType === DealType.RENEWAL && method === PricingMethod.MYFPI) 
     ? applyAnnualRate 
     : true;
+
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
 
   return (
     <Layout>
