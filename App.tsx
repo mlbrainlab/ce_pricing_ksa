@@ -21,18 +21,21 @@ const formatCurrency = (amount: number, currency: 'USD' | 'SAR') => {
   return `SAR ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(amount)}`;
 };
 
+// Initialize PostHog outside the component so it runs immediately
+if (typeof window !== 'undefined') {
+  posthog.init('phc_CxbCQgNgpx8NLdaWIQcW92rCssMtanf6RZXGTeab0iC', {
+    api_host: 'https://eu.i.posthog.com',
+    autocapture: true,
+    capture_pageview: true, // Enable automatic pageview capture
+    capture_pageleave: true // Track when users leave
+  });
+}
+
 const App: React.FC = () => {
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Initialize PostHog
-    posthog.init('phc_CxbCQgNgpx8NLdaWIQcW92rCssMtanf6RZXGTeab0iC', {
-      api_host: 'https://eu.i.posthog.com',
-      autocapture: true,
-      capture_pageview: false // We'll handle this manually or let autocapture do it
-    });
-
     // Check if user is already authenticated for the current month
     const currentMonth = new Date().toISOString().slice(0, 7);
     const authMonth = localStorage.getItem('wk_auth_month');
