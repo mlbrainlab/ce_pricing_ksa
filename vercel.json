@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/ingest/:match*",
+      "destination": "https://eu.i.posthog.com/:match*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
