@@ -88,13 +88,21 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   // Function to process bulk paste
   const handleBulkPaste = () => {
     const lines = bulkPasteText.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) return;
+
     const newSites: SiteBreakdownItem[] = lines.map((line, index) => ({
       id: Date.now().toString() + index,
       name: line.trim(),
       counts: {} // Counts still need to be filled manually
     }));
     
-    setSiteBreakdown(prev => [...prev, ...newSites]);
+    setSiteBreakdown(prev => {
+      // If the first row is completely empty (no name, no counts), replace it
+      if (prev.length > 0 && prev[0].name.trim() === '' && Object.keys(prev[0].counts).length === 0) {
+        return [...newSites, ...prev.slice(1)];
+      }
+      return [...prev, ...newSites];
+    });
     setBulkPasteText(''); // Clear text area
   };
 
