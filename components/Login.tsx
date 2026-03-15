@@ -16,8 +16,16 @@ export default function Login({ onLogin }: LoginProps) {
     e.preventDefault();
     setError('');
     
-    if (!name.trim()) {
-      setError('Please enter your name.');
+    const trimmedName = name.trim().toLowerCase();
+    
+    if (!trimmedName) {
+      setError('Please enter your initials.');
+      return;
+    }
+    
+    const allowedInitials = ['aa', 'ai', 'ma', 'mb', 'mn'];
+    if (!allowedInitials.includes(trimmedName)) {
+      setError('Invalid initials. Please enter your assigned 2-character initials.');
       return;
     }
     
@@ -31,7 +39,7 @@ export default function Login({ onLogin }: LoginProps) {
     try {
       const isValid = await verifyPasscode(passcode);
       if (isValid) {
-        onLogin(name.trim());
+        onLogin(trimmedName);
       } else {
         setError('Invalid passcode for the current month.');
       }
@@ -52,7 +60,7 @@ export default function Login({ onLogin }: LoginProps) {
           Sign in to access
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          Please enter your name and the monthly shared passcode.
+          Please enter your initials and the monthly shared passcode.
         </p>
       </div>
 
@@ -61,7 +69,7 @@ export default function Login({ onLogin }: LoginProps) {
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Full Name
+                Initials
               </label>
               <div className="mt-1">
                 <input
@@ -69,10 +77,11 @@ export default function Login({ onLogin }: LoginProps) {
                   name="name"
                   type="text"
                   required
+                  maxLength={2}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="John Doe"
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm uppercase"
+                  placeholder="e.g. AA"
                 />
               </div>
             </div>
