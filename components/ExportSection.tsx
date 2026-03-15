@@ -70,6 +70,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const [showMonthlyCost, setShowMonthlyCost] = useState(true);
   const [showTotals, setShowTotals] = useState(true);
   const [showEmrIntegration, setShowEmrIntegration] = useState(true); // Default true for EMR term
+  const [hasOptOutClause, setHasOptOutClause] = useState(false); // Opt-out clause for multi-year
 
   // Sites Logic
   const [hasDesignatedSites, setHasDesignatedSites] = useState(false);
@@ -418,6 +419,43 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
        doc.text(suffix, 14 + w1 + w2, startY);
     };
 
+    // Helper for rich text with <b> tags
+    const renderRichText = (text: string, x: number, startY: number, maxWidth: number) => {
+      const tokens = text.split(/(<b>.*?<\/b>)/g);
+      let currentX = x;
+      let currentY = startY;
+      
+      for (const token of tokens) {
+        if (!token) continue;
+        const isBold = token.startsWith('<b>') && token.endsWith('</b>');
+        const content = isBold ? token.slice(3, -4) : token;
+        
+        doc.setFont(fontName, isBold ? 'bold' : 'normal');
+        
+        const words = content.split(/(\s+)/);
+        for (const word of words) {
+          if (!word) continue;
+          if (word.match(/^\s+$/)) {
+            const spaceWidth = doc.getTextWidth(word);
+            if (currentX + spaceWidth <= x + maxWidth) {
+              currentX += spaceWidth;
+            }
+            continue;
+          }
+          
+          const wordWidth = doc.getTextWidth(word);
+          if (currentX + wordWidth > x + maxWidth && currentX > x) {
+            currentX = x;
+            currentY += 4;
+          }
+          
+          doc.text(word, currentX, currentY);
+          currentX += wordWidth;
+        }
+      }
+      return currentY;
+    };
+
     // --- OPERATING STATISTICS SECTION ---
     doc.setFontSize(14);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -629,23 +667,40 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     doc.setTextColor(0, 0, 0);
     doc.setFont(fontName, 'normal');
     
-    const terms: string[] = [];
+    const terms: { text: string, isRich?: boolean }[] = [];
     
-    terms.push("The prices mentioned above are not final and subject to change in case of releasing an official RFP.");
-    if (config.years > 1) terms.push("The prices above are tied to a multi-year non-opt-out contract for the same number of years.");
-    if (config.channel === ChannelType.DIRECT) terms.push("The price above is exempt from 15% VAT.");
+    terms.push({ text: "The prices mentioned above are not final and subject to change in case of releasing an official RFP." });
+    if (config.years > 1) {
+        if (!hasOptOutClause) {
+            terms.push({ text: "The prices above are tied to a multi-year non-opt-out contract for the same number of years." });
+        } else {
+            const yearsList = Array.from({length: config.years - 1}, (_, i) => i + 2);
+            let yearsStr = "";
+            if (yearsList.length === 1) yearsStr = `Year ${yearsList[0]}`;
+            else if (yearsList.length === 2) yearsStr = `Years ${yearsList[0]} and ${yearsList[1]}`;
+            else {
+                const last = yearsList.pop();
+                yearsStr = `Years ${yearsList.join(', ')}, and ${last}`;
+            }
+            terms.push({ 
+                text: `<b>Opt-out option:</b> Customer may opt not to renew for ${yearsStr} of this proposal term by providing written notice to UpToDate, Inc. <b>90 days</b> prior to the start date of each respective year of the proposal term. If such notice is not received, Customer will automatically be invoiced for the next year of the proposal term. This clause requires internal approvals from Wolters Kluwer before consideration.`,
+                isRich: true
+            });
+        }
+    }
+    if (config.channel === ChannelType.DIRECT) terms.push({ text: "The price above is exempt from 15% VAT." });
     
     if (config.years > 1 && config.channel === ChannelType.DIRECT) {
-        terms.push("Payment of the above prices will be made against annual invoices issued each year, with payment due 30 days from the activation start date.");
+        terms.push({ text: "Payment of the above prices will be made against annual invoices issued each year, with payment due 30 days from the activation start date." });
     }
 
-    terms.push("Upon renewing the subscription, a statistics recount will be executed, considering the standard price of the exit year.");
-    terms.push("The Internet access is a must for this subscription to be utilized.");
-    terms.push("This budgetary proposal is valid for 60-days.");
+    terms.push({ text: "Upon renewing the subscription, a statistics recount will be executed, considering the standard price of the exit year." });
+    terms.push({ text: "The Internet access is a must for this subscription to be utilized." });
+    terms.push({ text: "This budgetary proposal is valid for 60-days." });
     
     // Conditional EMR Term
     if (showEmrIntegration) {
-        terms.push("Integrating UpToDate® or Lexidrug® with your EMR is included in the prices above, even if the EMR changed during the subscription.*");
+        terms.push({ text: "Integrating UpToDate® or Lexidrug® with your EMR is included in the prices above, even if the EMR changed during the subscription.*" });
     }
 
     terms.forEach(term => {
@@ -654,9 +709,16 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         // Header rendered in loop at end
         finalY = 55;
       }
-      const splitTerm = doc.splitTextToSize(`• ${term}`, 180);
-      doc.text(splitTerm, 14, finalY);
-      finalY += (splitTerm.length * 4) + 1.5;
+      
+      if (term.isRich) {
+        doc.text("• ", 14, finalY);
+        const newY = renderRichText(term.text, 18, finalY, 176);
+        finalY = newY + 5.5;
+      } else {
+        const splitTerm = doc.splitTextToSize(`• ${term.text}`, 180);
+        doc.text(splitTerm, 14, finalY);
+        finalY += (splitTerm.length * 4) + 1.5;
+      }
     });
 
     if (finalY > 260) {
@@ -1469,6 +1531,21 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                   </button>
               )}
           </div>
+
+          {config.years > 1 && (
+            <div className="flex items-center">
+                <input 
+                  id="opt-out-checkbox" 
+                  type="checkbox" 
+                  checked={hasOptOutClause} 
+                  onChange={(e) => setHasOptOutClause(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                />
+                <label htmlFor="opt-out-checkbox" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+                  Opt-out Clause
+                </label>
+            </div>
+          )}
       </div>
 
       <div className="flex space-x-4">
