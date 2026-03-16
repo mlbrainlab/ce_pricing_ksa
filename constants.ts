@@ -29,7 +29,7 @@ export const AVAILABLE_PRODUCTS: ProductDefinition[] = [
 
 export const UTD_VARIANTS: Record<string, number> = {
   "ANYWHERE": 259,
-  "UTDADV": 270,
+  "UTDADV": 259 * 1.08,
   "UTDEE": 265,
   "SM": 0, // Special bucket pricing
 };
