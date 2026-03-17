@@ -53,6 +53,7 @@ export const LD_VARIANTS: Record<string, number> = {
   "Seats+FLINK": 330, // 300 + 10%
   "Seats+IPE": 360,   // 300 + 20%
   "Seats+FLINK+IPE": 390, // 300 + 30%
+  "Hospital Pharmacy Model": 0,
 };
 
 // Add-on Costs per Bed (Net Additive)

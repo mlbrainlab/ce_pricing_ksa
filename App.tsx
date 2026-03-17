@@ -352,15 +352,22 @@ const App: React.FC = () => {
           if (existingVariant === 'UTDADV') return ['UTDADV', 'UTDEE'];
       }
       if (productId === 'ld') {
-          // Base -> Base, Flink, Flink+IPE
-          if (existingVariant.includes('BASE PKG')) {
-              // Note: FLINK variants in constants are +FLINK
-              return ['BASE PKG', '+FLINK', '+FLINK+IPE'];
-          }
-          // Flink -> Flink, Flink+IPE
-          if (existingVariant === '+FLINK') return ['+FLINK', '+FLINK+IPE'];
-          // Flink+IPE -> Flink+IPE
-          if (existingVariant === '+FLINK+IPE') return ['+FLINK+IPE'];
+          if (existingVariant === 'BASE PKG') return ['BASE PKG', 'BASE PKG+FLINK', 'BASE PKG+FLINK+IPE'];
+          if (existingVariant === 'BASE PKG+FLINK') return ['BASE PKG+FLINK', 'BASE PKG+FLINK+IPE'];
+          if (existingVariant === 'BASE PKG+FLINK+IPE') return ['BASE PKG+FLINK+IPE'];
+          
+          if (existingVariant === 'EE-Combo') return ['EE-Combo', 'EE-Combo+FLINK', 'EE-Combo+FLINK+IPE'];
+          if (existingVariant === 'EE-Combo+FLINK') return ['EE-Combo+FLINK', 'EE-Combo+FLINK+IPE'];
+          if (existingVariant === 'EE-Combo+FLINK+IPE') return ['EE-Combo+FLINK+IPE'];
+
+          if (existingVariant === 'Seats') return ['Seats', 'Seats+FLINK', 'Seats+IPE', 'Seats+FLINK+IPE'];
+          if (existingVariant === 'Seats+FLINK') return ['Seats+FLINK', 'Seats+FLINK+IPE'];
+          if (existingVariant === 'Seats+IPE') return ['Seats+IPE', 'Seats+FLINK+IPE'];
+          if (existingVariant === 'Seats+FLINK+IPE') return ['Seats+FLINK+IPE'];
+
+          if (existingVariant === 'Hospital Pharmacy Model') return ['Hospital Pharmacy Model'];
+          
+          return Object.keys(LD_VARIANTS); // Fallback
       }
       return [existingVariant]; // Default
   };
@@ -507,7 +514,7 @@ const App: React.FC = () => {
                    : (product.id === 'utd' ? Object.keys(UTD_VARIANTS) : Object.keys(LD_VARIANTS));
 
                 const isUTDSM = product.id === 'utd' && input.variant === 'SM';
-                const isLXDSeats = product.id === 'ld' && input.variant.includes('Seats');
+                const isLXDSeats = product.id === 'ld' && (input.variant.includes('Seats') || input.variant === 'Hospital Pharmacy Model');
 
                 return (
                   <div key={product.id} className={`border rounded-md transition-colors ${isSelected ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-200 dark:border-gray-700'}`}>
@@ -613,7 +620,7 @@ const App: React.FC = () => {
                                       return <option key={v} value={v} disabled>{v} (Requires UTD EE)</option>;
                                    }
 
-                                   return <option key={v} value={v}>{v} (${price})</option>;
+                                   return <option key={v} value={v}>{v}{price > 0 ? ` ($${price})` : ''}</option>;
                                  })}
                                </select>
                              </div>

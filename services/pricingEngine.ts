@@ -99,9 +99,16 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
     }
     
     const count = inputs.count; 
-    const baseGross = (definition?.hasVariants || prodId === 'utd' || prodId === 'ld') 
-      ? (count * listRate) 
-      : (definition?.defaultBasePrice || 0);
+    let baseGross = 0;
+    
+    if (prodId === 'ld' && inputs.variant === 'Hospital Pharmacy Model') {
+      const extraUsers = Math.max(0, count - 6);
+      baseGross = 6500 + (extraUsers * 1000);
+    } else {
+      baseGross = (definition?.hasVariants || prodId === 'utd' || prodId === 'ld') 
+        ? (count * listRate) 
+        : (definition?.defaultBasePrice || 0);
+    }
 
     const effectiveDiscount = inputs.baseDiscount;
     let baseNet = baseGross * (1 - (effectiveDiscount / 100));
@@ -146,8 +153,7 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
             // Variant Upgrade
             if (existing === 'ANYWHERE' && target === 'UTDADV') {
                 // "add the annual rate + 8%"
-                const uplift = (upliftVal + 8) / 100;
-                pathBasedPrice = expiring * (1 + uplift);
+                pathBasedPrice = standardBase * 1.08;
                 productNotes.push(`UTD: Upsell Anywhere -> Adv (Uplift + 8% applied)`);
 
             } else if (existing === 'ANYWHERE' && target === 'UTDEE') {
@@ -344,9 +350,17 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
     const ldAddonNet = getLXDAddonNet(ldInputs, ldInputs.count, applyWHT);
     const ldBaseNet = ldCurrentNet - ldAddonNet;
 
-    if (ldBaseNet < activeComboFloor) {
-      year1ProductNets['ld'] = activeComboFloor + ldAddonNet;
-      productNotes.push(`LD adjusted to Combo Floor (Base: ${activeComboFloor.toFixed(0)} + Addons)`);
+    let currentLdFloor = activeComboFloor;
+    if (ldInputs.variant === 'Hospital Pharmacy Model') {
+        const extraUsers = Math.max(0, ldInputs.count - 6);
+        let hpFloor = 6500 + (extraUsers * 1000);
+        if (applyWHT) hpFloor = hpFloor / WHT_FACTOR;
+        currentLdFloor = hpFloor; // Always use calculated floor for Hospital Pharmacy Model
+    }
+
+    if (ldBaseNet < currentLdFloor) {
+      year1ProductNets['ld'] = currentLdFloor + ldAddonNet;
+      productNotes.push(`LD adjusted to Floor (Base: ${currentLdFloor.toFixed(0)} + Addons)`);
       floorTriggered = true;
     }
 
@@ -384,9 +398,17 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
     const ldAddonNet = getLXDAddonNet(ldInputs, ldInputs.count, applyWHT);
     const ldBaseNet = ldCurrentNet - ldAddonNet;
 
-    if (ldBaseNet < activeStandardFloor) {
-      year1ProductNets['ld'] = activeStandardFloor + ldAddonNet;
-      productNotes.push(`LD adjusted to Minimum Floor (Base: ${activeStandardFloor.toFixed(0)} + Addons)`);
+    let currentLdFloor = activeStandardFloor;
+    if (ldInputs.variant === 'Hospital Pharmacy Model') {
+        const extraUsers = Math.max(0, ldInputs.count - 6);
+        let hpFloor = 6500 + (extraUsers * 1000);
+        if (applyWHT) hpFloor = hpFloor / WHT_FACTOR;
+        currentLdFloor = hpFloor;
+    }
+
+    if (ldBaseNet < currentLdFloor) {
+      year1ProductNets['ld'] = currentLdFloor + ldAddonNet;
+      productNotes.push(`LD adjusted to Minimum Floor (Base: ${currentLdFloor.toFixed(0)} + Addons)`);
       floorTriggered = true;
     }
   }

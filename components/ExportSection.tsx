@@ -483,7 +483,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             if (p.countLabel === 'BC') countLabelText = 'active beds';
             
             // Override for Lexidrug Seats variant
-            if (pid === 'ld' && inp.variant && inp.variant.includes('Seats')) {
+            if (pid === 'ld' && inp.variant && (inp.variant.includes('Seats') || inp.variant === 'Hospital Pharmacy Model')) {
                 countLabelText = 'seats';
             }
 
@@ -701,6 +701,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     // Conditional EMR Term
     if (showEmrIntegration) {
         terms.push({ text: "Integrating UpToDate® or Lexidrug® with your EMR is included in the prices above, even if the EMR changed during the subscription.*" });
+    }
+
+    const hasHospitalPharmacyModel = config.selectedProducts.includes('ld') && config.productInputs['ld']?.variant === 'Hospital Pharmacy Model';
+    if (hasHospitalPharmacyModel) {
+        terms.push({ text: "This subscription is limited to the above number of seats." });
     }
 
     terms.forEach(term => {
