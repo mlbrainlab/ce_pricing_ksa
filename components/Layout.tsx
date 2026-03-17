@@ -8,7 +8,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     setMounted(true);
     // On mount, check local storage or system preference
     const savedTheme = localStorage.getItem('theme');
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const systemPrefersDark = mediaQuery.matches;
     
     if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
       setIsDark(true);
@@ -17,6 +18,21 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       setIsDark(false);
       document.documentElement.classList.remove('dark');
     }
+
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (!localStorage.getItem('theme')) {
+        if (e.matches) {
+          setIsDark(true);
+          document.documentElement.classList.add('dark');
+        } else {
+          setIsDark(false);
+          document.documentElement.classList.remove('dark');
+        }
+      }
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
   const toggleTheme = () => {

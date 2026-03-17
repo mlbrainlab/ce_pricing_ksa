@@ -211,7 +211,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     let currentY = 170;
     doc.setTextColor(60, 60, 60);
     const hasUTD = config.selectedProducts.includes('utd');
-    const hasLD = config.selectedProducts.includes('ld');
+    const hasLXD = config.selectedProducts.includes('lxd');
     if (hasUTD) {
         const variant = config.productInputs['utd']?.variant || '';
         let title = "UpToDate\u00AE";
@@ -227,8 +227,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         doc.text("Clinical Decision Support Solution", 105, currentY, { align: 'center' });
         currentY += 20;
     }
-    if (hasLD) {
-        const variant = config.productInputs['ld']?.variant || '';
+    if (hasLXD) {
+        const variant = config.productInputs['lxd']?.variant || '';
         let subHeading = "Drug Referential Solution";
         if (variant.includes('FLINK')) {
             subHeading = variant.includes('IPE') ? "including Formulink\u2122 and Integrated Patient Education" : "including Formulink\u2122";
@@ -324,7 +324,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     const totalStartIndex = 1 + config.selectedProducts.length;
     const columnStyles: any = {};
     if (productColIndices['utd'] !== undefined) columnStyles[productColIndices['utd']] = { fillColor: [220, 252, 231] };
-    if (productColIndices['ld'] !== undefined) columnStyles[productColIndices['ld']] = { fillColor: [224, 242, 254] };
+    if (productColIndices['lxd'] !== undefined) columnStyles[productColIndices['lxd']] = { fillColor: [224, 242, 254] };
     columnStyles[totalStartIndex] = { fontStyle: 'bold' };
     if (isIndirect) columnStyles[totalStartIndex + 2] = { fontStyle: 'bold' };
 
@@ -332,7 +332,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       const prodCols = config.selectedProducts.map(pid => {
          let label = pid;
          if (pid === 'utd') label = 'UpToDate';
-         if (pid === 'ld') label = 'Lexidrug';
+         if (pid === 'lxd') label = 'Lexidrug';
          return `${label} (SAR)`;
       });
       tableHead = [['Year', ...prodCols, 'Total (SAR)', 'VAT (15%)', 'Grand Total\n(SAR)']];
@@ -359,7 +359,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       const prodCols = config.selectedProducts.map(pid => {
          let label = pid;
          if (pid === 'utd') label = 'UpToDate';
-         if (pid === 'ld') label = 'Lexidrug';
+         if (pid === 'lxd') label = 'Lexidrug';
          return `${label} (USD)`;
       });
       tableHead = [['Year', ...prodCols, 'Total (USD)']];
@@ -475,7 +475,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         if(p && inp) {
             let productName = p.name;
             if (pid === 'utd') productName = 'UpToDate';
-            if (pid === 'ld') productName = 'Lexidrug';
+            if (pid === 'lxd') productName = 'Lexidrug';
             
             // Text Replacement Logic: HC->clinicians, BC->active beds
             let countLabelText = p.countLabel;
@@ -483,7 +483,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             if (p.countLabel === 'BC') countLabelText = 'active beds';
             
             // Override for Lexidrug Seats variant
-            if (pid === 'ld' && inp.variant && (inp.variant.includes('Seats') || inp.variant === 'Hospital Pharmacy Model')) {
+            if (pid === 'lxd' && inp.variant && (inp.variant.includes('Seats') || inp.variant === 'Hospital Pharmacy Model')) {
                 countLabelText = 'seats';
             }
 
@@ -625,14 +625,14 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             finalY += 5;
         }
 
-        if (config.selectedProducts.includes('ld')) {
-            const count = config.productInputs['ld'].count || 1;
+        if (config.selectedProducts.includes('lxd')) {
+            const count = config.productInputs['lxd'].count || 1;
             const totalGrossUSD = data.yearlyResults.reduce((sum, r) => {
-                const bd = r.breakdown.find(x => x.id === 'ld');
+                const bd = r.breakdown.find(x => x.id === 'lxd');
                 return sum + (bd ? bd.gross : 0);
             }, 0);
             const totalGrossSAR = data.yearlyResults.reduce((sum, r) => {
-                const bd = r.breakdown.find(x => x.id === 'ld');
+                const bd = r.breakdown.find(x => x.id === 'lxd');
                 return sum + (bd ? bd.grossSAR : 0);
             }, 0);
             const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
@@ -643,7 +643,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         }
         
         // Add a small gap after monthly costs if they exist
-        if (config.selectedProducts.includes('utd') || config.selectedProducts.includes('ld')) {
+        if (config.selectedProducts.includes('utd') || config.selectedProducts.includes('lxd')) {
             finalY += 2;
         }
     }
@@ -703,7 +703,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         terms.push({ text: "Integrating UpToDate® or Lexidrug® with your EMR is included in the prices above, even if the EMR changed during the subscription.*" });
     }
 
-    const hasHospitalPharmacyModel = config.selectedProducts.includes('ld') && config.productInputs['ld']?.variant === 'Hospital Pharmacy Model';
+    const hasHospitalPharmacyModel = config.selectedProducts.includes('lxd') && config.productInputs['lxd']?.variant === 'Hospital Pharmacy Model';
     if (hasHospitalPharmacyModel) {
         terms.push({ text: "This subscription is limited to the above number of seats." });
     }
@@ -769,13 +769,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
     const techSpecs = [];
     const utdVariant = hasUTD ? config.productInputs['utd']?.variant : null;
-    const lxdVariant = hasLD ? config.productInputs['ld']?.variant : null;
+    const lxdVariant = hasLXD ? config.productInputs['lxd']?.variant : null;
 
     if (hasUTD) {
        techSpecs.push({ name: "AI is less a revolution", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMt5i2DUCp6zhZlJG0ufaPLUSSIGN36DQnF01FSaK12p8J3u2___dWYq8PLUSSIGN5mQgaRFxL3mOqKYo___n" });
        
        if (utdVariant === 'UTDEE') {
-           if (hasLD) {
+           if (hasLXD) {
                if (lxdVariant?.includes('FLINK') && lxdVariant?.includes('IPE')) {
                    techSpecs.push({ name: "TS_UTD PRO FLINK+IPE", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtZUXeskXsITPadJQRrdQhtuNZ2RDkEWAE1Bl7BCJSMgnhauADmOlYVesjiWw7dfVJ" });
                } else if (lxdVariant?.includes('FLINK')) {
@@ -796,7 +796,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
        techSpecs.push({ name: "UTD Facts-at-a-glance", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtTG3c8ANMBhZRuFWZyPLUSSIGNbZadPLUSSIGNWRqxIsdRKRbxLt1m8oMBdYYMOn8grPVgEz2RpGQbG" });
     }
 
-    if (hasLD && (utdVariant !== 'UTDEE')) {
+    if (hasLXD && (utdVariant !== 'UTDEE')) {
         if (lxdVariant?.includes('FLINK') && lxdVariant?.includes('IPE')) {
             techSpecs.push({ name: "TS_LXD FLINK+IPE", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMt4VgDwBbSHbScqX___9fVqHlKhXWnm2Fae55SMM7fc9tUrmJtoGCyc19xa___3YGozWh___" });
         } else if (lxdVariant?.includes('FLINK')) {

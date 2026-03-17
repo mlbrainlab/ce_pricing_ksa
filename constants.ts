@@ -7,7 +7,7 @@ export const EXCHANGE_RATE_SAR = 3.76;
 // Floor Prices (Pre-WHT Division)
 // Logic: $6,500 / 0.95 = $6,842.11
 export const STANDARD_FLOOR_RAW = 6500;
-export const COMBO_FLOOR_LD_RAW = 4000;
+export const COMBO_FLOOR_LXD_RAW = 4000;
 
 export const RECOGNITION_FACTORS = {
   NEW_LOGO: {
@@ -24,7 +24,7 @@ export const RECOGNITION_FACTORS = {
 
 export const AVAILABLE_PRODUCTS: ProductDefinition[] = [
   { id: 'utd', name: 'UTD', shortName: 'UTD', hasVariants: true, countLabel: 'HC' },
-  { id: 'ld', name: 'LXD', shortName: 'LXD', hasVariants: true, countLabel: 'BC' },
+  { id: 'lxd', name: 'LXD', shortName: 'LXD', hasVariants: true, countLabel: 'BC' },
 ];
 
 export const UTD_VARIANTS: Record<string, number> = {
@@ -42,7 +42,7 @@ export const UTD_SM_BUCKETS = [
   { min: 300, max: 499, price: 445 },
 ];
 
-export const LD_VARIANTS: Record<string, number> = {
+export const LXD_VARIANTS: Record<string, number> = {
   "BASE PKG": 80,
   "BASE PKG+FLINK": 92,
   "BASE PKG+FLINK+IPE": 108,

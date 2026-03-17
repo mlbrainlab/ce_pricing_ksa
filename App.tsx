@@ -12,7 +12,7 @@ import {
   ProductInput, 
   DealConfiguration 
 } from './types';
-import { AVAILABLE_PRODUCTS, UTD_VARIANTS, LD_VARIANTS } from './constants';
+import { AVAILABLE_PRODUCTS, UTD_VARIANTS, LXD_VARIANTS } from './constants';
 
 const formatCurrency = (amount: number, currency: 'USD' | 'SAR') => {
   if (currency === 'USD') {
@@ -76,21 +76,21 @@ const App: React.FC = () => {
   const [applyAnnualRate, setApplyAnnualRate] = useState<boolean>(false); // Toggle for Renewal MYFPI
   const [globalRateVal, setGlobalRateVal] = useState<number>(5);
   const [utdRateVal, setUtdRateVal] = useState<number>(8); // Default 8%
-  const [ldRateVal, setLdRateVal] = useState<number>(5);
+  const [lxdRateVal, setLxdRateVal] = useState<number>(5);
 
   // Renewal Uplift Rates (Specific to Renewal Base Calculation)
   const [renewalUpliftGlobal, setRenewalUpliftGlobal] = useState<number>(5);
   const [renewalUpliftUTD, setRenewalUpliftUTD] = useState<number>(8);
-  const [renewalUpliftLD, setRenewalUpliftLD] = useState<number>(5);
+  const [renewalUpliftLXD, setRenewalUpliftLXD] = useState<number>(5);
 
   // Product Inputs State
   const [productInputs, setProductInputs] = useState<Record<string, ProductInput>>({
     'utd': { count: 100, existingCount: 100, variant: 'ANYWHERE', existingVariant: 'ANYWHERE', baseDiscount: 0, expiringAmount: 0, dph: 0, forceHeadcountOverride: false, changeInStats: false },
-    'ld': { count: 50, existingCount: 50, variant: 'BASE PKG', existingVariant: 'BASE PKG', baseDiscount: 0, expiringAmount: 0, dph: 0, forceHeadcountOverride: false, changeInStats: false },
+    'lxd': { count: 50, existingCount: 50, variant: 'BASE PKG', existingVariant: 'BASE PKG', baseDiscount: 0, expiringAmount: 0, dph: 0, forceHeadcountOverride: false, changeInStats: false },
   });
 
-  // Check if we need split rates (if both UTD and LD are selected)
-  const showSplitRates = selectedProductIds.includes('utd') && selectedProductIds.includes('ld');
+  // Check if we need split rates (if both UTD and LXD are selected)
+  const showSplitRates = selectedProductIds.includes('utd') && selectedProductIds.includes('lxd');
   const isIndirect = channel !== ChannelType.DIRECT;
 
   // EFFECT: Auto-Uncheck WHT when Renewal is selected
@@ -113,13 +113,13 @@ const App: React.FC = () => {
         // Uplift Rates
         setRenewalUpliftGlobal(8);
         setRenewalUpliftUTD(8);
-      } else if (selectedProductIds.includes('ld')) {
+      } else if (selectedProductIds.includes('lxd')) {
         // Structure Rates
         setGlobalRateVal(5);
-        setLdRateVal(5);
+        setLxdRateVal(5);
         // Uplift Rates
         setRenewalUpliftGlobal(5);
-        setRenewalUpliftLD(5);
+        setRenewalUpliftLXD(5);
       }
     }
   }, [selectedProductIds]);
@@ -137,35 +137,35 @@ const App: React.FC = () => {
     // Override values if disabled
     const effGlobal = useAnnualRate ? globalRateVal : 0;
     const effUtd = useAnnualRate ? utdRateVal : 0;
-    const effLd = useAnnualRate ? ldRateVal : 0;
+    const effLxd = useAnnualRate ? lxdRateVal : 0;
 
     // Generate arrays based on effective single input values (Structure Rates)
     const rates = generateRateArray(effGlobal, years);
     const utdRates = generateRateArray(effUtd, years);
-    const ldRates = generateRateArray(effLd, years);
+    const lxdRates = generateRateArray(effLxd, years);
 
     const productRates: Record<string, number[]> = {};
     if (showSplitRates) {
       productRates['utd'] = utdRates;
-      productRates['ld'] = ldRates;
+      productRates['lxd'] = lxdRates;
     } else {
       if (selectedProductIds.includes('utd')) productRates['utd'] = rates;
-      if (selectedProductIds.includes('ld')) productRates['ld'] = rates;
+      if (selectedProductIds.includes('lxd')) productRates['lxd'] = rates;
     }
 
     // Renewal Uplifts
     // Allow independent Uplift Rate (Y1) vs Annual Rate (Y2+) for MYFPI
     const currentGlobalUplift = renewalUpliftGlobal;
     const currentUtdUplift = renewalUpliftUTD;
-    const currentLdUplift = renewalUpliftLD;
+    const currentLxdUplift = renewalUpliftLXD;
 
     const renewalUpliftRates: Record<string, number> = {};
     if (showSplitRates) {
         renewalUpliftRates['utd'] = currentUtdUplift;
-        renewalUpliftRates['ld'] = currentLdUplift;
+        renewalUpliftRates['lxd'] = currentLxdUplift;
     } else {
         if (selectedProductIds.includes('utd')) renewalUpliftRates['utd'] = currentGlobalUplift;
-        if (selectedProductIds.includes('ld')) renewalUpliftRates['ld'] = currentGlobalUplift;
+        if (selectedProductIds.includes('lxd')) renewalUpliftRates['lxd'] = currentGlobalUplift;
     }
 
     return {
@@ -184,7 +184,7 @@ const App: React.FC = () => {
       useStartDate,
       startMonthYear
     };
-  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, ldRateVal, renewalUpliftGlobal, renewalUpliftUTD, renewalUpliftLD, showSplitRates, applyWHT, flatPricing, rounding, applyAnnualRate, useStartDate, startMonthYear]);
+  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, lxdRateVal, renewalUpliftGlobal, renewalUpliftUTD, renewalUpliftLXD, showSplitRates, applyWHT, flatPricing, rounding, applyAnnualRate, useStartDate, startMonthYear]);
 
   // Results
   const results = useMemo(() => calculatePricing(config), [config]);
@@ -231,15 +231,15 @@ const App: React.FC = () => {
         }
     }
 
-    if (config.selectedProducts.includes('ld')) {
-        const count = config.productInputs['ld'].count || 1;
-        if (config.productInputs['ld'].count > 0) {
+    if (config.selectedProducts.includes('lxd')) {
+        const count = config.productInputs['lxd'].count || 1;
+        if (config.productInputs['lxd'].count > 0) {
             const totalGrossUSD = results.yearlyResults.reduce((sum, r) => {
-                const bd = r.breakdown.find(x => x.id === 'ld');
+                const bd = r.breakdown.find(x => x.id === 'lxd');
                 return sum + (bd ? bd.gross : 0);
             }, 0);
             const totalGrossSAR = results.yearlyResults.reduce((sum, r) => {
-                const bd = r.breakdown.find(x => x.id === 'ld');
+                const bd = r.breakdown.find(x => x.id === 'lxd');
                 return sum + (bd ? bd.grossSAR : 0);
             }, 0);
 
@@ -351,7 +351,7 @@ const App: React.FC = () => {
           // Adv -> Adv, EE
           if (existingVariant === 'UTDADV') return ['UTDADV', 'UTDEE'];
       }
-      if (productId === 'ld') {
+      if (productId === 'lxd') {
           if (existingVariant === 'BASE PKG') return ['BASE PKG', 'BASE PKG+FLINK', 'BASE PKG+FLINK+IPE'];
           if (existingVariant === 'BASE PKG+FLINK') return ['BASE PKG+FLINK', 'BASE PKG+FLINK+IPE'];
           if (existingVariant === 'BASE PKG+FLINK+IPE') return ['BASE PKG+FLINK+IPE'];
@@ -367,7 +367,7 @@ const App: React.FC = () => {
 
           if (existingVariant === 'Hospital Pharmacy Model') return ['Hospital Pharmacy Model'];
           
-          return Object.keys(LD_VARIANTS); // Fallback
+          return Object.keys(LXD_VARIANTS); // Fallback
       }
       return [existingVariant]; // Default
   };
@@ -469,13 +469,13 @@ const App: React.FC = () => {
                 const currentUTDVariant = productInputs['utd']?.variant;
                 const isRestrictedUTD = isUTDSelected && (currentUTDVariant === 'ANYWHERE' || currentUTDVariant === 'UTDADV');
                 
-                // Logic for disabling Base Discount on LD if UTD EE + LD EE-Combo is selected
+                // Logic for disabling Base Discount on LXD if UTD EE + LXD EE-Combo is selected
                 const isUTDEE = isUTDSelected && currentUTDVariant === 'UTDEE';
-                const isLDComboVariant = product.id === 'ld' && input.variant.includes('EE-Combo');
-                const shouldDisableLDDiscount = isUTDEE && isLDComboVariant;
+                const isLXDComboVariant = product.id === 'lxd' && input.variant.includes('EE-Combo');
+                const shouldDisableLXDDiscount = isUTDEE && isLXDComboVariant;
 
-                // Rename discount label if split rates (Combo) are active for LD
-                const discountLabel = (product.id === 'ld' && isUTDSelected) ? 'Combo Discount %' : 'Base Discount %';
+                // Rename discount label if split rates (Combo) are active for LXD
+                const discountLabel = (product.id === 'lxd' && isUTDSelected) ? 'Combo Discount %' : 'Base Discount %';
 
                 // RENEWAL SPECIFIC LOGIC
                 const isRenewal = dealType === DealType.RENEWAL;
@@ -490,7 +490,7 @@ const App: React.FC = () => {
                 const showStatsCheckbox = isRenewal && product.id === 'utd';
 
                 // LXD Addon Check
-                const isLXDAddonUpgrade = isRenewal && product.id === 'ld' && existingVariant !== targetVariant;
+                const isLXDAddonUpgrade = isRenewal && product.id === 'lxd' && existingVariant !== targetVariant;
                 
                 // Logic to Enable Count Input
                 // Default: Disabled (0) for Renewal
@@ -503,7 +503,7 @@ const App: React.FC = () => {
                         isCountDisabled = false;
                     }
                     // Enable count input for LXD renewal to allow stats change
-                    if (product.id === 'ld') {
+                    if (product.id === 'lxd') {
                         isCountDisabled = false;
                     }
                 }
@@ -511,10 +511,10 @@ const App: React.FC = () => {
                 // Variants Filtering
                 const allowedTargetVariants = isRenewal 
                    ? getAllowedTargetVariants(product.id, existingVariant) 
-                   : (product.id === 'utd' ? Object.keys(UTD_VARIANTS) : Object.keys(LD_VARIANTS));
+                   : (product.id === 'utd' ? Object.keys(UTD_VARIANTS) : Object.keys(LXD_VARIANTS));
 
                 const isUTDSM = product.id === 'utd' && input.variant === 'SM';
-                const isLXDSeats = product.id === 'ld' && (input.variant.includes('Seats') || input.variant === 'Hospital Pharmacy Model');
+                const isLXDSeats = product.id === 'lxd' && (input.variant.includes('Seats') || input.variant === 'Hospital Pharmacy Model');
 
                 return (
                   <div key={product.id} className={`border rounded-md transition-colors ${isSelected ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-200 dark:border-gray-700'}`}>
@@ -581,7 +581,7 @@ const App: React.FC = () => {
                                       {product.id === 'utd' && Object.keys(UTD_VARIANTS).map(v => (
                                          <option key={v} value={v}>{v}</option>
                                       ))}
-                                      {product.id === 'ld' && Object.keys(LD_VARIANTS).map(v => {
+                                      {product.id === 'lxd' && Object.keys(LXD_VARIANTS).map(v => {
                                          if(v.includes('EE-Combo')) return null; 
                                          return <option key={v} value={v}>{v}</option>;
                                       })}
@@ -613,10 +613,10 @@ const App: React.FC = () => {
                                  {allowedTargetVariants.map(v => {
                                    let price = 0;
                                    if (product.id === 'utd') price = UTD_VARIANTS[v];
-                                   if (product.id === 'ld') price = LD_VARIANTS[v];
+                                   if (product.id === 'lxd') price = LXD_VARIANTS[v];
                                    
                                    // Specific filtering for Combo logic in New Logo context (unchanged)
-                                   if (!isRenewal && product.id === 'ld' && v.includes('EE-Combo') && isRestrictedUTD) {
+                                   if (!isRenewal && product.id === 'lxd' && v.includes('EE-Combo') && isRestrictedUTD) {
                                       return <option key={v} value={v} disabled>{v} (Requires UTD EE)</option>;
                                    }
 
@@ -668,8 +668,8 @@ const App: React.FC = () => {
                                type="number"
                                min="0"
                                max="100"
-                               disabled={shouldDisableLDDiscount}
-                               className={`block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums ${shouldDisableLDDiscount ? 'opacity-50 cursor-not-allowed' : ''}`}
+                               disabled={shouldDisableLXDDiscount}
+                               className={`block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums ${shouldDisableLXDDiscount ? 'opacity-50 cursor-not-allowed' : ''}`}
                                value={input.baseDiscount}
                                onChange={(e) => handleInputChange(product.id, 'baseDiscount', parseFloat(e.target.value) || 0)}
                              />
@@ -743,7 +743,7 @@ const App: React.FC = () => {
                     {showSplitRates ? (
                       <>
                         {renderRateInput("UTD Uplift", renewalUpliftUTD, setRenewalUpliftUTD, "Uplift %", "border-blue-200 dark:border-blue-800")}
-                        {renderRateInput("LD Uplift", renewalUpliftLD, setRenewalUpliftLD, "Uplift %", "border-green-200 dark:border-green-800")}
+                        {renderRateInput("LXD Uplift", renewalUpliftLXD, setRenewalUpliftLXD, "Uplift %", "border-green-200 dark:border-green-800")}
                       </>
                     ) : (
                       renderRateInput("Uplift", renewalUpliftGlobal, setRenewalUpliftGlobal, "Uplift %")
@@ -778,7 +778,7 @@ const App: React.FC = () => {
                         {showSplitRates ? (
                             <>
                               {renderRateInput("UTD Rate", utdRateVal, setUtdRateVal, "Annual %", "border-blue-200 dark:border-blue-800")}
-                              {renderRateInput("LD Rate", ldRateVal, setLdRateVal, "Annual %", "border-green-200 dark:border-green-800")}
+                              {renderRateInput("LXD Rate", lxdRateVal, setLxdRateVal, "Annual %", "border-green-200 dark:border-green-800")}
                             </>
                           ) : (
                             renderRateInput("Rate", globalRateVal, setGlobalRateVal, "Annual %")
@@ -1091,9 +1091,9 @@ const App: React.FC = () => {
                )}
              </div>
              <ul className="mt-2 text-xs text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-1">
-                <li><strong>Base Calculation:</strong> UTD (HC × Rate) / LD (BC × Rate).</li>
+                <li><strong>Base Calculation:</strong> UTD (HC × Rate) / LXD (BC × Rate).</li>
                 <li><strong>WHT Adjustment:</strong> {applyWHT ? "Prices grossed up (divided by 0.95)." : "No WHT gross up applied."}</li>
-                <li><strong>Floor Rules:</strong> Single Deal Min $6,842. Combo Deal LD Min $4,210. (Adjusted dynamically for WHT).</li>
+                <li><strong>Floor Rules:</strong> Single Deal Min $6,842. Combo Deal LXD Min $4,210. (Adjusted dynamically for WHT).</li>
                 <li><strong>Recognized Revenue:</strong> Applied {dealType} {channel} factor. 
                    {channel !== ChannelType.DIRECT && dealType === DealType.NEW_LOGO && " (Y1 vs Y2+ margins applied)."}
                 </li>
