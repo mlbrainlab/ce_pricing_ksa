@@ -1491,7 +1491,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       </div>
       
       {/* Designated Sites and Start Date Checkboxes */}
-      <div className="flex flex-wrap items-center gap-6 mb-6">
+      <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-6 mb-6 flex-wrap">
           <div className="flex items-center">
               <input 
                 id="designated-sites-check"
