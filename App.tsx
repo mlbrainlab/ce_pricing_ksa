@@ -360,10 +360,10 @@ const App: React.FC = () => {
           if (existingVariant === 'EE-Combo+FLINK') return ['EE-Combo+FLINK', 'EE-Combo+FLINK+IPE'];
           if (existingVariant === 'EE-Combo+FLINK+IPE') return ['EE-Combo+FLINK+IPE'];
 
-          if (existingVariant === 'Seats') return ['Seats', 'Seats+FLINK', 'Seats+IPE', 'Seats+FLINK+IPE'];
-          if (existingVariant === 'Seats+FLINK') return ['Seats+FLINK', 'Seats+FLINK+IPE'];
-          if (existingVariant === 'Seats+IPE') return ['Seats+IPE', 'Seats+FLINK+IPE'];
-          if (existingVariant === 'Seats+FLINK+IPE') return ['Seats+FLINK+IPE'];
+          // if (existingVariant === 'Seats') return ['Seats', 'Seats+FLINK', 'Seats+IPE', 'Seats+FLINK+IPE'];
+          // if (existingVariant === 'Seats+FLINK') return ['Seats+FLINK', 'Seats+FLINK+IPE'];
+          // if (existingVariant === 'Seats+IPE') return ['Seats+IPE', 'Seats+FLINK+IPE'];
+          // if (existingVariant === 'Seats+FLINK+IPE') return ['Seats+FLINK+IPE'];
 
           if (existingVariant === 'Hospital Pharmacy Model') return ['Hospital Pharmacy Model'];
           

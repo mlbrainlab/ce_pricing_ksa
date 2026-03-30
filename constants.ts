@@ -49,10 +49,10 @@ export const LXD_VARIANTS: Record<string, number> = {
   "EE-Combo": 66.25, // 0.25 * 265
   "EE-Combo+FLINK": 78.25,
   "EE-Combo+FLINK+IPE": 94.25,
-  "Seats": 300,
-  "Seats+FLINK": 330, // 300 + 10%
-  "Seats+IPE": 360,   // 300 + 20%
-  "Seats+FLINK+IPE": 390, // 300 + 30%
+  // "Seats": 300,
+  // "Seats+FLINK": 330, // 300 + 10%
+  // "Seats+IPE": 360,   // 300 + 20%
+  // "Seats+FLINK+IPE": 390, // 300 + 30%
   "Hospital Pharmacy Model": 0,
 };
 

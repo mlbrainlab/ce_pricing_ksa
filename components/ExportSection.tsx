@@ -168,11 +168,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
         try {
             // Add WK Logo - Made slightly smaller than before (using white base64 version)
-            doc.addImage(WK_LOGO_BASE64, 'PNG', 14, 10, 58, 10, 'WK_LOGO', 'FAST');
+            doc.addImage(WK_LOGO_BASE64, 'PNG', 14, 10, 50, 10, 'WK_LOGO', 'FAST');
             
             // Add Samir Logo if Indirect (using white base64 version)
             if (isIndirect) {
-                doc.addImage(SAMIR_WHITE_LOGO_BASE64, 'PNG', 140, 10, 58, 10, 'SAMIR_LOGO', 'FAST');
+                doc.addImage(SAMIR_WHITE_LOGO_BASE64, 'PNG', 162, 10, 36, 10, 'SAMIR_LOGO', 'FAST');
             }
         } catch (e) {
             console.warn("Logo load error", e);
@@ -283,7 +283,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     doc.setFont(fontName, 'normal');
     const disclaimer = `The information contained within this Proposal is confidential and proprietary and may be used solely for the purpose of evaluating the potential license of offerings and/or services provided by the Wolters Kluwer Health, Inc. entities (sometimes collectively referred to as “Wolters Kluwer”) identified in this Proposal. This Proposal is non-binding on each party. Neither this Proposal, nor any oral or written communication concerning the matters covered by this Proposal, shall create any binding obligations on any party; only those obligations set forth in a separate written definitive agreement negotiated and executed by all parties in a form approved by each party shall be binding upon the parties. Any information contained within this Proposal may only be disclosed to directors, officers, employees, and agents of the recipient organization who need to know such information for the purpose of evaluating this Proposal. The information contained within this Proposal shall not be communicated to anyone outside of the recipient organization without the express written permission of Wolters Kluwer.`;
     const splitText = doc.splitTextToSize(disclaimer, 180);
+    
+    doc.setLineHeightFactor(1.5);
     doc.text(splitText, 14, 60);
+    doc.setLineHeightFactor(1.15); // Reset to default
     // Footer added dynamically at the end
 
     doc.addPage();
