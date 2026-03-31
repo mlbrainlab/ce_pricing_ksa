@@ -2,6 +2,7 @@
 export enum DealType {
   NEW_LOGO = 'New Logo',
   RENEWAL = 'Renewal',
+  EXTENSION = 'Extension',
 }
 
 export enum ChannelType {

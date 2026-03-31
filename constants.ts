@@ -1,6 +1,8 @@
 
 import { ProductDefinition } from './types';
 
+export const APP_VERSION = '6.5.0';
+
 export const WHT_FACTOR = 0.95;
 export const EXCHANGE_RATE_SAR = 3.76;
 

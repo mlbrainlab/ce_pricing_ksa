@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { APP_VERSION } from '../constants';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [themePref, setThemePref] = useState<'light' | 'dark' | 'system'>('system');
@@ -60,7 +61,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                CE
              </div>
              <h1 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white">
-               Pricing KSA <span className="text-gray-400 font-normal">v6.8.2</span>
+               Pricing KSA <span className="text-gray-400 font-normal">v{APP_VERSION}</span>
              </h1>
           </div>
           
