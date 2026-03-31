@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { CalculationOutput, DealConfiguration, ChannelType, DealType, PricingMethod } from '../types';
-import { AVAILABLE_PRODUCTS } from '../constants';
+import { AVAILABLE_PRODUCTS, EXCHANGE_RATE_SAR } from '../constants';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import ExcelJS from 'exceljs';
@@ -13,9 +13,10 @@ interface ExportSectionProps {
   data: CalculationOutput;
   config: DealConfiguration;
   useStartDate: boolean;
-  setUseStartDate: (val: boolean) => void;
   startMonthYear: string;
   setStartMonthYear: (val: string) => void;
+  isExtensionQuote?: boolean;
+  extensionResults?: any;
 }
 
 // Logo URLs
@@ -47,9 +48,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   data, 
   config,
   useStartDate,
-  setUseStartDate,
   startMonthYear,
-  setStartMonthYear
+  setStartMonthYear,
+  isExtensionQuote,
+  extensionResults
 }) => {
   const [customerName, setCustomerName] = useState('');
   const [repName, setRepName] = useState('');
@@ -57,6 +59,26 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const [repEmail, setRepEmail] = useState('');
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [isExcelLoading, setIsExcelLoading] = useState(false);
+  
+  // Auto Credential Capture
+  React.useEffect(() => {
+    const authName = localStorage.getItem('wk_auth_name');
+    if (authName) {
+      const initials = authName.toLowerCase();
+      const credentials: Record<string, { name: string, email: string, phone: string }> = {
+        'aa': { name: 'REDACTED', email: 'REDACTED', phone: 'REDACTED' },
+        'ma': { name: 'REDACTED', email: 'REDACTED', phone: 'REDACTED' },
+        'ai': { name: 'REDACTED', email: 'REDACTED', phone: 'REDACTED' },
+        'mn': { name: 'REDACTED', email: 'REDACTED', phone: 'REDACTED' }
+      };
+      
+      if (credentials[initials]) {
+        setRepName(credentials[initials].name);
+        setRepEmail(credentials[initials].email);
+        setRepPhone(credentials[initials].phone);
+      }
+    }
+  }, []);
   
   // Font State - Default to FiraSans as requested
   const [selectedFont] = useState<FontType>('FiraSans');
@@ -67,10 +89,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const [isFontLoading, setIsFontLoading] = useState(false);
 
   // PDF Options
-  const [showMonthlyCost, setShowMonthlyCost] = useState(true);
-  const [showTotals, setShowTotals] = useState(true);
-  const [showEmrIntegration, setShowEmrIntegration] = useState(true); // Default true for EMR term
-  const [hasOptOutClause, setHasOptOutClause] = useState(false); // Opt-out clause for multi-year
+  const [showMonthlyCost] = useState(false);
+  const [showTotals] = useState(false);
+  const [showEmrIntegration] = useState(false); // Default true for EMR term
+  const [hasOptOutClause] = useState(false); // Opt-out clause for multi-year
 
   // Sites Logic
   const [hasDesignatedSites, setHasDesignatedSites] = useState(false);
@@ -111,102 +133,104 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
   const handlePDFExport = async () => {
     setIsPdfLoading(true);
-    const doc = new jsPDF();
-    const fontName = selectedFont;
-    const isIndirect = config.channel !== ChannelType.DIRECT;
-    const displayCurrency = isIndirect ? 'SAR' : 'USD';
-    
-    // Font Loading Logic
     try {
-        let regularFontB64 = fontCache[fontName].regular;
-        let boldFontB64 = fontCache[fontName].bold;
+      const doc = new jsPDF();
+      const fontName = selectedFont;
+      const isIndirect = config.channel !== ChannelType.DIRECT;
+      const displayCurrency = isIndirect ? 'SAR' : 'USD';
+      
+      // Font Loading Logic
+      try {
+          let regularFontB64 = fontCache[fontName].regular;
+          let boldFontB64 = fontCache[fontName].bold;
 
-        if (!regularFontB64 || !boldFontB64) {
-             setIsFontLoading(true);
-             const [regBlob, boldBlob] = await Promise.all([
-                 fetch(FONT_URLS[fontName].regular).then(res => res.blob()),
-                 fetch(FONT_URLS[fontName].bold).then(res => res.blob())
-             ]);
+          if (!regularFontB64 || !boldFontB64) {
+               setIsFontLoading(true);
+               const [regBlob, boldBlob] = await Promise.all([
+                   fetch(FONT_URLS[fontName].regular).then(res => res.blob()),
+                   fetch(FONT_URLS[fontName].bold).then(res => res.blob())
+               ]);
 
-             const blobToBase64 = (blob: Blob) => new Promise<string>((resolve) => {
-                 const reader = new FileReader();
-                 reader.onloadend = () => resolve(reader.result as string);
-                 reader.readAsDataURL(blob);
-             });
+               const blobToBase64 = (blob: Blob) => new Promise<string>((resolve) => {
+                   const reader = new FileReader();
+                   reader.onloadend = () => resolve(reader.result as string);
+                   reader.readAsDataURL(blob);
+               });
 
-             regularFontB64 = (await blobToBase64(regBlob)).split(',')[1];
-             boldFontB64 = (await blobToBase64(boldBlob)).split(',')[1];
+               regularFontB64 = (await blobToBase64(regBlob)).split(',')[1];
+               boldFontB64 = (await blobToBase64(boldBlob)).split(',')[1];
 
-             setFontCache(prev => ({
-                 ...prev,
-                 [fontName]: { regular: regularFontB64, bold: boldFontB64 }
-             }));
-             setIsFontLoading(false);
-        }
+               setFontCache(prev => ({
+                   ...prev,
+                   [fontName]: { regular: regularFontB64, bold: boldFontB64 }
+               }));
+               setIsFontLoading(false);
+          }
 
-        doc.addFileToVFS(`${fontName}-Regular.ttf`, regularFontB64!);
-        doc.addFont(`${fontName}-Regular.ttf`, fontName, 'normal');
-        doc.addFileToVFS(`${fontName}-Bold.ttf`, boldFontB64!);
-        doc.addFont(`${fontName}-Bold.ttf`, fontName, 'bold');
-    } catch (e) {
-        console.error("Font loading error", e);
-    }
+          doc.addFileToVFS(`${fontName}-Regular.ttf`, regularFontB64!);
+          doc.addFont(`${fontName}-Regular.ttf`, fontName, 'normal');
+          doc.addFileToVFS(`${fontName}-Bold.ttf`, boldFontB64!);
+          doc.addFont(`${fontName}-Bold.ttf`, fontName, 'bold');
+      } catch (e) {
+          console.error("Font loading error", e);
+      }
 
-    const primaryColor: [number, number, number] = [0, 122, 195];
-    const docDate = new Date().toLocaleDateString();
-    const refId = `REF-${Date.now().toString().slice(-6)}`;
-    let finalY = 60;
+      const primaryColor: [number, number, number] = [0, 122, 195];
+      const docDate = new Date().toLocaleDateString();
+      const refId = `REF-${Date.now().toString().slice(-6)}`;
+      let finalY = 60;
 
-    const renderHeader = (_isFirstPage: boolean) => {
-        // Blue Header Background
-        doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-        if (_isFirstPage) {
-            doc.rect(0, 0, 210, 135, 'F'); // Large blue background for first page
-        } else {
-            doc.rect(0, 0, 210, 32, 'F'); // Standard header for other pages
-        }
+      const renderHeader = (_isFirstPage: boolean) => {
+          // Blue Header Background
+          doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+          if (_isFirstPage) {
+              doc.rect(0, 0, 210, 135, 'F'); // Large blue background for first page
+          } else {
+              doc.rect(0, 0, 210, 32, 'F'); // Standard header for other pages
+          }
 
-        try {
-            // Add WK Logo - Made slightly smaller than before (using white base64 version)
-            doc.addImage(WK_LOGO_BASE64, 'PNG', 14, 10, 50, 10, 'WK_LOGO', 'FAST');
-            
-            // Add Samir Logo if Indirect (using white base64 version)
-            if (isIndirect) {
-                doc.addImage(SAMIR_WHITE_LOGO_BASE64, 'PNG', 162, 10, 36, 10, 'SAMIR_LOGO', 'FAST');
-            }
-        } catch (e) {
-            console.warn("Logo load error", e);
-        }
-        
-        doc.setFontSize(12);
-        doc.setTextColor(255, 255, 255);
-        // doc.text("Wolters Kluwer Health", 14, 25); // Removed as requested
-    };
+          try {
+              // Add WK Logo - Made slightly smaller than before (using white base64 version)
+              doc.addImage(WK_LOGO_BASE64, 'PNG', 14, 10, 50, 10, 'WK_LOGO', 'FAST');
+              
+              // Add Samir Logo if Indirect (using white base64 version)
+              if (isIndirect) {
+                  doc.addImage(SAMIR_WHITE_LOGO_BASE64, 'PNG', 162, 10, 36, 10, 'SAMIR_LOGO', 'FAST');
+              }
+          } catch (e) {
+              console.warn("Logo load error", e);
+          }
+          
+          doc.setFontSize(12);
+          doc.setTextColor(255, 255, 255);
+          // doc.text("Wolters Kluwer Health", 14, 25); // Removed as requested
+      };
 
-    const addFooter = (pageNumber: number) => {
-        const pageHeight = doc.internal.pageSize.height || 297;
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(`Page ${pageNumber}`, 196, pageHeight - 10, { align: 'right' });
-        doc.text(`©${new Date().getFullYear()} UpToDate, Inc. and its affiliates and/or licensors. All rights reserved.`, 14, pageHeight - 14);
-    };
+      const addFooter = (pageNumber: number) => {
+          const pageHeight = doc.internal.pageSize.height || 297;
+          doc.setFontSize(8);
+          doc.setTextColor(150, 150, 150);
+          doc.text(`Page ${pageNumber}`, 196, pageHeight - 10, { align: 'right' });
+          doc.text(`©${new Date().getFullYear()} UpToDate, Inc. and its affiliates and/or licensors. All rights reserved.`, 14, pageHeight - 14);
+      };
 
-    const formatMoney = (amount: number, currency: string) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
-    };
+      const formatMoney = (amount: number, currency: string) => {
+          return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+      };
 
-    // Initial Header
-    renderHeader(true);
-    doc.setFontSize(26);
-    doc.setFont(fontName, 'bold');
-    doc.setTextColor(255, 255, 255); // White text for title on blue background
-    const proposalTitle = config.dealType === DealType.RENEWAL 
-        ? "BUDGETARY COMMERCIAL\nPROPOSAL [RENEWAL]" 
-        : "BUDGETARY COMMERCIAL\nPROPOSAL";
-    doc.text(proposalTitle, 105, 95, { align: 'center' });
-  // ...
-
-    // Removed duplicate Designated Sites logic
+      // Initial Header
+      renderHeader(true);
+      doc.setFontSize(26);
+      doc.setFont(fontName, 'bold');
+      doc.setTextColor(255, 255, 255); // White text for title on blue background
+      
+      let proposalTitle = "BUDGETARY COMMERCIAL\nPROPOSAL";
+      if (config.dealType === DealType.RENEWAL) {
+          proposalTitle = "BUDGETARY COMMERCIAL\nPROPOSAL [RENEWAL]";
+      } else if (config.dealType === DealType.EXTENSION) {
+          proposalTitle = "BUDGETARY COMMERCIAL\nPROPOSAL [EXTENSION]";
+      }
+      doc.text(proposalTitle, 105, 95, { align: 'center' });
 
     let currentY = 170;
     doc.setTextColor(60, 60, 60);
@@ -294,7 +318,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     doc.setFontSize(16);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFont(fontName, 'bold');
-    doc.text("Pricing Details", 14, 45);
+    doc.text(isExtensionQuote ? "Extension Quote Details" : "Pricing Details", 14, 45);
 
     const getYearLabel = (yearIndex: number) => {
         if (useStartDate && startMonthYear) {
@@ -321,69 +345,146 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
     let tableHead: string[][] = [];
     let tableBody: string[][] = [];
-    // isIndirect already defined
-    const productColIndices: Record<string, number> = {};
-    config.selectedProducts.forEach((pid, idx) => { productColIndices[pid] = 1 + idx; });
-    const totalStartIndex = 1 + config.selectedProducts.length;
     const columnStyles: any = {};
-    if (productColIndices['utd'] !== undefined) columnStyles[productColIndices['utd']] = { fillColor: [220, 252, 231] };
-    if (productColIndices['lxd'] !== undefined) columnStyles[productColIndices['lxd']] = { fillColor: [224, 242, 254] };
-    columnStyles[totalStartIndex] = { fontStyle: 'bold' };
-    if (isIndirect) columnStyles[totalStartIndex + 2] = { fontStyle: 'bold' };
 
-    if (isIndirect) {
-      const prodCols = config.selectedProducts.map(pid => {
-         let label = pid;
-         if (pid === 'utd') label = 'UpToDate';
-         if (pid === 'lxd') label = 'Lexidrug';
-         return `${label} (SAR)`;
-      });
-      tableHead = [['Year', ...prodCols, 'Total (SAR)', 'VAT (15%)', 'Grand Total\n(SAR)']];
-      tableBody = data.yearlyResults.map(r => {
-        const pValues = config.selectedProducts.map(pid => {
-           const bd = r.breakdown.find(x => x.id === pid);
-           return bd ? formatMoney(bd.grossSAR, 'SAR') : '-';
-        });
-        return [ getYearLabel(r.year - 1), ...pValues, formatMoney(r.grossSAR, 'SAR'), formatMoney(r.vatSAR, 'SAR'), formatMoney(r.grandTotalSAR, 'SAR') ];
-      });
-      
-      // Totals Row - Conditionally Added
-      if (showTotals) {
-          const productTotalsSAR = config.selectedProducts.map(pid => {
-              const total = data.yearlyResults.reduce((sum, r) => {
-                  const bd = r.breakdown.find(x => x.id === pid);
-                  return sum + (bd ? bd.grossSAR : 0);
-              }, 0);
-              return formatMoney(total, 'SAR');
-          });
-          tableBody.push(['TOTAL', ...productTotalsSAR, formatMoney(data.totalGrossSAR, 'SAR'), formatMoney(data.totalVatSAR, 'SAR'), formatMoney(data.totalGrandTotalSAR, 'SAR')]);
+    const getExtensionDates = () => {
+        if (useStartDate && startMonthYear && extensionResults) {
+            const [yearStr, monthStr] = startMonthYear.split('-');
+            const startYear = parseInt(yearStr);
+            const startMonth = parseInt(monthStr);
+            
+            const start = new Date(startYear, startMonth - 1, 1);
+            const end = new Date(start);
+            
+            if (extensionResults.useFullExtension) {
+                end.setMonth(end.getMonth() + extensionResults.integerMonths);
+                end.setDate(end.getDate() + extensionResults.extraDays - 1);
+            } else {
+                end.setMonth(end.getMonth() + (extensionResults.type === 'A' ? extensionResults.integerMonths : extensionResults.monthsCovered));
+                end.setDate(end.getDate() - 1);
+            }
+            
+            const formatD = (d: Date) => {
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                const day = d.getDate().toString().padStart(2, '0');
+                const month = monthNames[d.getMonth()];
+                return `${month} ${day}, ${d.getFullYear()}`;
+            };
+            
+            return `${formatD(start)} to ${formatD(end)}`;
+        }
+        return 'N/A';
+    };
+
+    if (isExtensionQuote && extensionResults) {
+      if (extensionResults.type === 'A') {
+        tableHead = [['Description', 'Value']];
+        tableBody = [
+          ['Variant', extensionResults.variant],
+          ['Dates', getExtensionDates()],
+          ['Customer TCV (USD)', formatMoney(extensionResults.customerTCV, 'USD')],
+          ['Extension Percentage', `${extensionResults.extensionPercentage}%`],
+          ['Customer Extension (USD)', formatMoney(extensionResults.customerExtension, 'USD')],
+          ['Current Spend (Exit Year) (USD)', formatMoney(extensionResults.currentSpend, 'USD')],
+          ['Monthly Cost (USD)', formatMoney(extensionResults.monthlyCost, 'USD')],
+        ];
+        
+        if (extensionResults.useFullExtension) {
+            tableBody.push(['Extension Duration', `${extensionResults.days} days (${extensionResults.integerMonths} months, ${extensionResults.extraDays} days)`]);
+        } else {
+            tableBody.push(['Months Available', extensionResults.monthsAvailable.toFixed(2)]);
+            tableBody.push(['Integer Months', extensionResults.integerMonths.toString()]);
+            tableBody.push(['Difference to Extension (FPI %)', `${extensionResults.fpiPercentage?.toFixed(2) || '0.00'}%`]);
+        }
+        
+        tableBody.push(['End-User Price (USD)', formatMoney(extensionResults.endUserPrice, 'USD')]);
+        
+        if (isIndirect) {
+          tableBody.push(['End-User Price (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')]);
+          tableBody.push(['VAT (15%) (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')]);
+          tableBody.push(['Total (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')]);
+        }
+      } else {
+        tableHead = [['Description', 'Value']];
+        tableBody = [
+          ['Variant', extensionResults.variant],
+          ['Dates', getExtensionDates()],
+          ['Current Spend (Exit Year) (USD)', formatMoney(extensionResults.currentSpend, 'USD')],
+          ['Monthly Cost (USD)', formatMoney(extensionResults.monthlyCost, 'USD')],
+          ['Monthly Cost (SAR)', formatMoney(extensionResults.monthlyCostSAR, 'SAR')],
+          ['Eligible Months (<100k SAR)', extensionResults.monthsCovered.toString()],
+          ['End-User Price (USD)', formatMoney(extensionResults.endUserPrice, 'USD')],
+        ];
+        if (isIndirect) {
+          tableBody.push(['End-User Price (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')]);
+          tableBody.push(['VAT (15%) (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')]);
+          tableBody.push(['Total (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')]);
+        }
       }
     } else {
-      const prodCols = config.selectedProducts.map(pid => {
-         let label = pid;
-         if (pid === 'utd') label = 'UpToDate';
-         if (pid === 'lxd') label = 'Lexidrug';
-         return `${label} (USD)`;
-      });
-      tableHead = [['Year', ...prodCols, 'Total (USD)']];
-      tableBody = data.yearlyResults.map(r => {
-        const pValues = config.selectedProducts.map(pid => {
-           const bd = r.breakdown.find(x => x.id === pid);
-           return bd ? formatMoney(bd.gross, 'USD') : '-';
+      // isIndirect already defined
+      const productColIndices: Record<string, number> = {};
+      config.selectedProducts.forEach((pid, idx) => { productColIndices[pid] = 1 + idx; });
+      const totalStartIndex = 1 + config.selectedProducts.length;
+      if (productColIndices['utd'] !== undefined) columnStyles[productColIndices['utd']] = { fillColor: [220, 252, 231] };
+      if (productColIndices['lxd'] !== undefined) columnStyles[productColIndices['lxd']] = { fillColor: [224, 242, 254] };
+      columnStyles[totalStartIndex] = { fontStyle: 'bold' };
+      if (isIndirect) columnStyles[totalStartIndex + 2] = { fontStyle: 'bold' };
+
+      if (isIndirect) {
+        const prodCols = config.selectedProducts.map(pid => {
+           let label = pid;
+           if (pid === 'utd') label = 'UpToDate';
+           if (pid === 'lxd') label = 'Lexidrug';
+           return `${label} (SAR)`;
         });
-        return [ getYearLabel(r.year - 1), ...pValues, formatMoney(r.grossUSD, 'USD') ];
-      });
-      
-      // Totals Row - Conditionally Added
-      if (showTotals) {
-          const productTotalsUSD = config.selectedProducts.map(pid => {
-              const total = data.yearlyResults.reduce((sum, r) => {
-                  const bd = r.breakdown.find(x => x.id === pid);
-                  return sum + (bd ? bd.gross : 0);
-              }, 0);
-              return formatMoney(total, 'USD');
+        tableHead = [['Year', ...prodCols, 'Total (SAR)', 'VAT (15%)', 'Grand Total\n(SAR)']];
+        tableBody = data.yearlyResults.map(r => {
+          const pValues = config.selectedProducts.map(pid => {
+             const bd = r.breakdown.find(x => x.id === pid);
+             return bd ? formatMoney(bd.grossSAR, 'SAR') : '-';
           });
-          tableBody.push(['TOTAL', ...productTotalsUSD, formatMoney(data.totalGrossUSD, 'USD')]);
+          return [ getYearLabel(r.year - 1), ...pValues, formatMoney(r.grossSAR, 'SAR'), formatMoney(r.vatSAR, 'SAR'), formatMoney(r.grandTotalSAR, 'SAR') ];
+        });
+        
+        // Totals Row - Conditionally Added
+        if (showTotals) {
+            const productTotalsSAR = config.selectedProducts.map(pid => {
+                const total = data.yearlyResults.reduce((sum, r) => {
+                    const bd = r.breakdown.find(x => x.id === pid);
+                    return sum + (bd ? bd.grossSAR : 0);
+                }, 0);
+                return formatMoney(total, 'SAR');
+            });
+            tableBody.push(['TOTAL', ...productTotalsSAR, formatMoney(data.totalGrossSAR, 'SAR'), formatMoney(data.totalVatSAR, 'SAR'), formatMoney(data.totalGrandTotalSAR, 'SAR')]);
+        }
+      } else {
+        const prodCols = config.selectedProducts.map(pid => {
+           let label = pid;
+           if (pid === 'utd') label = 'UpToDate';
+           if (pid === 'lxd') label = 'Lexidrug';
+           return `${label} (USD)`;
+        });
+        tableHead = [['Year', ...prodCols, 'Total (USD)']];
+        tableBody = data.yearlyResults.map(r => {
+          const pValues = config.selectedProducts.map(pid => {
+             const bd = r.breakdown.find(x => x.id === pid);
+             return bd ? formatMoney(bd.gross, 'USD') : '-';
+          });
+          return [ getYearLabel(r.year - 1), ...pValues, formatMoney(r.grossUSD, 'USD') ];
+        });
+        
+        // Totals Row - Conditionally Added
+        if (showTotals) {
+            const productTotalsUSD = config.selectedProducts.map(pid => {
+                const total = data.yearlyResults.reduce((sum, r) => {
+                    const bd = r.breakdown.find(x => x.id === pid);
+                    return sum + (bd ? bd.gross : 0);
+                }, 0);
+                return formatMoney(total, 'USD');
+            });
+            tableBody.push(['TOTAL', ...productTotalsUSD, formatMoney(data.totalGrossUSD, 'USD')]);
+        }
       }
     }
 
@@ -460,195 +561,197 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     };
 
     // --- OPERATING STATISTICS SECTION ---
-    doc.setFontSize(14);
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setFont(fontName, 'bold');
-    doc.text("Operating Statistics", 14, finalY);
-    finalY += 6;
-    doc.setFontSize(9);
-    doc.setTextColor(0, 0, 0);
+    if (!isExtensionQuote) {
+      doc.setFontSize(14);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.setFont(fontName, 'bold');
+      doc.text("Operating Statistics", 14, finalY);
+      finalY += 6;
+      doc.setFontSize(9);
+      doc.setTextColor(0, 0, 0);
 
-    // Order Requested: 1. Stats Line, 2. Designated Sites, 3. Monthly Cost
+      // Order Requested: 1. Stats Line, 2. Designated Sites, 3. Monthly Cost
 
-    // 1. Stats Line (Moved to top)
-    const statsParts: string[] = [];
-    config.selectedProducts.forEach(pid => {
-        const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-        const inp = config.productInputs[pid];
-        if(p && inp) {
-            let productName = p.name;
-            if (pid === 'utd') productName = 'UpToDate';
-            if (pid === 'lxd') productName = 'Lexidrug';
-            
-            // Text Replacement Logic: HC->clinicians, BC->active beds
-            let countLabelText = p.countLabel;
-            if (p.countLabel === 'HC') countLabelText = 'clinicians';
-            if (p.countLabel === 'BC') countLabelText = 'active beds';
-            
-            // Override for Lexidrug Seats variant
-            if (pid === 'lxd' && inp.variant && (inp.variant.includes('Seats') || inp.variant === 'Hospital Pharmacy Model')) {
-                countLabelText = 'seats';
-            }
+      // 1. Stats Line (Moved to top)
+      const statsParts: string[] = [];
+      config.selectedProducts.forEach(pid => {
+          const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+          const inp = config.productInputs[pid];
+          if(p && inp) {
+              let productName = p.name;
+              if (pid === 'utd') productName = 'UpToDate';
+              if (pid === 'lxd') productName = 'Lexidrug';
+              
+              // Text Replacement Logic: HC->clinicians, BC->active beds
+              let countLabelText = p.countLabel;
+              if (p.countLabel === 'HC') countLabelText = 'clinicians';
+              if (p.countLabel === 'BC') countLabelText = 'active beds';
+              
+              // Override for Lexidrug Seats variant
+              if (pid === 'lxd' && inp.variant && (inp.variant.includes('Seats') || inp.variant === 'Hospital Pharmacy Model')) {
+                  countLabelText = 'seats';
+              }
 
-            // STATS LOGIC:
-            const statsToPrint = inp.count > 0 ? inp.count : (inp.existingCount || 0);
+              // STATS LOGIC:
+              const statsToPrint = inp.count > 0 ? inp.count : (inp.existingCount || 0);
 
-            if (statsToPrint > 0) {
-               // Apply locale string formatting
-               statsParts.push(`${statsToPrint.toLocaleString('en-US')} ${countLabelText} for ${productName}`);
-            }
-        }
-    });
-    
-    if(statsParts.length > 0) {
-        doc.setFont(fontName, 'normal');
-        const statsText = `This proposal is based on the following statistics for ${customerName}: ${statsParts.join(', ')}.`;
-        const splitStats = doc.splitTextToSize(statsText, 180);
-        doc.text(splitStats, 14, finalY);
-        finalY += (splitStats.length * 4) + 1.5;
-    }
+              if (statsToPrint > 0) {
+                 // Apply locale string formatting
+                 statsParts.push(`${statsToPrint.toLocaleString('en-US')} ${countLabelText} for ${productName}`);
+              }
+          }
+      });
+      
+      if(statsParts.length > 0) {
+          doc.setFont(fontName, 'normal');
+          const statsText = `This proposal is based on the following statistics for ${customerName}: ${statsParts.join(', ')}.`;
+          const splitStats = doc.splitTextToSize(statsText, 180);
+          doc.text(splitStats, 14, finalY);
+          finalY += (splitStats.length * 4) + 1.5;
+      }
 
-    // 2. Designated Sites (Moved to middle)
-    if (hasDesignatedSites) {
-        if (isBreakdownPerSite && siteBreakdown.length > 0) {
-            // BREAKDOWN TABLE LOGIC
-            doc.setFont(fontName, 'bold');
-            doc.text("Price Breakdown per Site:", 14, finalY);
-            finalY += 6;
-            
-            // Table Headers
-            const siteHeaders = ['Site Name'];
-            config.selectedProducts.forEach(pid => {
-                const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-                siteHeaders.push(`${p?.shortName || p?.name} Count`);
-            });
-            
-            if (!showSitesOnly) {
-                siteHeaders.push(`Est. Annual Cost (${displayCurrency})`);
-            }
+      // 2. Designated Sites (Moved to middle)
+      if (hasDesignatedSites) {
+          if (isBreakdownPerSite && siteBreakdown.length > 0) {
+              // BREAKDOWN TABLE LOGIC
+              doc.setFont(fontName, 'bold');
+              doc.text("Price Breakdown per Site:", 14, finalY);
+              finalY += 6;
+              
+              // Table Headers
+              const siteHeaders = ['Site Name'];
+              config.selectedProducts.forEach(pid => {
+                  const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                  siteHeaders.push(`${p?.shortName || p?.name} Count`);
+              });
+              
+              if (!showSitesOnly) {
+                  siteHeaders.push(`Est. Annual Cost (${displayCurrency})`);
+              }
 
-            const siteBody = siteBreakdown.map(site => {
-                const row = [site.name];
-                let siteTotalCost = 0;
+              const siteBody = siteBreakdown.map(site => {
+                  const row = [site.name];
+                  let siteTotalCost = 0;
 
-                config.selectedProducts.forEach(pid => {
-                    const count = site.counts[pid] || 0;
-                    row.push(count.toLocaleString());
-                    
-                    // Calculate Prorated Cost
-                    if (!showSitesOnly) {
-                        const totalCount = config.productInputs[pid]?.count || 1; 
-                        const productTotalNet = data.productNetTotals[pid] / config.years; 
-                        
-                        if (totalCount > 0) {
-                            const siteProductCost = (count / totalCount) * productTotalNet;
-                            siteTotalCost += siteProductCost;
-                        }
-                    }
-                });
+                  config.selectedProducts.forEach(pid => {
+                      const count = site.counts[pid] || 0;
+                      row.push(count.toLocaleString());
+                      
+                      // Calculate Prorated Cost
+                      if (!showSitesOnly) {
+                          const totalCount = config.productInputs[pid]?.count || 1; 
+                          const productTotalNet = data.productNetTotals[pid] / config.years; 
+                          
+                          if (totalCount > 0) {
+                              const siteProductCost = (count / totalCount) * productTotalNet;
+                              siteTotalCost += siteProductCost;
+                          }
+                      }
+                  });
 
-                if (!showSitesOnly) {
-                    const displayCost = isIndirect ? (siteTotalCost * 3.76) : siteTotalCost; 
-                    row.push(formatMoney(displayCost, displayCurrency));
-                }
-                return row;
-            });
+                  if (!showSitesOnly) {
+                      const displayCost = isIndirect ? (siteTotalCost * EXCHANGE_RATE_SAR) : siteTotalCost; 
+                      row.push(formatMoney(displayCost, displayCurrency));
+                  }
+                  return row;
+              });
 
-            autoTable(doc, {
-                startY: finalY,
-                head: [siteHeaders],
-                body: siteBody,
-                theme: 'grid',
-                headStyles: { fillColor: [240, 240, 240], textColor: 0, font: fontName, fontStyle: 'bold', valign: 'middle' },
-                styles: { fontSize: 9, font: fontName, overflow: 'linebreak', cellPadding: 2, valign: 'middle', halign: 'left' },
-                margin: { top: 35, left: 14, right: 14 },
-            });
-            
-            finalY = (doc as any).lastAutoTable.finalY + 6;
+              autoTable(doc, {
+                  startY: finalY,
+                  head: [siteHeaders],
+                  body: siteBody,
+                  theme: 'grid',
+                  headStyles: { fillColor: [240, 240, 240], textColor: 0, font: fontName, fontStyle: 'bold', valign: 'middle' },
+                  styles: { fontSize: 9, font: fontName, overflow: 'linebreak', cellPadding: 2, valign: 'middle', halign: 'left' },
+                  margin: { top: 35, left: 14, right: 14 },
+              });
+              
+              finalY = (doc as any).lastAutoTable.finalY + 6;
 
-        } else if (designatedSites.trim().length > 0) {
-            // STANDARD LIST LOGIC - Two Column Table
-            doc.setFont(fontName, 'bold');
-            doc.text("Sites included in the above pricing:", 14, finalY);
-            finalY += 5;
-            
-            const sites = designatedSites.split('\n').filter(s => s.trim().length > 0);
-            const tableBody = [];
-            for (let i = 0; i < sites.length; i += 2) {
-                const row = [
-                    `${i + 1}. ${sites[i].trim()}`,
-                    sites[i + 1] ? `${i + 2}. ${sites[i + 1].trim()}` : ''
-                ];
-                tableBody.push(row);
-            }
+          } else if (designatedSites.trim().length > 0) {
+              // STANDARD LIST LOGIC - Two Column Table
+              doc.setFont(fontName, 'bold');
+              doc.text("Sites included in the above pricing:", 14, finalY);
+              finalY += 5;
+              
+              const sites = designatedSites.split('\n').filter(s => s.trim().length > 0);
+              const tableBody = [];
+              for (let i = 0; i < sites.length; i += 2) {
+                  const row = [
+                      `${i + 1}. ${sites[i].trim()}`,
+                      sites[i + 1] ? `${i + 2}. ${sites[i + 1].trim()}` : ''
+                  ];
+                  tableBody.push(row);
+              }
 
-            autoTable(doc, {
-                startY: finalY,
-                body: tableBody,
-                theme: 'plain', // Clean look
-                styles: { 
-                    fontSize: 9, 
-                    font: fontName, 
-                    cellPadding: 3,
-                    lineColor: [220, 220, 220], // Light grey borders
-                    lineWidth: 0.1,
-                },
-                columnStyles: {
-                    0: { cellWidth: 90 },
-                    1: { cellWidth: 90 }
-                },
-                margin: { top: 35, left: 14, right: 14 },
-                didDrawCell: (data) => {
-                    // Draw border for every cell to ensure grid look
-                    doc.setDrawColor(220, 220, 220);
-                    doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height);
-                }
-            });
-            
-            finalY = (doc as any).lastAutoTable.finalY + 6;
-        }
-    }
+              autoTable(doc, {
+                  startY: finalY,
+                  body: tableBody,
+                  theme: 'plain', // Clean look
+                  styles: { 
+                      fontSize: 9, 
+                      font: fontName, 
+                      cellPadding: 3,
+                      lineColor: [220, 220, 220], // Light grey borders
+                      lineWidth: 0.1,
+                  },
+                  columnStyles: {
+                      0: { cellWidth: 90 },
+                      1: { cellWidth: 90 }
+                  },
+                  margin: { top: 35, left: 14, right: 14 },
+                  didDrawCell: (data) => {
+                      // Draw border for every cell to ensure grid look
+                      doc.setDrawColor(220, 220, 220);
+                      doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height);
+                  }
+              });
+              
+              finalY = (doc as any).lastAutoTable.finalY + 6;
+          }
+      }
 
-    // 3. Monthly Cost (Moved to bottom)
-    if (showMonthlyCost) {
-        if (config.selectedProducts.includes('utd')) {
-            const count = config.productInputs['utd'].count || 1;
-            const totalGrossUSD = data.yearlyResults.reduce((sum, r) => {
-                const bd = r.breakdown.find(x => x.id === 'utd');
-                return sum + (bd ? bd.gross : 0);
-            }, 0);
-            const totalGrossSAR = data.yearlyResults.reduce((sum, r) => {
-                const bd = r.breakdown.find(x => x.id === 'utd');
-                return sum + (bd ? bd.grossSAR : 0);
-            }, 0);
-            const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
-            const monthlyPerUnit = acv / count / 12;
-            const valStr = `${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-            renderBoldLine(finalY, "Your UpToDate subscription costs ", valStr, " monthly per physician.");
-            finalY += 5;
-        }
+      // 3. Monthly Cost (Moved to bottom)
+      if (showMonthlyCost) {
+          if (config.selectedProducts.includes('utd')) {
+              const count = config.productInputs['utd'].count || 1;
+              const totalGrossUSD = data.yearlyResults.reduce((sum, r) => {
+                  const bd = r.breakdown.find(x => x.id === 'utd');
+                  return sum + (bd ? bd.gross : 0);
+              }, 0);
+              const totalGrossSAR = data.yearlyResults.reduce((sum, r) => {
+                  const bd = r.breakdown.find(x => x.id === 'utd');
+                  return sum + (bd ? bd.grossSAR : 0);
+              }, 0);
+              const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
+              const monthlyPerUnit = acv / count / 12;
+              const valStr = `${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+              renderBoldLine(finalY, "Your UpToDate subscription costs ", valStr, " monthly per physician.");
+              finalY += 5;
+          }
 
-        if (config.selectedProducts.includes('lxd')) {
-            const count = config.productInputs['lxd'].count || 1;
-            const totalGrossUSD = data.yearlyResults.reduce((sum, r) => {
-                const bd = r.breakdown.find(x => x.id === 'lxd');
-                return sum + (bd ? bd.gross : 0);
-            }, 0);
-            const totalGrossSAR = data.yearlyResults.reduce((sum, r) => {
-                const bd = r.breakdown.find(x => x.id === 'lxd');
-                return sum + (bd ? bd.grossSAR : 0);
-            }, 0);
-            const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
-            const monthlyPerUnit = acv / count / 12;
-            const valStr = `${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-            renderBoldLine(finalY, "Your Lexidrug subscription costs ", valStr, " monthly per bed.");
-            finalY += 5;
-        }
-        
-        // Add a small gap after monthly costs if they exist
-        if (config.selectedProducts.includes('utd') || config.selectedProducts.includes('lxd')) {
-            finalY += 2;
-        }
+          if (config.selectedProducts.includes('lxd')) {
+              const count = config.productInputs['lxd'].count || 1;
+              const totalGrossUSD = data.yearlyResults.reduce((sum, r) => {
+                  const bd = r.breakdown.find(x => x.id === 'lxd');
+                  return sum + (bd ? bd.gross : 0);
+              }, 0);
+              const totalGrossSAR = data.yearlyResults.reduce((sum, r) => {
+                  const bd = r.breakdown.find(x => x.id === 'lxd');
+                  return sum + (bd ? bd.grossSAR : 0);
+              }, 0);
+              const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
+              const monthlyPerUnit = acv / count / 12;
+              const valStr = `${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+              renderBoldLine(finalY, "Your Lexidrug subscription costs ", valStr, " monthly per bed.");
+              finalY += 5;
+          }
+          
+          // Add a small gap after monthly costs if they exist
+          if (config.selectedProducts.includes('utd') || config.selectedProducts.includes('lxd')) {
+              finalY += 2;
+          }
+      }
     }
 
     // --- TERMS & CONDITIONS SECTION ---
@@ -864,7 +967,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
        ? `Quote_${customerName.replace(/\s+/g,'_')}_${config.dealType}_${new Date().toISOString().slice(0,10)}.pdf`
        : `Quote_${config.dealType}_${new Date().toISOString().slice(0,10)}.pdf`;
     doc.save(filename);
-    setIsPdfLoading(false);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("An error occurred while generating the PDF. Please try again.");
+    } finally {
+      setIsPdfLoading(false);
+    }
   };
 
   const handleExcelExport = async () => {
@@ -873,6 +981,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     try {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('Pricing Quote');
+
+      const isIndirect = config.channel !== ChannelType.DIRECT;
+      const currency = isIndirect ? 'SAR' : 'USD';
+      const currencyFmt = isIndirect ? '"SAR "#,##0' : '"$"#,##0.00';
 
       // Styles
       const fontStyle = { name: 'Aptos Display', size: 11 };
@@ -998,127 +1110,162 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
       sheet.addRow([]);
 
-      // --- 4. Commercial Schedule (With Formulas) ---
-      sheet.addRow(['COMMERCIAL SCHEDULE']).font = { ...fontStyle, bold: true, size: 14 };
+      // --- 4. Commercial Schedule / Extension Quote ---
+      if (isExtensionQuote && extensionResults) {
+        sheet.addRow(['EXTENSION QUOTE']).font = { ...fontStyle, bold: true, size: 14 };
+        const extHeaderRow = sheet.addRow(['Description', 'Value']);
+        extHeaderRow.eachCell(cell => cell.style = headerStyle);
 
-      const isIndirect = config.channel !== ChannelType.DIRECT;
-      const currency = isIndirect ? 'SAR' : 'USD';
-      const currencyFmt = isIndirect ? '"SAR "#,##0' : '"$"#,##0.00';
-
-      const scheduleHeaders = ['Year'];
-      config.selectedProducts.forEach(pid => {
-          const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-          scheduleHeaders.push(`${p?.shortName || p?.name} (${currency})`);
-      });
-      scheduleHeaders.push(`Total (${currency})`);
-
-      if (isIndirect) {
-          scheduleHeaders.push('VAT (15%)');
-          scheduleHeaders.push('Grand Total (SAR)');
-      }
-
-      const scheduleHeaderRow = sheet.addRow(scheduleHeaders);
-      scheduleHeaderRow.eachCell(cell => cell.style = headerStyle);
-
-      const startRowIndex = sheet.rowCount + 1;
-      let prevRowNumber = 0;
-
-      const getYearLabelExcel = (yearIndex: number) => {
-          if (useStartDate && startMonthYear) {
-              const [yearStr, monthStr] = startMonthYear.split('-');
-              const startYear = parseInt(yearStr);
-              const startMonth = parseInt(monthStr);
-              
-              const start = new Date(startYear + yearIndex, startMonth - 1, 1);
-              const end = new Date(start);
-              end.setFullYear(end.getFullYear() + 1);
-              end.setDate(end.getDate() - 1);
-              
-              const formatD = (d: Date) => {
-                  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                  const day = d.getDate().toString().padStart(2, '0');
-                  const month = monthNames[d.getMonth()];
-                  return `${month} ${day}, ${d.getFullYear()}`;
-              };
-              
-              return `Year ${yearIndex + 1}:\n${formatD(start)} to ${formatD(end)}`;
-          }
-          return `Year ${yearIndex + 1}`;
-      };
-
-      data.yearlyResults.forEach((r, yearIdx) => {
-          const rowData: any[] = [getYearLabelExcel(r.year - 1)];
+        if (extensionResults.type === 'A') {
+          sheet.addRow(['Variant', extensionResults.variant]);
+          sheet.addRow(['Customer TCV (USD)', extensionResults.customerTCV]).getCell(2).numFmt = '"$"#,##0.00';
+          sheet.addRow(['Extension Percentage', extensionResults.extensionPercentage / 100]).getCell(2).numFmt = '0.00%';
+          sheet.addRow(['Customer Extension (USD)', extensionResults.customerExtension]).getCell(2).numFmt = '"$"#,##0.00';
+          sheet.addRow(['Current Spend (Exit Year) (USD)', extensionResults.currentSpend]).getCell(2).numFmt = '"$"#,##0.00';
+          sheet.addRow(['Monthly Cost (USD)', extensionResults.monthlyCost]).getCell(2).numFmt = '"$"#,##0.00';
+          sheet.addRow(['Months Available', extensionResults.monthsAvailable]).getCell(2).numFmt = '0.00';
+          sheet.addRow(['Integer Months', extensionResults.integerMonths]);
+          sheet.addRow(['Difference to Extension (FPI %)', (extensionResults.fpiPercentage || 0) / 100]).getCell(2).numFmt = '0.00%';
+          sheet.addRow(['End-User Price (USD)', extensionResults.endUserPrice]).getCell(2).numFmt = '"$"#,##0.00';
           
-          config.selectedProducts.forEach((pid) => { // Removed unused prodIdx
-              const bd = r.breakdown.find(x => x.id === pid);
-              const val = isIndirect ? bd?.grossSAR : bd?.gross;
-              rowData.push(val || 0);
-          });
+          if (config.channel !== ChannelType.DIRECT) {
+            sheet.addRow(['End-User Price (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR]).getCell(2).numFmt = '"SAR "#,##0.00';
+            sheet.addRow(['VAT (15%) (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15]).getCell(2).numFmt = '"SAR "#,##0.00';
+            sheet.addRow(['Total (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15]).getCell(2).numFmt = '"SAR "#,##0.00';
+          }
+        } else {
+          sheet.addRow(['Variant', extensionResults.variant]);
+          sheet.addRow(['Current Spend (Exit Year) (USD)', extensionResults.currentSpend]).getCell(2).numFmt = '"$"#,##0.00';
+          sheet.addRow(['Monthly Cost (USD)', extensionResults.monthlyCost]).getCell(2).numFmt = '"$"#,##0.00';
+          sheet.addRow(['Monthly Cost (SAR)', extensionResults.monthlyCostSAR]).getCell(2).numFmt = '"SAR "#,##0.00';
+          sheet.addRow(['Eligible Months (<100k SAR)', extensionResults.monthsCovered]);
+          sheet.addRow(['End-User Price (USD)', extensionResults.endUserPrice]).getCell(2).numFmt = '"$"#,##0.00';
           
-          // Placeholders
-          rowData.push(null); // Total
-          if (isIndirect) { rowData.push(null); rowData.push(null); }
-
-          const addedRow = sheet.addRow(rowData);
-          const currentRowNumber = addedRow.number;
-
-          if (!config.flatPricing && yearIdx > 0 && prevRowNumber > 0) {
-               config.selectedProducts.forEach((_, prodIdx) => { // Replaced unused pid with _
-                   const colIndex = prodIdx + 2; 
-                   const colLetter = getColLetter(colIndex);
-                   const rateColLetter = getColLetter(colIndex); 
-                   
-                   if (config.channel === ChannelType.DIRECT) {
-                       const formula = `${colLetter}${prevRowNumber}*(1+${rateColLetter}${rateRowNumber})`;
-                       addedRow.getCell(colIndex).value = {
-                           formula: formula,
-                           result: rowData[colIndex - 1] 
-                       };
-                   }
-               });
+          if (config.channel !== ChannelType.DIRECT) {
+            sheet.addRow(['End-User Price (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR]).getCell(2).numFmt = '"SAR "#,##0.00';
+            sheet.addRow(['VAT (15%) (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15]).getCell(2).numFmt = '"SAR "#,##0.00';
+            sheet.addRow(['Total (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15]).getCell(2).numFmt = '"SAR "#,##0.00';
           }
+        }
+      } else {
+        // --- 4. Commercial Schedule (With Formulas) ---
+        sheet.addRow(['COMMERCIAL SCHEDULE']).font = { ...fontStyle, bold: true, size: 14 };
 
-          const lastProdColLetter = getColLetter(1 + config.selectedProducts.length);
-          const totalColIndex = 1 + config.selectedProducts.length + 1;
-          addedRow.getCell(totalColIndex).value = {
-              formula: `SUM(B${currentRowNumber}:${lastProdColLetter}${currentRowNumber})`,
-              result: isIndirect ? r.grossSAR : r.grossUSD
-          };
+        const scheduleHeaders = ['Year'];
+        config.selectedProducts.forEach(pid => {
+            const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+            scheduleHeaders.push(`${p?.shortName || p?.name} (${currency})`);
+        });
+        scheduleHeaders.push(`Total (${currency})`);
 
-          if (isIndirect) {
-             const totalColLetter = getColLetter(totalColIndex);
-             const vatColIndex = totalColIndex + 1;
-             addedRow.getCell(vatColIndex).value = {
-                 formula: `${totalColLetter}${currentRowNumber}*0.15`,
-                 result: r.vatSAR
-             };
-             const vatColLetter = getColLetter(vatColIndex);
-             const grandTotalColIndex = vatColIndex + 1;
-             addedRow.getCell(grandTotalColIndex).value = {
-                 formula: `${totalColLetter}${currentRowNumber}+${vatColLetter}${currentRowNumber}`,
-                 result: r.grandTotalSAR
-             };
-          }
+        if (isIndirect) {
+            scheduleHeaders.push('VAT (15%)');
+            scheduleHeaders.push('Grand Total (SAR)');
+        }
 
-          for (let c = 2; c <= scheduleHeaders.length; c++) {
-              addedRow.getCell(c).numFmt = currencyFmt;
-          }
-          addedRow.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-          
-          prevRowNumber = currentRowNumber;
-      });
+        const scheduleHeaderRow = sheet.addRow(scheduleHeaders);
+        scheduleHeaderRow.eachCell(cell => cell.style = headerStyle);
 
-      const endRowIndex = sheet.rowCount;
-      const totalRow = sheet.addRow(['TOTAL']);
-      totalRow.font = { ...fontStyle, bold: true };
+        const startRowIndex = sheet.rowCount + 1;
+        let prevRowNumber = 0;
 
-      for (let c = 2; c <= scheduleHeaders.length; c++) {
-          const colLetter = getColLetter(c);
-          totalRow.getCell(c).value = {
-              formula: `SUM(${colLetter}${startRowIndex}:${colLetter}${endRowIndex})`,
-              result: 0
-          };
-          totalRow.getCell(c).numFmt = currencyFmt;
+        const getYearLabelExcel = (yearIndex: number) => {
+            if (useStartDate && startMonthYear) {
+                const [yearStr, monthStr] = startMonthYear.split('-');
+                const startYear = parseInt(yearStr);
+                const startMonth = parseInt(monthStr);
+                
+                const start = new Date(startYear + yearIndex, startMonth - 1, 1);
+                const end = new Date(start);
+                end.setFullYear(end.getFullYear() + 1);
+                end.setDate(end.getDate() - 1);
+                
+                const formatD = (d: Date) => {
+                    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                    const day = d.getDate().toString().padStart(2, '0');
+                    const month = monthNames[d.getMonth()];
+                    return `${month} ${day}, ${d.getFullYear()}`;
+                };
+                
+                return `Year ${yearIndex + 1}:\n${formatD(start)} to ${formatD(end)}`;
+            }
+            return `Year ${yearIndex + 1}`;
+        };
+
+        data.yearlyResults.forEach((r, yearIdx) => {
+            const rowData: any[] = [getYearLabelExcel(r.year - 1)];
+            
+            config.selectedProducts.forEach((pid) => { // Removed unused prodIdx
+                const bd = r.breakdown.find(x => x.id === pid);
+                const val = isIndirect ? bd?.grossSAR : bd?.gross;
+                rowData.push(val || 0);
+            });
+            
+            // Placeholders
+            rowData.push(null); // Total
+            if (isIndirect) { rowData.push(null); rowData.push(null); }
+
+            const addedRow = sheet.addRow(rowData);
+            const currentRowNumber = addedRow.number;
+
+            if (!config.flatPricing && yearIdx > 0 && prevRowNumber > 0) {
+                 config.selectedProducts.forEach((_, prodIdx) => { // Replaced unused pid with _
+                     const colIndex = prodIdx + 2; 
+                     const colLetter = getColLetter(colIndex);
+                     const rateColLetter = getColLetter(colIndex); 
+                     
+                     if (config.channel === ChannelType.DIRECT) {
+                         const formula = `${colLetter}${prevRowNumber}*(1+${rateColLetter}${rateRowNumber})`;
+                         addedRow.getCell(colIndex).value = {
+                             formula: formula,
+                             result: rowData[colIndex - 1] 
+                         };
+                     }
+                 });
+            }
+
+            const lastProdColLetter = getColLetter(1 + config.selectedProducts.length);
+            const totalColIndex = 1 + config.selectedProducts.length + 1;
+            addedRow.getCell(totalColIndex).value = {
+                formula: `SUM(B${currentRowNumber}:${lastProdColLetter}${currentRowNumber})`,
+                result: isIndirect ? r.grossSAR : r.grossUSD
+            };
+
+            if (isIndirect) {
+               const totalColLetter = getColLetter(totalColIndex);
+               const vatColIndex = totalColIndex + 1;
+               addedRow.getCell(vatColIndex).value = {
+                   formula: `${totalColLetter}${currentRowNumber}*0.15`,
+                   result: r.vatSAR
+               };
+               const vatColLetter = getColLetter(vatColIndex);
+               const grandTotalColIndex = vatColIndex + 1;
+               addedRow.getCell(grandTotalColIndex).value = {
+                   formula: `${totalColLetter}${currentRowNumber}+${vatColLetter}${currentRowNumber}`,
+                   result: r.grandTotalSAR
+               };
+            }
+
+            for (let c = 2; c <= scheduleHeaders.length; c++) {
+                addedRow.getCell(c).numFmt = currencyFmt;
+            }
+            addedRow.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+            
+            prevRowNumber = currentRowNumber;
+        });
+
+        const endRowIndex = sheet.rowCount;
+        const totalRow = sheet.addRow(['TOTAL']);
+        totalRow.font = { ...fontStyle, bold: true };
+
+        for (let c = 2; c <= scheduleHeaders.length; c++) {
+            const colLetter = getColLetter(c);
+            totalRow.getCell(c).value = {
+                formula: `SUM(${colLetter}${startRowIndex}:${colLetter}${endRowIndex})`,
+                result: 0
+            };
+            totalRow.getCell(c).numFmt = currencyFmt;
+        }
       }
 
       sheet.addRow([]);
@@ -1417,18 +1564,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             type="text" 
             placeholder="Enter Rep Name"
             value={repName}
-            onChange={(e) => {
-                const val = e.target.value;
-                setRepName(val);
-                // Auto-populate email
-                const clean = val.trim().toLowerCase().replace(/\s+/g, '.');
-                if (clean) {
-                    setRepEmail(`${clean}@wolterskluwer.com`);
-                } else {
-                    setRepEmail('');
-                }
-            }}
-            className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 font-sans"
+            readOnly
+            className="block w-full text-sm border-gray-300 rounded-md shadow-sm border p-2 bg-gray-100 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-300 font-sans cursor-not-allowed"
           />
         </div>
         <div>
@@ -1437,8 +1574,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
              type="email" 
              placeholder="first.last@wolterskluwer.com"
              value={repEmail}
-             onChange={(e) => setRepEmail(e.target.value)}
-             className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 font-sans"
+             readOnly
+             className="block w-full text-sm border-gray-300 rounded-md shadow-sm border p-2 bg-gray-100 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-300 font-sans cursor-not-allowed"
            />
         </div>
         <div>
@@ -1447,53 +1584,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
              type="tel" 
              placeholder="+966..."
              value={repPhone}
-             onChange={(e) => setRepPhone(e.target.value)}
-             className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 font-sans"
+             readOnly
+             className="block w-full text-sm border-gray-300 rounded-md shadow-sm border p-2 bg-gray-100 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-300 font-sans cursor-not-allowed"
            />
         </div>
       </div>
       
-      {/* PDF Export Options */}
-      <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-6 mb-4 flex-wrap">
-        <div className="flex items-center">
-            <input 
-              id="pdf-monthly-cost"
-              type="checkbox" 
-              checked={showMonthlyCost} 
-              onChange={(e) => setShowMonthlyCost(e.target.checked)}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
-            />
-            <label htmlFor="pdf-monthly-cost" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300">
-              PDF: Show Monthly Unit Cost
-            </label>
-        </div>
-        <div className="flex items-center">
-            <input 
-              id="pdf-totals-row"
-              type="checkbox" 
-              checked={showTotals} 
-              onChange={(e) => setShowTotals(e.target.checked)}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
-            />
-            <label htmlFor="pdf-totals-row" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300">
-              PDF: Show Totals Row
-            </label>
-        </div>
-        <div className="flex items-center">
-            <input 
-              id="pdf-emr-term"
-              type="checkbox" 
-              checked={showEmrIntegration} 
-              onChange={(e) => setShowEmrIntegration(e.target.checked)}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
-            />
-            <label htmlFor="pdf-emr-term" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300">
-              PDF: Add EMR Integration term
-            </label>
-        </div>
-      </div>
-      
-      {/* Designated Sites and Start Date Checkboxes */}
+      {/* Designated Sites and Start Date */}
       <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-6 mb-6 flex-wrap">
           <div className="flex items-center">
               <input 
@@ -1517,43 +1614,16 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           </div>
 
           <div className="flex items-center">
-              <input 
-                id="start-date-checkbox" 
-                type="checkbox" 
-                checked={useStartDate} 
-                onChange={(e) => {
-                  setUseStartDate(e.target.checked);
-                  if (e.target.checked) setIsStartDateModalOpen(true);
-                }}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
-              />
-              <label htmlFor="start-date-checkbox" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
-                Include Start Date
-              </label>
-              {useStartDate && (
-                  <button 
-                    onClick={() => setIsStartDateModalOpen(true)}
-                    className="ml-2 text-[10px] text-blue-600 underline hover:text-blue-800"
-                  >
-                    (Edit Date)
-                  </button>
-              )}
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                Start Date: {startMonthYear}
+              </span>
+              <button 
+                onClick={() => setIsStartDateModalOpen(true)}
+                className="ml-2 text-[10px] text-blue-600 underline hover:text-blue-800"
+              >
+                (Edit Date)
+              </button>
           </div>
-
-          {config.years > 1 && (
-            <div className="flex items-center">
-                <input 
-                  id="opt-out-checkbox" 
-                  type="checkbox" 
-                  checked={hasOptOutClause} 
-                  onChange={(e) => setHasOptOutClause(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
-                />
-                <label htmlFor="opt-out-checkbox" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
-                  Opt-out Clause
-                </label>
-            </div>
-          )}
       </div>
 
       <div className="flex space-x-4">

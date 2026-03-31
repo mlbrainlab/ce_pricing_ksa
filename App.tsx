@@ -12,7 +12,7 @@ import {
   ProductInput, 
   DealConfiguration 
 } from './types';
-import { AVAILABLE_PRODUCTS, UTD_VARIANTS, LXD_VARIANTS } from './constants';
+import { AVAILABLE_PRODUCTS, UTD_VARIANTS, LXD_VARIANTS, EXCHANGE_RATE_SAR } from './constants';
 
 const formatCurrency = (amount: number, currency: 'USD' | 'SAR') => {
   if (currency === 'USD') {
@@ -60,7 +60,7 @@ const App: React.FC = () => {
   // Deal State
   const [dealType, setDealType] = useState<DealType>(DealType.NEW_LOGO);
   const [channel, setChannel] = useState<ChannelType>(ChannelType.DIRECT);
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>(['utd']);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [years, setYears] = useState<number>(3);
   const [method, setMethod] = useState<PricingMethod>(PricingMethod.MYFPI);
   const [applyWHT, setApplyWHT] = useState<boolean>(true); // Default true for KSA
@@ -68,8 +68,19 @@ const App: React.FC = () => {
   const [rounding, setRounding] = useState<boolean>(false); // New Rounding Option
   const [notification, setNotification] = useState<string | null>(null); // Notification State
   
+  // Extension Quote State
+  const isExtensionQuote = dealType === DealType.EXTENSION;
+  const [extensionOption, setExtensionOption] = useState<'A' | 'B'>('A');
+  const [expiringTerm, setExpiringTerm] = useState<'multi' | 'single'>('multi');
+  const [expiringTCV, setExpiringTCV] = useState<number>(0);
+  const [currentSpend, setCurrentSpend] = useState<number>(0);
+  const [extensionPercentage, setExtensionPercentage] = useState<number>(10);
+  const [extensionFPI, setExtensionFPI] = useState<number | null>(null);
+  const [extensionVariant, setExtensionVariant] = useState<string>('ANYWHERE');
+  const [useFullExtension, setUseFullExtension] = useState<boolean>(false);
+
   // Start Date State
-  const [useStartDate, setUseStartDate] = useState<boolean>(false);
+  const [useStartDate] = useState<boolean>(true);
   const [startMonthYear, setStartMonthYear] = useState<string>(new Date().toISOString().slice(0, 7));
   
   // Structure Rates (Multi-Year logic: FPI or Reverse Discount)
@@ -88,6 +99,40 @@ const App: React.FC = () => {
     'utd': { count: 100, existingCount: 100, variant: 'ANYWHERE', existingVariant: 'ANYWHERE', baseDiscount: 0, expiringAmount: 0, dph: 0, forceHeadcountOverride: false, changeInStats: false },
     'lxd': { count: 50, existingCount: 50, variant: 'BASE PKG', existingVariant: 'BASE PKG', baseDiscount: 0, expiringAmount: 0, dph: 0, forceHeadcountOverride: false, changeInStats: false },
   });
+
+  const resetForm = () => {
+    setDealType(DealType.NEW_LOGO);
+    setChannel(ChannelType.DIRECT);
+    setSelectedProductIds([]);
+    setYears(3);
+    setMethod(PricingMethod.MYFPI);
+    setApplyWHT(true);
+    setFlatPricing(false);
+    setRounding(false);
+    
+    setExtensionOption('A');
+    setExpiringTerm('multi');
+    setExpiringTCV(0);
+    setCurrentSpend(0);
+    setExtensionPercentage(10);
+    setExtensionFPI(null);
+    setExtensionVariant('ANYWHERE');
+    setUseFullExtension(false);
+    
+    setStartMonthYear(new Date().toISOString().slice(0, 7));
+    setApplyAnnualRate(false);
+    setGlobalRateVal(5);
+    setUtdRateVal(8);
+    setLxdRateVal(5);
+    setRenewalUpliftGlobal(5);
+    setRenewalUpliftUTD(8);
+    setRenewalUpliftLXD(5);
+    
+    setProductInputs({
+      'utd': { count: 100, existingCount: 100, variant: 'ANYWHERE', existingVariant: 'ANYWHERE', baseDiscount: 0, expiringAmount: 0, dph: 0, forceHeadcountOverride: false, changeInStats: false },
+      'lxd': { count: 50, existingCount: 50, variant: 'BASE PKG', existingVariant: 'BASE PKG', baseDiscount: 0, expiringAmount: 0, dph: 0, forceHeadcountOverride: false, changeInStats: false },
+    });
+  };
 
   // Check if we need split rates (if both UTD and LXD are selected)
   const showSplitRates = selectedProductIds.includes('utd') && selectedProductIds.includes('lxd');
@@ -188,6 +233,98 @@ const App: React.FC = () => {
 
   // Results
   const results = useMemo(() => calculatePricing(config), [config]);
+
+  // Extension Quote Logic
+  const extensionResults = useMemo(() => {
+    if (!isExtensionQuote) return null;
+
+    const tcv = expiringTerm === 'multi' ? expiringTCV : currentSpend;
+    const monthlyCost = currentSpend / 12;
+    
+    // Net Factor for Extension Quotes (Renewal + Indirect)
+    let netFactor = 1.0;
+    if (channel === ChannelType.FULFILMENT) netFactor = 0.95;
+    if (channel === ChannelType.PARTNER_SOURCED) netFactor = 0.90;
+
+    if (extensionOption === 'A') {
+      const customerExtension = tcv * (extensionPercentage / 100);
+      const monthsAvailable = monthlyCost > 0 ? customerExtension / monthlyCost : 0;
+      let integerMonths = Math.floor(monthsAvailable);
+      let nMonthsCost = integerMonths * monthlyCost;
+      
+      let fpiPercentage = 0;
+      let endUserPrice = 0;
+      let days = 0;
+      let extraDays = 0;
+      let percentageLess = 0;
+      let percentageMore = 0;
+
+      if (useFullExtension) {
+        const dailyCost = monthlyCost / 30;
+        days = dailyCost > 0 ? Math.round(customerExtension / dailyCost) : 0;
+        integerMonths = Math.floor(days / 30);
+        extraDays = days % 30;
+        endUserPrice = customerExtension;
+        
+        percentageLess = tcv > 0 ? (integerMonths * monthlyCost) / tcv * 100 : 0;
+        percentageMore = tcv > 0 ? ((integerMonths + 1) * monthlyCost) / tcv * 100 : 0;
+      } else {
+        if (extensionFPI !== null) {
+          fpiPercentage = extensionFPI;
+        } else {
+          fpiPercentage = nMonthsCost > 0 ? ((customerExtension / nMonthsCost) - 1) * 100 : 0;
+        }
+        endUserPrice = nMonthsCost * (1 + (fpiPercentage / 100));
+      }
+
+      const netPrice = endUserPrice * netFactor;
+      const commission = endUserPrice - netPrice;
+
+      return {
+        type: 'A' as const,
+        variant: extensionVariant,
+        customerTCV: tcv,
+        extensionPercentage,
+        customerExtension,
+        currentSpend,
+        monthlyCost,
+        monthsAvailable,
+        integerMonths,
+        nMonthsCost,
+        fpiPercentage,
+        endUserPrice,
+        commission,
+        netPrice,
+        useFullExtension,
+        days,
+        extraDays,
+        percentageLess,
+        percentageMore
+      };
+    } else {
+      // Option B
+      const maxSAR = 100000;
+      const maxSARExVAT = maxSAR / 1.15; // 86956.52
+      const monthlyCostSAR = monthlyCost * EXCHANGE_RATE_SAR;
+      const monthsCovered = monthlyCostSAR > 0 ? Math.floor(maxSARExVAT / monthlyCostSAR) : 0;
+      const endUserPrice = monthsCovered * monthlyCost;
+      const netPrice = endUserPrice * netFactor;
+      const commission = endUserPrice - netPrice;
+
+      return {
+        type: 'B' as const,
+        variant: extensionVariant,
+        currentSpend,
+        monthlyCost,
+        monthlyCostSAR,
+        monthsCovered,
+        maxSARExVAT,
+        endUserPrice,
+        commission,
+        netPrice
+      };
+    }
+  }, [isExtensionQuote, extensionOption, expiringTerm, expiringTCV, currentSpend, extensionPercentage, extensionFPI, channel, extensionVariant, useFullExtension]);
 
   // Validation Logic for UTDEE
   const utdEeWarning = useMemo(() => {
@@ -428,7 +565,15 @@ const App: React.FC = () => {
           
           {/* Section 1: Deal Basics */}
           <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-5 border border-gray-100 dark:border-gray-700 transition-colors">
-            <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mb-4">1. Deal Context</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">1. Deal Context</h2>
+              <button
+                onClick={resetForm}
+                className="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium px-2 py-1 border border-red-200 dark:border-red-800 rounded bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+              >
+                Reset Form
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Type</label>
@@ -439,6 +584,7 @@ const App: React.FC = () => {
                 >
                   <option value={DealType.NEW_LOGO}>New Logo</option>
                   <option value={DealType.RENEWAL}>Renewal</option>
+                  <option value={DealType.EXTENSION}>Extension</option>
                 </select>
               </div>
               <div>
@@ -454,11 +600,137 @@ const App: React.FC = () => {
                 </select>
               </div>
             </div>
+            {isExtensionQuote && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded text-xs text-yellow-800 dark:text-yellow-200">
+                  <strong>Note:</strong> RL and Finance approvals are required for Extension Quotes.
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Section 2: Products & Inputs */}
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-5 border border-gray-100 dark:border-gray-700 transition-colors">
-            <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mb-4">2. Product Mix</h2>
+          {/* Extension Quote Configuration */}
+          {isExtensionQuote && (
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-5 border border-gray-100 dark:border-gray-700 transition-colors">
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mb-4">Extension Configuration</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Option</label>
+                  <select
+                    className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    value={extensionOption}
+                    onChange={(e) => setExtensionOption(e.target.value as 'A' | 'B')}
+                  >
+                    <option value="A">Option A (% of TCV)</option>
+                    <option value="B">Option B (Specific Months under 100k SAR)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Variant</label>
+                  <select
+                    className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    value={extensionVariant}
+                    onChange={(e) => setExtensionVariant(e.target.value)}
+                  >
+                    {Object.keys(UTD_VARIANTS).map(v => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                    {Object.keys(LXD_VARIANTS).map(v => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {extensionOption === 'A' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Expiring Term</label>
+                    <select
+                      className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      value={expiringTerm}
+                      onChange={(e) => setExpiringTerm(e.target.value as 'multi' | 'single')}
+                    >
+                      <option value="multi">Multi-Year</option>
+                      <option value="single">Single Year</option>
+                    </select>
+                  </div>
+                )}
+
+                {extensionOption === 'A' && expiringTerm === 'multi' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Customer TCV (USD)</label>
+                    <FormattedNumberInput
+                      value={expiringTCV}
+                      onChange={setExpiringTCV}
+                      className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Current Spend (Exit Year) (USD)</label>
+                  <FormattedNumberInput
+                    value={currentSpend}
+                    onChange={setCurrentSpend}
+                    className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
+                  />
+                </div>
+
+                {extensionOption === 'A' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Extension Percentage (%)</label>
+                    <FormattedNumberInput
+                      value={extensionPercentage}
+                      onChange={setExtensionPercentage}
+                      className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
+                    />
+                  </div>
+                )}
+                
+                {extensionOption === 'A' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Difference to Extension (FPI %)</label>
+                    <div className="flex items-center space-x-2">
+                      <FormattedNumberInput
+                        value={extensionFPI !== null ? extensionFPI : (extensionResults?.type === 'A' ? extensionResults.fpiPercentage : 0)}
+                        onChange={setExtensionFPI}
+                        className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
+                        disabled={useFullExtension}
+                      />
+                      <button
+                        onClick={() => setExtensionFPI(null)}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                        disabled={useFullExtension}
+                      >
+                        Auto
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {extensionOption === 'A' && (
+                  <div className="flex items-center mt-2">
+                    <input
+                      id="use-full-extension-checkbox"
+                      type="checkbox"
+                      checked={useFullExtension}
+                      onChange={(e) => setUseFullExtension(e.target.checked)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                    />
+                    <label htmlFor="use-full-extension-checkbox" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Use full extension
+                    </label>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!isExtensionQuote && (
+            <>
+              {/* Section 2: Products & Inputs */}
+              <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-5 border border-gray-100 dark:border-gray-700 transition-colors">
+                <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mb-4">2. Product Mix</h2>
             <div className="space-y-4">
               {AVAILABLE_PRODUCTS.map(product => {
                 const isSelected = selectedProductIds.includes(product.id);
@@ -824,19 +1096,168 @@ const App: React.FC = () => {
                   </label>
                </div>
             </div>
-          </div>
-
+            </div>
+            </>
+          )}
         </div>
 
         {/* Right Column: Output */}
         <div className="xl:col-span-2 space-y-6 xl:sticky xl:top-24 h-fit">
           
+          {isExtensionQuote && extensionResults && (
+            <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 transition-colors">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white">Extension Quote Results</h3>
+                <div className="text-xs font-sans tabular-nums text-gray-500 dark:text-gray-400">
+                  1 USD = {EXCHANGE_RATE_SAR} SAR
+                </div>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                {extensionResults.type === 'A' && (
+                  <>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-100 dark:border-gray-600">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Extension Value</div>
+                        <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.customerExtension, 'USD')}</div>
+                      </div>
+                      {extensionResults.useFullExtension ? (
+                        <>
+                          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800 col-span-3">
+                            <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">Extension Duration</div>
+                            <div className="text-xl font-bold text-blue-700 dark:text-blue-300 font-sans">
+                              {extensionResults.days} days - equivalent to {extensionResults.integerMonths} months and {extensionResults.extraDays} days
+                            </div>
+                            <div className="text-sm text-blue-600 dark:text-blue-400 mt-2">
+                              <div>{extensionResults.integerMonths} months = {extensionResults.percentageLess?.toFixed(2)}% of TCV</div>
+                              <div>{extensionResults.integerMonths + 1} months = {extensionResults.percentageMore?.toFixed(2)}% of TCV</div>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-100 dark:border-gray-600">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Available Months</div>
+                            <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{extensionResults.monthsAvailable.toFixed(2)}</div>
+                          </div>
+                          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
+                            <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">Extension Months</div>
+                            <div className="text-xl font-bold text-blue-700 dark:text-blue-300 font-sans">{extensionResults.integerMonths}</div>
+                          </div>
+                          <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800">
+                            <div className="text-xs text-purple-600 dark:text-purple-400 uppercase font-sans">FPI %</div>
+                            <div className="text-xl font-bold text-purple-700 dark:text-purple-300 font-sans">{extensionResults.fpiPercentage?.toFixed(2) || '0.00'}%</div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                      <h4 className="text-sm font-bold text-gray-800 dark:text-white mb-3 font-sans">Pricing Breakdown</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-blue-500 dark:border-blue-400">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">End-User Price</div>
+                          <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.endUserPrice, 'USD')}</div>
+                          {isIndirect && (
+                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                              <div>SAR: {formatCurrency(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')}</div>
+                              <div>VAT (15%): {formatCurrency(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')}</div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')}</div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-orange-500 dark:border-orange-400">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Reseller Fees</div>
+                          <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.commission, 'USD')}</div>
+                          {isIndirect && (
+                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                              <div>SAR: {formatCurrency(extensionResults.commission * EXCHANGE_RATE_SAR, 'SAR')}</div>
+                              <div>VAT (15%): {formatCurrency(extensionResults.commission * EXCHANGE_RATE_SAR * 0.15, 'SAR')}</div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.commission * EXCHANGE_RATE_SAR * 1.15, 'SAR')}</div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-gray-500 dark:border-gray-400">
+                          <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">Net Price</div>
+                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(extensionResults.netPrice, 'USD')}</div>
+                          {isIndirect && (
+                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                              <div>SAR: {formatCurrency(extensionResults.netPrice * EXCHANGE_RATE_SAR, 'SAR')}</div>
+                              <div>VAT (15%): {formatCurrency(extensionResults.netPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')}</div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.netPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {extensionResults.type === 'B' && (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-100 dark:border-gray-600">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Monthly Cost (SAR)</div>
+                        <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.monthlyCostSAR, 'SAR')}</div>
+                      </div>
+                      <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
+                        <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">Eligible Months (&lt;100k SAR)</div>
+                        <div className="text-xl font-bold text-blue-700 dark:text-blue-300 font-sans">{extensionResults.monthsCovered}</div>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                      <h4 className="text-sm font-bold text-gray-800 dark:text-white mb-3 font-sans">Pricing Breakdown (for {extensionResults.monthsCovered} months)</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-blue-500 dark:border-blue-400">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">End-User Price</div>
+                          <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.endUserPrice, 'USD')}</div>
+                          {isIndirect && (
+                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                              <div>SAR: {formatCurrency(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')}</div>
+                              <div>VAT (15%): {formatCurrency(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')}</div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')}</div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-orange-500 dark:border-orange-400">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Reseller Fees</div>
+                          <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.commission, 'USD')}</div>
+                          {isIndirect && (
+                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                              <div>SAR: {formatCurrency(extensionResults.commission * EXCHANGE_RATE_SAR, 'SAR')}</div>
+                              <div>VAT (15%): {formatCurrency(extensionResults.commission * EXCHANGE_RATE_SAR * 0.15, 'SAR')}</div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.commission * EXCHANGE_RATE_SAR * 1.15, 'SAR')}</div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-gray-500 dark:border-gray-400">
+                          <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">Net Price</div>
+                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(extensionResults.netPrice, 'USD')}</div>
+                          {isIndirect && (
+                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                              <div>SAR: {formatCurrency(extensionResults.netPrice * EXCHANGE_RATE_SAR, 'SAR')}</div>
+                              <div>VAT (15%): {formatCurrency(extensionResults.netPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')}</div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.netPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!isExtensionQuote && (
+            <>
           <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 transition-colors">
              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
                 <h3 className="text-lg font-bold text-gray-800 dark:text-white">Commercial Schedule</h3>
                 {isIndirect && (
                   <div className="text-xs font-sans tabular-nums text-gray-500 dark:text-gray-400">
-                     1 USD = {3.76} SAR
+                     1 USD = {EXCHANGE_RATE_SAR} SAR
                   </div>
                 )}
              </div>
@@ -1080,6 +1501,8 @@ const App: React.FC = () => {
               </div>
             )}
           </div>
+          </>
+          )}
 
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-md p-4 transition-colors">
              <div className="flex justify-between items-start">
@@ -1116,9 +1539,10 @@ const App: React.FC = () => {
             data={results} 
             config={config} 
             useStartDate={useStartDate}
-            setUseStartDate={setUseStartDate}
             startMonthYear={startMonthYear}
             setStartMonthYear={setStartMonthYear}
+            isExtensionQuote={isExtensionQuote}
+            extensionResults={extensionResults}
           />
         </div>
       </div>
