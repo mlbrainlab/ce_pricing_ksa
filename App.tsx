@@ -80,7 +80,7 @@ const App: React.FC = () => {
   const [useFullExtension, setUseFullExtension] = useState<boolean>(false);
 
   // Start Date State
-  const [useStartDate] = useState<boolean>(true);
+  const [useStartDate, setUseStartDate] = useState<boolean>(true);
   const [startMonthYear, setStartMonthYear] = useState<string>(new Date().toISOString().slice(0, 7));
   
   // Structure Rates (Multi-Year logic: FPI or Reverse Discount)
@@ -138,12 +138,16 @@ const App: React.FC = () => {
   const showSplitRates = selectedProductIds.includes('utd') && selectedProductIds.includes('lxd');
   const isIndirect = channel !== ChannelType.DIRECT;
 
-  // EFFECT: Auto-Uncheck WHT when Renewal is selected
+  // EFFECT: Auto-Uncheck WHT when Renewal is selected, force FULFILMENT for Extension
   useEffect(() => {
     if (dealType === DealType.RENEWAL) {
       setApplyWHT(false);
     } else {
       setApplyWHT(true);
+    }
+
+    if (dealType === DealType.EXTENSION) {
+      setChannel(ChannelType.FULFILMENT);
     }
   }, [dealType]);
 
@@ -260,8 +264,10 @@ const App: React.FC = () => {
       let percentageMore = 0;
 
       if (useFullExtension) {
-        const dailyCost = monthlyCost / 30;
-        days = dailyCost > 0 ? Math.round(customerExtension / dailyCost) : 0;
+        const expiringDays = expiringTerm === 'multi' ? 1095 : 365;
+        const dailyCost = tcv / expiringDays;
+        const exactDays = dailyCost > 0 ? customerExtension / dailyCost : 0;
+        days = Math.floor(exactDays);
         integerMonths = Math.floor(days / 30);
         extraDays = days % 30;
         endUserPrice = customerExtension;
@@ -594,7 +600,7 @@ const App: React.FC = () => {
                   value={channel}
                   onChange={(e) => setChannel(e.target.value as ChannelType)}
                 >
-                  <option value={ChannelType.DIRECT}>Direct (USD)</option>
+                  <option value={ChannelType.DIRECT} disabled={isExtensionQuote}>Direct (USD)</option>
                   <option value={ChannelType.FULFILMENT}>Fulfilment (SAR)</option>
                   <option value={ChannelType.PARTNER_SOURCED}>Partner Sourced (SAR)</option>
                 </select>
@@ -691,12 +697,15 @@ const App: React.FC = () => {
                   <div>
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Difference to Extension (FPI %)</label>
                     <div className="flex items-center space-x-2">
-                      <FormattedNumberInput
-                        value={extensionFPI !== null ? extensionFPI : (extensionResults?.type === 'A' ? extensionResults.fpiPercentage : 0)}
-                        onChange={setExtensionFPI}
-                        className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
-                        disabled={useFullExtension}
-                      />
+                      <div className="relative flex-1">
+                        <FormattedNumberInput
+                          value={extensionFPI !== null ? extensionFPI : (extensionResults?.type === 'A' ? Number(extensionResults.fpiPercentage.toFixed(2)) : 0)}
+                          onChange={setExtensionFPI}
+                          className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 pr-6 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
+                          disabled={useFullExtension}
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 text-sm">%</span>
+                      </div>
                       <button
                         onClick={() => setExtensionFPI(null)}
                         className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
@@ -1124,13 +1133,55 @@ const App: React.FC = () => {
                       {extensionResults.useFullExtension ? (
                         <>
                           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800 col-span-3">
-                            <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">Extension Duration</div>
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">Extension Duration</div>
+                              <div className="flex space-x-2">
+                                <button 
+                                  onClick={() => {
+                                    const targetMonths = Math.max(1, extensionResults.integerMonths - (extensionResults.extraDays === 0 ? 1 : 0));
+                                    const newPercentage = extensionResults.customerTCV > 0 ? (targetMonths * extensionResults.monthlyCost) / extensionResults.customerTCV * 100 : 0;
+                                    setExtensionPercentage(newPercentage);
+                                  }}
+                                  className="p-1 bg-blue-100 dark:bg-blue-800 hover:bg-blue-200 dark:hover:bg-blue-700 rounded text-blue-700 dark:text-blue-200 transition-colors"
+                                  title="Previous Month"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    const targetMonths = extensionResults.integerMonths + 1;
+                                    const newPercentage = extensionResults.customerTCV > 0 ? (targetMonths * extensionResults.monthlyCost) / extensionResults.customerTCV * 100 : 0;
+                                    setExtensionPercentage(newPercentage);
+                                  }}
+                                  className="p-1 bg-blue-100 dark:bg-blue-800 hover:bg-blue-200 dark:hover:bg-blue-700 rounded text-blue-700 dark:text-blue-200 transition-colors"
+                                  title="Next Month"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+                                </button>
+                              </div>
+                            </div>
                             <div className="text-xl font-bold text-blue-700 dark:text-blue-300 font-sans">
                               {extensionResults.days} days - equivalent to {extensionResults.integerMonths} months and {extensionResults.extraDays} days
                             </div>
-                            <div className="text-sm text-blue-600 dark:text-blue-400 mt-2">
-                              <div>{extensionResults.integerMonths} months = {extensionResults.percentageLess?.toFixed(2)}% of TCV</div>
-                              <div>{extensionResults.integerMonths + 1} months = {extensionResults.percentageMore?.toFixed(2)}% of TCV</div>
+                            <div className="text-sm text-blue-600 dark:text-blue-400 mt-2 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span>{extensionResults.integerMonths} months = {extensionResults.percentageLess?.toFixed(2)}% of TCV</span>
+                                <button 
+                                  onClick={() => setExtensionPercentage(extensionResults.percentageLess || 0)}
+                                  className="text-xs bg-blue-100 dark:bg-blue-800 hover:bg-blue-200 dark:hover:bg-blue-700 text-blue-700 dark:text-blue-200 px-2 py-1 rounded transition-colors"
+                                >
+                                  Use {extensionResults.percentageLess?.toFixed(2)}%
+                                </button>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span>{extensionResults.integerMonths + 1} months = {extensionResults.percentageMore?.toFixed(2)}% of TCV</span>
+                                <button 
+                                  onClick={() => setExtensionPercentage(extensionResults.percentageMore || 0)}
+                                  className="text-xs bg-blue-100 dark:bg-blue-800 hover:bg-blue-200 dark:hover:bg-blue-700 text-blue-700 dark:text-blue-200 px-2 py-1 rounded transition-colors"
+                                >
+                                  Use {extensionResults.percentageMore?.toFixed(2)}%
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </>
@@ -1504,41 +1555,44 @@ const App: React.FC = () => {
           </>
           )}
 
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-md p-4 transition-colors">
-             <div className="flex justify-between items-start">
-               <h4 className="text-sm font-bold text-yellow-800 dark:text-yellow-200">Architect Notes</h4>
-               {utdEeWarning && (
-                 <span className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded">
-                   {utdEeWarning}
-                 </span>
-               )}
-             </div>
-             <ul className="mt-2 text-xs text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-1">
-                <li><strong>Base Calculation:</strong> UTD (HC × Rate) / LXD (BC × Rate).</li>
-                <li><strong>WHT Adjustment:</strong> {applyWHT ? "Prices grossed up (divided by 0.95)." : "No WHT gross up applied."}</li>
-                <li><strong>Floor Rules:</strong> Single Deal Min $6,842. Combo Deal LXD Min $4,210. (Adjusted dynamically for WHT).</li>
-                <li><strong>Recognized Revenue:</strong> Applied {dealType} {channel} factor. 
-                   {channel !== ChannelType.DIRECT && dealType === DealType.NEW_LOGO && " (Y1 vs Y2+ margins applied)."}
-                </li>
-                {dealType === DealType.RENEWAL && (
-                  <li><strong>Renewal Split:</strong> Renewal Base calculated as sum of [Product Expiring × (1 + Product Uplift Rate)]. Upsell is the remainder of ACV.</li>
-                )}
-                {results.yearlyResults[0].floorAdjusted && (
-                  <li><strong>Auto-Adjustment:</strong> Pricing was automatically raised to meet the minimum floor requirements.</li>
-                )}
-                {/* Monthly Cost Analysis */}
-                {monthlyCosts.length > 0 && (
-                   <li className="font-semibold italic pt-1 text-yellow-900 dark:text-yellow-100">
-                     Unit Economics: {monthlyCosts.join(', ')}.
-                   </li>
-                )}
-             </ul>
-          </div>
+          {!isExtensionQuote && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-md p-4 transition-colors">
+               <div className="flex justify-between items-start">
+                 <h4 className="text-sm font-bold text-yellow-800 dark:text-yellow-200">Architect Notes</h4>
+                 {utdEeWarning && (
+                   <span className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded">
+                     {utdEeWarning}
+                   </span>
+                 )}
+               </div>
+               <ul className="mt-2 text-xs text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-1">
+                  <li><strong>Base Calculation:</strong> UTD (HC × Rate) / LXD (BC × Rate).</li>
+                  <li><strong>WHT Adjustment:</strong> {applyWHT ? "Prices grossed up (divided by 0.95)." : "No WHT gross up applied."}</li>
+                  <li><strong>Floor Rules:</strong> Single Deal Min $6,842. Combo Deal LXD Min $4,210. (Adjusted dynamically for WHT).</li>
+                  <li><strong>Recognized Revenue:</strong> Applied {dealType} {channel} factor. 
+                     {channel !== ChannelType.DIRECT && dealType === DealType.NEW_LOGO && " (Y1 vs Y2+ margins applied)."}
+                  </li>
+                  {dealType === DealType.RENEWAL && (
+                    <li><strong>Renewal Split:</strong> Renewal Base calculated as sum of [Product Expiring × (1 + Product Uplift Rate)]. Upsell is the remainder of ACV.</li>
+                  )}
+                  {results.yearlyResults[0].floorAdjusted && (
+                    <li><strong>Auto-Adjustment:</strong> Pricing was automatically raised to meet the minimum floor requirements.</li>
+                  )}
+                  {/* Monthly Cost Analysis */}
+                  {monthlyCosts.length > 0 && (
+                     <li className="font-semibold italic pt-1 text-yellow-900 dark:text-yellow-100">
+                       Unit Economics: {monthlyCosts.join(', ')}.
+                     </li>
+                  )}
+               </ul>
+            </div>
+          )}
 
           <ExportSection 
             data={results} 
             config={config} 
             useStartDate={useStartDate}
+            setUseStartDate={setUseStartDate}
             startMonthYear={startMonthYear}
             setStartMonthYear={setStartMonthYear}
             isExtensionQuote={isExtensionQuote}
