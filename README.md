@@ -1,20 +1,35 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# CE Pricing KSA
 
-# Run and deploy your AI Studio app
+A comprehensive web-based pricing calculator for Clinical Effectiveness (CE) products in the KSA region. This tool supports complex deal configurations including New Logo, Renewal, and Extension quotes, featuring advanced PDF and Excel export capabilities, automated credential capture, and real-time unit economics analysis.
 
-This contains everything you need to run your app locally.
+## The Version History (From 6.0.0 to 6.5.0)
 
-View your app in AI Studio: https://ai.studio/apps/05f2b0bb-5db4-4143-a488-4f1320195d55
+**v6.0.0: The Web Migration (Major Release)**
+* The initial translation of the Excel pricing calculator into a React web application.
+* Core pricing engine (MYFPI, MYPP, Renewals, New Logo).
+* Product variants (UTD, LXD, Add-ons).
 
-## Run Locally
+**v6.1.0: Export Capabilities (Minor Release)**
+* Added the ability to generate and download professional PDF proposals.
+* Added the ability to export raw data to Excel (.xlsx) files.
+* Implemented dynamic tables and technical specification links in the exports.
 
-**Prerequisites:**  Node.js
+**v6.2.0: Security & Analytics (Minor Release)**
+* Implemented the Login screen with monthly passcodes and initials validation.
+* Added PostHog analytics to track user logins and quote generation.
+* Added Dark/Light mode toggling and responsive layout refinements.
 
+**v6.3.0: Advanced Deal Configurations (Minor Release)**
+* Added "Designated Sites" logic (Breakdown per site, showing sites only).
+* Added Start Date selection and logic.
+* Added WHT (Withholding Tax) toggles and Rounding options.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+**v6.4.0: Extension Quotes - Phase 1 (Minor Release)**
+* Introduced "Extension" as a brand new Deal Type alongside New Logo and Renewal.
+* Added Option A (Pro-rated) and Option B (Flat Rate) calculation logic.
+
+**v6.5.0: Automation & Refinements (Current Version)**
+* Feature: "Use Full Extension" logic (calculating exact days, months, and suggesting percentages).
+* Feature: Auto Credential Capture (mapping initials to full name, email, and phone automatically).
+* Patch/Fix: Fixed the infinite "processing..." bug in the PDF export.
+* Patch/Fix: Added the "Reset Form" button and removed the default UTD product selection.

@@ -18,30 +18,56 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
   disabled = false,
   placeholder = "0"
 }) => {
-  const [isFocused, setIsFocused] = useState(false);
   const [internalValue, setInternalValue] = useState("");
 
-  useEffect(() => {
-    if (!isFocused) {
-       // When not focused, show formatted value (with commas)
-       // If 0, show "0"
-       setInternalValue(value === 0 ? "0" : value.toLocaleString('en-US', { maximumFractionDigits: 2 }));
-    }
-  }, [value, isFocused]);
+  // Helper to format a string with commas
+  const formatWithCommas = (str: string) => {
+    if (!str) return "";
+    const parts = str.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
 
-  const handleFocus = () => {
-    setIsFocused(true);
-    // Requirement: Remove the 0 default value automatically
+  useEffect(() => {
+    // Sync external value changes to internal state, but don't overwrite if the user is typing a decimal
+    if (value === 0 && internalValue === "") {
+      // Keep it empty if user cleared it
+      return;
+    }
+    
+    // If the parsed internal value matches the prop value, don't update to avoid cursor jumping
+    const parsedInternal = parseFloat(internalValue.replace(/,/g, ''));
+    if (!isNaN(parsedInternal) && parsedInternal === value && internalValue.endsWith('.')) {
+      return;
+    }
+    if (!isNaN(parsedInternal) && parsedInternal === value && internalValue.endsWith('.0')) {
+      return;
+    }
+
     if (value === 0) {
       setInternalValue("");
     } else {
-      // On focus, switch to raw number string for editing
-      setInternalValue(value.toString());
+      setInternalValue(formatWithCommas(value.toString()));
+    }
+  }, [value]);
+
+  const handleFocus = () => {
+    if (value === 0) {
+      setInternalValue("");
     }
   };
 
   const handleBlur = () => {
-    setIsFocused(false);
+    if (internalValue === "" || internalValue === "-") {
+      setInternalValue("");
+      onChange(0);
+    } else {
+      const clean = internalValue.replace(/,/g, '');
+      const parsed = parseFloat(clean);
+      if (!isNaN(parsed)) {
+        setInternalValue(formatWithCommas(parsed.toString()));
+      }
+    }
     if (onBlur) {
       onBlur();
     }
@@ -50,20 +76,21 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     
-    // Handle empty or just minus sign
     if (raw === "" || raw === "-") {
         setInternalValue(raw);
         if (raw === "") onChange(0);
         return;
     }
     
-    // Allow standard float number format
-    // Remove commas if user pastes them (though we removed them on focus, pasting is possible)
     const clean = raw.replace(/,/g, '');
     
+    // Allow numbers with optional decimal point
     if (!/^-?\d*\.?\d*$/.test(clean)) return;
 
-    setInternalValue(raw); // Update UI
+    // Format with commas for display
+    const formatted = formatWithCommas(clean);
+    setInternalValue(formatted);
+    
     const parsed = parseFloat(clean);
     if (!isNaN(parsed)) {
         onChange(parsed);

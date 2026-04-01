@@ -13,6 +13,7 @@ interface ExportSectionProps {
   data: CalculationOutput;
   config: DealConfiguration;
   useStartDate: boolean;
+  setUseStartDate: (val: boolean) => void;
   startMonthYear: string;
   setStartMonthYear: (val: string) => void;
   isExtensionQuote?: boolean;
@@ -27,16 +28,30 @@ interface ExportSectionProps {
 // Reliable Font URLs
 const FONT_URLS = {
   Inter: {
-    regular: "https://raw.githubusercontent.com/zingrx/fonts_inter_ttf/refs/heads/main/ttf/Inter-Regular.ttf",
-    bold: "https://raw.githubusercontent.com/zingrx/fonts_inter_ttf/refs/heads/main/ttf/Inter-Bold.ttf"
+    regular: "https://cdn.jsdelivr.net/gh/zingrx/fonts_inter_ttf@main/ttf/Inter-Regular.ttf",
+    bold: "https://cdn.jsdelivr.net/gh/zingrx/fonts_inter_ttf@main/ttf/Inter-Bold.ttf"
   },
   FiraSans: {
-    regular: "https://raw.githubusercontent.com/google/fonts/main/ofl/firasans/FiraSans-Regular.ttf",
-    bold: "https://raw.githubusercontent.com/google/fonts/main/ofl/firasans/FiraSans-Bold.ttf"
+    regular: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/firasans/FiraSans-Regular.ttf",
+    bold: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/firasans/FiraSans-Bold.ttf"
   }
 };
 
 type FontType = 'Inter' | 'FiraSans';
+
+export const PRODUCT_FULL_NAMES: Record<string, string> = {
+  "ANYWHERE": "UpToDate® Anywhere",
+  "UTDADV": "UpToDate® Advanced™",
+  "UTDEE": "UpToDate® Enterprise™",
+  "SM": "UpToDate® Small Market",
+  "BASE PKG": "Lexidrug® Base Package",
+  "BASE PKG+FLINK": "Lexidrug® Base Package + Formulary Link",
+  "BASE PKG+FLINK+IPE": "Lexidrug® Base Package + Formulary Link + IPE",
+  "EE-Combo": "Lexidrug® Enterprise Combo",
+  "EE-Combo+FLINK": "Lexidrug® Enterprise Combo + Formulary Link",
+  "EE-Combo+FLINK+IPE": "Lexidrug® Enterprise Combo + Formulary Link + IPE",
+  "Hospital Pharmacy Model": "Lexidrug® Hospital Pharmacy Model"
+};
 
 interface SiteBreakdownItem {
   id: string; // unique id for list management
@@ -48,6 +63,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   data, 
   config,
   useStartDate,
+  setUseStartDate,
   startMonthYear,
   setStartMonthYear,
   isExtensionQuote,
@@ -87,12 +103,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     FiraSans: { regular: null, bold: null }
   });
   const [isFontLoading, setIsFontLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   // PDF Options
-  const [showMonthlyCost] = useState(false);
-  const [showTotals] = useState(false);
-  const [showEmrIntegration] = useState(false); // Default true for EMR term
-  const [hasOptOutClause] = useState(false); // Opt-out clause for multi-year
+  const [showMonthlyCost, setShowMonthlyCost] = useState(true);
+  const [showTotals, setShowTotals] = useState(true);
+  const [showEmrIntegration, setShowEmrIntegration] = useState(true); // Default true for EMR term
+  const [hasOptOutClause, setHasOptOutClause] = useState(false); // Opt-out clause for multi-year
 
   // Sites Logic
   const [hasDesignatedSites, setHasDesignatedSites] = useState(false);
@@ -133,6 +150,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
   const handlePDFExport = async () => {
     setIsPdfLoading(true);
+    setPdfError(null);
     try {
       const doc = new jsPDF();
       const fontName = selectedFont;
@@ -146,14 +164,31 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
           if (!regularFontB64 || !boldFontB64) {
                setIsFontLoading(true);
+               
+               const fetchWithTimeout = (url: string, timeout = 5000) => {
+                   return Promise.race([
+                       fetch(url).then(res => {
+                           if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                           return res.blob();
+                       }),
+                       new Promise<Blob>((_, reject) => 
+                           setTimeout(() => reject(new Error('Request timeout')), timeout)
+                       )
+                   ]);
+               };
+
                const [regBlob, boldBlob] = await Promise.all([
-                   fetch(FONT_URLS[fontName].regular).then(res => res.blob()),
-                   fetch(FONT_URLS[fontName].bold).then(res => res.blob())
+                   fetchWithTimeout(FONT_URLS[fontName].regular),
+                   fetchWithTimeout(FONT_URLS[fontName].bold)
                ]);
 
-               const blobToBase64 = (blob: Blob) => new Promise<string>((resolve) => {
+               const blobToBase64 = (blob: Blob) => new Promise<string>((resolve, reject) => {
                    const reader = new FileReader();
-                   reader.onloadend = () => resolve(reader.result as string);
+                   reader.onloadend = () => {
+                       if (reader.result) resolve(reader.result as string);
+                       else reject(new Error('Failed to read blob'));
+                   };
+                   reader.onerror = reject;
                    reader.readAsDataURL(blob);
                });
 
@@ -164,15 +199,18 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                    ...prev,
                    [fontName]: { regular: regularFontB64, bold: boldFontB64 }
                }));
-               setIsFontLoading(false);
           }
 
-          doc.addFileToVFS(`${fontName}-Regular.ttf`, regularFontB64!);
-          doc.addFont(`${fontName}-Regular.ttf`, fontName, 'normal');
-          doc.addFileToVFS(`${fontName}-Bold.ttf`, boldFontB64!);
-          doc.addFont(`${fontName}-Bold.ttf`, fontName, 'bold');
+          if (regularFontB64 && boldFontB64) {
+              doc.addFileToVFS(`${fontName}-Regular.ttf`, regularFontB64);
+              doc.addFont(`${fontName}-Regular.ttf`, fontName, 'normal');
+              doc.addFileToVFS(`${fontName}-Bold.ttf`, boldFontB64);
+              doc.addFont(`${fontName}-Bold.ttf`, fontName, 'bold');
+          }
       } catch (e) {
           console.error("Font loading error", e);
+      } finally {
+          setIsFontLoading(false);
       }
 
       const primaryColor: [number, number, number] = [0, 122, 195];
@@ -211,7 +249,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           doc.setFontSize(8);
           doc.setTextColor(150, 150, 150);
           doc.text(`Page ${pageNumber}`, 196, pageHeight - 10, { align: 'right' });
-          doc.text(`©${new Date().getFullYear()} UpToDate, Inc. and its affiliates and/or licensors. All rights reserved.`, 14, pageHeight - 14);
+          doc.text(`©${new Date().getFullYear()} UpToDate, Inc. and its affiliates and/or licensors. All rights reserved.`, 14, pageHeight - 10);
       };
 
       const formatMoney = (amount: number, currency: string) => {
@@ -378,48 +416,36 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
     if (isExtensionQuote && extensionResults) {
       if (extensionResults.type === 'A') {
+        const durationText = extensionResults.useFullExtension 
+            ? `${extensionResults.days} days (${extensionResults.integerMonths} months${extensionResults.extraDays > 0 ? ` and ${extensionResults.extraDays} days` : ''})`
+            : `${Math.round(extensionResults.monthsAvailable * 30)} days (${extensionResults.monthsAvailable.toFixed(2)} months)`;
+
         tableHead = [['Description', 'Value']];
         tableBody = [
-          ['Variant', extensionResults.variant],
+          ['Product', PRODUCT_FULL_NAMES[extensionResults.variant] || extensionResults.variant],
           ['Dates', getExtensionDates()],
-          ['Customer TCV (USD)', formatMoney(extensionResults.customerTCV, 'USD')],
-          ['Extension Percentage', `${extensionResults.extensionPercentage}%`],
-          ['Customer Extension (USD)', formatMoney(extensionResults.customerExtension, 'USD')],
-          ['Current Spend (Exit Year) (USD)', formatMoney(extensionResults.currentSpend, 'USD')],
-          ['Monthly Cost (USD)', formatMoney(extensionResults.monthlyCost, 'USD')],
+          ['Total Contract\'s Value (SAR)', formatMoney(extensionResults.customerTCV * EXCHANGE_RATE_SAR, 'SAR')],
+          ['Extension Percentage', `${extensionResults.extensionPercentage.toFixed(2)}%`],
+          ['Extension Value (SAR)', formatMoney(extensionResults.customerExtension * EXCHANGE_RATE_SAR, 'SAR')],
+          ['Current Spend of Last Year (SAR)', formatMoney(extensionResults.currentSpend * EXCHANGE_RATE_SAR, 'SAR')],
+          ['Daily Cost (SAR)', formatMoney((extensionResults.monthlyCost / 30) * EXCHANGE_RATE_SAR, 'SAR')],
+          ['Extension Duration', durationText],
+          ['End-User Price (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')],
+          ['VAT (15%) (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')],
+          ['Total (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')]
         ];
-        
-        if (extensionResults.useFullExtension) {
-            tableBody.push(['Extension Duration', `${extensionResults.days} days (${extensionResults.integerMonths} months, ${extensionResults.extraDays} days)`]);
-        } else {
-            tableBody.push(['Months Available', extensionResults.monthsAvailable.toFixed(2)]);
-            tableBody.push(['Integer Months', extensionResults.integerMonths.toString()]);
-            tableBody.push(['Difference to Extension (FPI %)', `${extensionResults.fpiPercentage?.toFixed(2) || '0.00'}%`]);
-        }
-        
-        tableBody.push(['End-User Price (USD)', formatMoney(extensionResults.endUserPrice, 'USD')]);
-        
-        if (isIndirect) {
-          tableBody.push(['End-User Price (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')]);
-          tableBody.push(['VAT (15%) (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')]);
-          tableBody.push(['Total (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')]);
-        }
       } else {
         tableHead = [['Description', 'Value']];
         tableBody = [
-          ['Variant', extensionResults.variant],
+          ['Product', PRODUCT_FULL_NAMES[extensionResults.variant] || extensionResults.variant],
           ['Dates', getExtensionDates()],
-          ['Current Spend (Exit Year) (USD)', formatMoney(extensionResults.currentSpend, 'USD')],
-          ['Monthly Cost (USD)', formatMoney(extensionResults.monthlyCost, 'USD')],
-          ['Monthly Cost (SAR)', formatMoney(extensionResults.monthlyCostSAR, 'SAR')],
-          ['Eligible Months (<100k SAR)', extensionResults.monthsCovered.toString()],
-          ['End-User Price (USD)', formatMoney(extensionResults.endUserPrice, 'USD')],
+          ['Current Spend of Last Year (SAR)', formatMoney(extensionResults.currentSpend * EXCHANGE_RATE_SAR, 'SAR')],
+          ['Daily Cost (SAR)', formatMoney((extensionResults.monthlyCost / 30) * EXCHANGE_RATE_SAR, 'SAR')],
+          ['Extension Duration', `${Math.round(extensionResults.monthsCovered * 30)} days (${extensionResults.monthsCovered} months)`],
+          ['End-User Price (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')],
+          ['VAT (15%) (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')],
+          ['Total (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')]
         ];
-        if (isIndirect) {
-          tableBody.push(['End-User Price (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')]);
-          tableBody.push(['VAT (15%) (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')]);
-          tableBody.push(['Total (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')]);
-        }
       }
     } else {
       // isIndirect already defined
@@ -498,9 +524,17 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       columnStyles: columnStyles,
       margin: { top: 35, left: 14, right: 14 },
       didParseCell: (data) => {
-        // Only bold the last row if showTotals is true
-        if (showTotals && data.section === 'body' && data.row.index === tableBody.length - 1) { 
-            data.cell.styles.fontStyle = 'bold'; 
+        if (isExtensionQuote) {
+            const boldRows = ['Dates', 'Extension Duration', 'End-User Price (SAR)', 'Total (SAR)'];
+            const firstCell = Array.isArray(data.row.raw) ? String(data.row.raw[0]) : '';
+            if (data.section === 'body' && boldRows.includes(firstCell)) {
+                data.cell.styles.fontStyle = 'bold';
+            }
+        } else {
+            // Only bold the last row if showTotals is true
+            if (showTotals && data.section === 'body' && data.row.index === tableBody.length - 1) { 
+                data.cell.styles.fontStyle = 'bold'; 
+            }
         }
       }
     });
@@ -610,107 +644,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           finalY += (splitStats.length * 4) + 1.5;
       }
 
-      // 2. Designated Sites (Moved to middle)
-      if (hasDesignatedSites) {
-          if (isBreakdownPerSite && siteBreakdown.length > 0) {
-              // BREAKDOWN TABLE LOGIC
-              doc.setFont(fontName, 'bold');
-              doc.text("Price Breakdown per Site:", 14, finalY);
-              finalY += 6;
-              
-              // Table Headers
-              const siteHeaders = ['Site Name'];
-              config.selectedProducts.forEach(pid => {
-                  const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-                  siteHeaders.push(`${p?.shortName || p?.name} Count`);
-              });
-              
-              if (!showSitesOnly) {
-                  siteHeaders.push(`Est. Annual Cost (${displayCurrency})`);
-              }
-
-              const siteBody = siteBreakdown.map(site => {
-                  const row = [site.name];
-                  let siteTotalCost = 0;
-
-                  config.selectedProducts.forEach(pid => {
-                      const count = site.counts[pid] || 0;
-                      row.push(count.toLocaleString());
-                      
-                      // Calculate Prorated Cost
-                      if (!showSitesOnly) {
-                          const totalCount = config.productInputs[pid]?.count || 1; 
-                          const productTotalNet = data.productNetTotals[pid] / config.years; 
-                          
-                          if (totalCount > 0) {
-                              const siteProductCost = (count / totalCount) * productTotalNet;
-                              siteTotalCost += siteProductCost;
-                          }
-                      }
-                  });
-
-                  if (!showSitesOnly) {
-                      const displayCost = isIndirect ? (siteTotalCost * EXCHANGE_RATE_SAR) : siteTotalCost; 
-                      row.push(formatMoney(displayCost, displayCurrency));
-                  }
-                  return row;
-              });
-
-              autoTable(doc, {
-                  startY: finalY,
-                  head: [siteHeaders],
-                  body: siteBody,
-                  theme: 'grid',
-                  headStyles: { fillColor: [240, 240, 240], textColor: 0, font: fontName, fontStyle: 'bold', valign: 'middle' },
-                  styles: { fontSize: 9, font: fontName, overflow: 'linebreak', cellPadding: 2, valign: 'middle', halign: 'left' },
-                  margin: { top: 35, left: 14, right: 14 },
-              });
-              
-              finalY = (doc as any).lastAutoTable.finalY + 6;
-
-          } else if (designatedSites.trim().length > 0) {
-              // STANDARD LIST LOGIC - Two Column Table
-              doc.setFont(fontName, 'bold');
-              doc.text("Sites included in the above pricing:", 14, finalY);
-              finalY += 5;
-              
-              const sites = designatedSites.split('\n').filter(s => s.trim().length > 0);
-              const tableBody = [];
-              for (let i = 0; i < sites.length; i += 2) {
-                  const row = [
-                      `${i + 1}. ${sites[i].trim()}`,
-                      sites[i + 1] ? `${i + 2}. ${sites[i + 1].trim()}` : ''
-                  ];
-                  tableBody.push(row);
-              }
-
-              autoTable(doc, {
-                  startY: finalY,
-                  body: tableBody,
-                  theme: 'plain', // Clean look
-                  styles: { 
-                      fontSize: 9, 
-                      font: fontName, 
-                      cellPadding: 3,
-                      lineColor: [220, 220, 220], // Light grey borders
-                      lineWidth: 0.1,
-                  },
-                  columnStyles: {
-                      0: { cellWidth: 90 },
-                      1: { cellWidth: 90 }
-                  },
-                  margin: { top: 35, left: 14, right: 14 },
-                  didDrawCell: (data) => {
-                      // Draw border for every cell to ensure grid look
-                      doc.setDrawColor(220, 220, 220);
-                      doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height);
-                  }
-              });
-              
-              finalY = (doc as any).lastAutoTable.finalY + 6;
-          }
-      }
-
       // 3. Monthly Cost (Moved to bottom)
       if (showMonthlyCost) {
           if (config.selectedProducts.includes('utd')) {
@@ -754,6 +687,107 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       }
     }
 
+    // 2. Designated Sites (Moved outside of Operating Statistics)
+    if (hasDesignatedSites) {
+        if (isBreakdownPerSite && siteBreakdown.length > 0) {
+            // BREAKDOWN TABLE LOGIC
+            doc.setFont(fontName, 'bold');
+            doc.text("Price Breakdown per Site:", 14, finalY);
+            finalY += 6;
+            
+            // Table Headers
+            const siteHeaders = ['Site Name'];
+            config.selectedProducts.forEach(pid => {
+                const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                siteHeaders.push(`${p?.shortName || p?.name} Count`);
+            });
+            
+            if (!showSitesOnly) {
+                siteHeaders.push(`Est. Annual Cost (${displayCurrency})`);
+            }
+
+            const siteBody = siteBreakdown.map(site => {
+                const row = [site.name];
+                let siteTotalCost = 0;
+
+                config.selectedProducts.forEach(pid => {
+                    const count = site.counts[pid] || 0;
+                    row.push(count.toLocaleString());
+                    
+                    // Calculate Prorated Cost
+                    if (!showSitesOnly) {
+                        const totalCount = config.productInputs[pid]?.count || 1; 
+                        const productTotalNet = data.productNetTotals[pid] / config.years; 
+                        
+                        if (totalCount > 0) {
+                            const siteProductCost = (count / totalCount) * productTotalNet;
+                            siteTotalCost += siteProductCost;
+                        }
+                    }
+                });
+
+                if (!showSitesOnly) {
+                    const displayCost = isIndirect ? (siteTotalCost * EXCHANGE_RATE_SAR) : siteTotalCost; 
+                    row.push(formatMoney(displayCost, displayCurrency));
+                }
+                return row;
+            });
+
+            autoTable(doc, {
+                startY: finalY,
+                head: [siteHeaders],
+                body: siteBody,
+                theme: 'grid',
+                headStyles: { fillColor: [240, 240, 240], textColor: 0, font: fontName, fontStyle: 'bold', valign: 'middle' },
+                styles: { fontSize: 9, font: fontName, overflow: 'linebreak', cellPadding: 2, valign: 'middle', halign: 'left' },
+                margin: { top: 35, left: 14, right: 14 },
+            });
+            
+            finalY = (doc as any).lastAutoTable.finalY + 6;
+
+        } else if (designatedSites.trim().length > 0) {
+            // STANDARD LIST LOGIC - Two Column Table
+            doc.setFont(fontName, 'bold');
+            doc.text("Sites included in the above pricing:", 14, finalY);
+            finalY += 5;
+            
+            const sites = designatedSites.split('\n').filter(s => s.trim().length > 0);
+            const tableBody = [];
+            for (let i = 0; i < sites.length; i += 2) {
+                const row = [
+                    `${i + 1}. ${sites[i].trim()}`,
+                    sites[i + 1] ? `${i + 2}. ${sites[i + 1].trim()}` : ''
+                ];
+                tableBody.push(row);
+            }
+
+            autoTable(doc, {
+                startY: finalY,
+                body: tableBody,
+                theme: 'plain', // Clean look
+                styles: { 
+                    fontSize: 9, 
+                    font: fontName, 
+                    cellPadding: 3,
+                    lineColor: [220, 220, 220], // Light grey borders
+                    lineWidth: 0.1,
+                },
+                columnStyles: {
+                    0: { cellWidth: 90 },
+                    1: { cellWidth: 90 }
+                },
+                margin: { top: 35, left: 14, right: 14 },
+                didDrawCell: (data) => {
+                    // Draw border for every cell to ensure grid look
+                    doc.setDrawColor(220, 220, 220);
+                    doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height);
+                }
+            });
+            
+            finalY = (doc as any).lastAutoTable.finalY + 6;
+        }
+    }
+
     // --- TERMS & CONDITIONS SECTION ---
     finalY += 2; 
     
@@ -775,43 +809,49 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     
     const terms: { text: string, isRich?: boolean }[] = [];
     
-    terms.push({ text: "The prices mentioned above are not final and subject to change in case of releasing an official RFP." });
-    if (config.years > 1) {
-        if (!hasOptOutClause) {
-            terms.push({ text: "The prices above are tied to a multi-year non-opt-out contract for the same number of years." });
-        } else {
-            const yearsList = Array.from({length: config.years - 1}, (_, i) => i + 2);
-            let yearsStr = "";
-            if (yearsList.length === 1) yearsStr = `Year ${yearsList[0]}`;
-            else if (yearsList.length === 2) yearsStr = `Years ${yearsList[0]} and ${yearsList[1]}`;
-            else {
-                const last = yearsList.pop();
-                yearsStr = `Years ${yearsList.join(', ')}, and ${last}`;
+    if (isExtensionQuote) {
+        terms.push({ text: "The prices mentioned above are not final and subject to change in case of releasing an official RFP." });
+        terms.push({ text: "The Internet access is a must for this subscription to be utilized." });
+        terms.push({ text: "This budgetary proposal is valid for 30-days." });
+    } else {
+        terms.push({ text: "The prices mentioned above are not final and subject to change in case of releasing an official RFP." });
+        if (config.years > 1) {
+            if (!hasOptOutClause) {
+                terms.push({ text: "The prices above are tied to a multi-year non-opt-out contract for the same number of years." });
+            } else {
+                const yearsList = Array.from({length: config.years - 1}, (_, i) => i + 2);
+                let yearsStr = "";
+                if (yearsList.length === 1) yearsStr = `Year ${yearsList[0]}`;
+                else if (yearsList.length === 2) yearsStr = `Years ${yearsList[0]} and ${yearsList[1]}`;
+                else {
+                    const last = yearsList.pop();
+                    yearsStr = `Years ${yearsList.join(', ')}, and ${last}`;
+                }
+                terms.push({ 
+                    text: `<b>Opt-out option:</b> Customer may opt not to renew for ${yearsStr} of this proposal term by providing written notice to UpToDate, Inc. <b>90 days</b> prior to the start date of each respective year of the proposal term. If such notice is not received, Customer will automatically be invoiced for the next year of the proposal term. This clause requires internal approvals from Wolters Kluwer before consideration.`,
+                    isRich: true
+                });
             }
-            terms.push({ 
-                text: `<b>Opt-out option:</b> Customer may opt not to renew for ${yearsStr} of this proposal term by providing written notice to UpToDate, Inc. <b>90 days</b> prior to the start date of each respective year of the proposal term. If such notice is not received, Customer will automatically be invoiced for the next year of the proposal term. This clause requires internal approvals from Wolters Kluwer before consideration.`,
-                isRich: true
-            });
         }
-    }
-    if (config.channel === ChannelType.DIRECT) terms.push({ text: "The price above is exempt from 15% VAT." });
-    
-    if (config.years > 1 && config.channel === ChannelType.DIRECT) {
-        terms.push({ text: "Payment of the above prices will be made against annual invoices issued each year, with payment due 30 days from the activation start date." });
-    }
+        if (config.channel === ChannelType.DIRECT) terms.push({ text: "The price above is exempt from 15% VAT." });
+        
+        if (config.years > 1 && config.channel === ChannelType.DIRECT) {
+            terms.push({ text: "Payment of the above prices will be made against annual invoices issued each year, with payment due 30 days from the activation start date." });
+        }
 
-    terms.push({ text: "Upon renewing the subscription, a statistics recount will be executed, considering the standard price of the exit year." });
-    terms.push({ text: "The Internet access is a must for this subscription to be utilized." });
-    terms.push({ text: "This budgetary proposal is valid for 60-days." });
-    
-    // Conditional EMR Term
-    if (showEmrIntegration) {
-        terms.push({ text: "Integrating UpToDate® or Lexidrug® with your EMR is included in the prices above, even if the EMR changed during the subscription.*" });
-    }
+        terms.push({ text: "Upon renewing the subscription, a statistics recount will be executed, considering the standard price of the exit year." });
+        terms.push({ text: "The Internet access is a must for this subscription to be utilized." });
+        terms.push({ text: "This budgetary proposal is valid for 60-days." });
+        
+        // Conditional EMR Term
+        if (showEmrIntegration) {
+            terms.push({ text: "Integrating UpToDate® or Lexidrug® with your EMR is included in the prices above, even if the EMR changed during the subscription.*" });
+        }
 
-    const hasHospitalPharmacyModel = config.selectedProducts.includes('lxd') && config.productInputs['lxd']?.variant === 'Hospital Pharmacy Model';
-    if (hasHospitalPharmacyModel) {
-        terms.push({ text: "This subscription is limited to the above number of seats." });
+        const hasHospitalPharmacyModel = config.selectedProducts.includes('lxd') && config.productInputs['lxd']?.variant === 'Hospital Pharmacy Model';
+        if (hasHospitalPharmacyModel) {
+            terms.push({ text: "This subscription is limited to the above number of seats." });
+        }
     }
 
     terms.forEach(term => {
@@ -839,7 +879,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     }
     
     // Conditional Footnote
-    if (showEmrIntegration) {
+    if (!isExtensionQuote && showEmrIntegration) {
         doc.setFontSize(8);
         doc.setTextColor(100, 100, 100);
         const footnote = "* Some EMR providers put additional charges to integrate our solutions, we’re neither responsible nor covering these costs. It has to be discussed with the EMR provider directly.";
@@ -851,106 +891,108 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     }
 
     // --- TECHNICAL SPECIFICATIONS SECTION ---
-    if (finalY > 245) {
-        doc.addPage();
-        // Header rendered in loop at end
-        finalY = 55;
-    } else {
-        finalY += 10; // Add padding above Technical Specifications
-    }
+    if (!isExtensionQuote) {
+      if (finalY > 245) {
+          doc.addPage();
+          // Header rendered in loop at end
+          finalY = 55;
+      } else {
+          finalY += 10; // Add padding above Technical Specifications
+      }
 
-    doc.setFontSize(14);
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setFont(fontName, 'bold');
-    doc.text("Technical Specifications", 14, finalY);
-    finalY += 6;
-    
-    doc.setFontSize(9);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont(fontName, 'normal');
-    const tsBody = "Full technical specifications for the products above can be found in the below links. Check section II: Licensed Materials for more details.";
-    const splitTsBody = doc.splitTextToSize(tsBody, 180);
-    doc.text(splitTsBody, 14, finalY);
-    finalY += (splitTsBody.length * 4) + 3;
+      doc.setFontSize(14);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.setFont(fontName, 'bold');
+      doc.text("Technical Specifications", 14, finalY);
+      finalY += 6;
+      
+      doc.setFontSize(9);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont(fontName, 'normal');
+      const tsBody = "Full technical specifications for the products above can be found in the below links. Check section II: Licensed Materials for more details.";
+      const splitTsBody = doc.splitTextToSize(tsBody, 180);
+      doc.text(splitTsBody, 14, finalY);
+      finalY += (splitTsBody.length * 4) + 3;
 
-    const techSpecs = [];
-    const utdVariant = hasUTD ? config.productInputs['utd']?.variant : null;
-    const lxdVariant = hasLXD ? config.productInputs['lxd']?.variant : null;
+      const techSpecs = [];
+      const utdVariant = hasUTD ? config.productInputs['utd']?.variant : null;
+      const lxdVariant = hasLXD ? config.productInputs['lxd']?.variant : null;
 
-    if (hasUTD) {
-       techSpecs.push({ name: "AI is less a revolution", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMt5i2DUCp6zhZlJG0ufaPLUSSIGN36DQnF01FSaK12p8J3u2___dWYq8PLUSSIGN5mQgaRFxL3mOqKYo___n" });
-       
-       if (utdVariant === 'UTDEE') {
-           if (hasLXD) {
-               if (lxdVariant?.includes('FLINK') && lxdVariant?.includes('IPE')) {
-                   techSpecs.push({ name: "TS_UTD PRO FLINK+IPE", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtZUXeskXsITPadJQRrdQhtuNZ2RDkEWAE1Bl7BCJSMgnhauADmOlYVesjiWw7dfVJ" });
-               } else if (lxdVariant?.includes('FLINK')) {
-                   techSpecs.push({ name: "TS_UTD PRO FLINK", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtGZjdQPLUSSIGNWLFpJk1KeLMVDDS9qT7P4gJNtGXD2___WecaRRtQkMZI2aabVnixTWUE8xU7" });
-               } else {
-                   techSpecs.push({ name: "TS_UTD PRO", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtAcmsDDuk3S7LGxDrktOrDv3ot___ZTAjaSBXQYSKn2k4oPLUSSIGNxLC7yyS0HWudcZHB2Yuj" });
-               }
-           } else {
-               techSpecs.push({ name: "Enterprise Overview", url: "https://clinicaleffectiveness.seismic.com/Link/Content/DCRVMVjqfHp8M8CMjVpfjBFRTR8G" });
-               techSpecs.push({ name: "TS_UTD Enterprise", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMt8IbgN8n0uDSOBiyENPLUSSIGN4ro6TzG28oYDl81xTREOMKK34Z3wZLXGTRVR4kesIPLUSSIGNLugr" });
-           }
-       } else if (utdVariant === 'ANYWHERE') {
-           techSpecs.push({ name: "TS_UTD ANYWHERE", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtTiPjiZ___2NsX8OtyK6sZSznVFmyFFsg4kgMUFuVqKXRKZIMQdKikAY7xPnOGAiMGq" });
-       } else if (utdVariant === 'UTDADV') {
-           techSpecs.push({ name: "TS_UTD ADV", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtcIzCVYJxWoPVidQjIsK5Nsfab1MH9ZkAonZcZkjoYhSgh5HAfnPLUSSIGN0UW2XhnMRkMrh" });
-       }
+      if (hasUTD) {
+         techSpecs.push({ name: "AI is less a revolution", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMt5i2DUCp6zhZlJG0ufaPLUSSIGN36DQnF01FSaK12p8J3u2___dWYq8PLUSSIGN5mQgaRFxL3mOqKYo___n" });
+         
+         if (utdVariant === 'UTDEE') {
+             if (hasLXD) {
+                 if (lxdVariant?.includes('FLINK') && lxdVariant?.includes('IPE')) {
+                     techSpecs.push({ name: "TS_UTD PRO FLINK+IPE", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtZUXeskXsITPadJQRrdQhtuNZ2RDkEWAE1Bl7BCJSMgnhauADmOlYVesjiWw7dfVJ" });
+                 } else if (lxdVariant?.includes('FLINK')) {
+                     techSpecs.push({ name: "TS_UTD PRO FLINK", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtGZjdQPLUSSIGNWLFpJk1KeLMVDDS9qT7P4gJNtGXD2___WecaRRtQkMZI2aabVnixTWUE8xU7" });
+                 } else {
+                     techSpecs.push({ name: "TS_UTD PRO", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtAcmsDDuk3S7LGxDrktOrDv3ot___ZTAjaSBXQYSKn2k4oPLUSSIGNxLC7yyS0HWudcZHB2Yuj" });
+                 }
+             } else {
+                 techSpecs.push({ name: "Enterprise Overview", url: "https://clinicaleffectiveness.seismic.com/Link/Content/DCRVMVjqfHp8M8CMjVpfjBFRTR8G" });
+                 techSpecs.push({ name: "TS_UTD Enterprise", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMt8IbgN8n0uDSOBiyENPLUSSIGN4ro6TzG28oYDl81xTREOMKK34Z3wZLXGTRVR4kesIPLUSSIGNLugr" });
+             }
+         } else if (utdVariant === 'ANYWHERE') {
+             techSpecs.push({ name: "TS_UTD ANYWHERE", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtTiPjiZ___2NsX8OtyK6sZSznVFmyFFsg4kgMUFuVqKXRKZIMQdKikAY7xPnOGAiMGq" });
+         } else if (utdVariant === 'UTDADV') {
+             techSpecs.push({ name: "TS_UTD ADV", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtcIzCVYJxWoPVidQjIsK5Nsfab1MH9ZkAonZcZkjoYhSgh5HAfnPLUSSIGN0UW2XhnMRkMrh" });
+         }
 
-       techSpecs.push({ name: "UTD Facts-at-a-glance", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtTG3c8ANMBhZRuFWZyPLUSSIGNbZadPLUSSIGNWRqxIsdRKRbxLt1m8oMBdYYMOn8grPVgEz2RpGQbG" });
-    }
+         techSpecs.push({ name: "UTD Facts-at-a-glance", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtTG3c8ANMBhZRuFWZyPLUSSIGNbZadPLUSSIGNWRqxIsdRKRbxLt1m8oMBdYYMOn8grPVgEz2RpGQbG" });
+      }
 
-    if (hasLXD && (utdVariant !== 'UTDEE')) {
-        if (lxdVariant?.includes('FLINK') && lxdVariant?.includes('IPE')) {
-            techSpecs.push({ name: "TS_LXD FLINK+IPE", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMt4VgDwBbSHbScqX___9fVqHlKhXWnm2Fae55SMM7fc9tUrmJtoGCyc19xa___3YGozWh___" });
-        } else if (lxdVariant?.includes('FLINK')) {
-            techSpecs.push({ name: "TS_LXD FLINK", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtgLqWFPdYXbhE14___Mu53BeKKXWoLf___4MSQSPVb7vmVoXjICTCkDzs5YJPLUSSIGNWDmL3s6___" });
-        } else {
-            techSpecs.push({ name: "TS_LXD", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtB9PLUSSIGNXU4wChIjFDE15Pr5xxrFlXHbAJp3PLUSSIGNh3P42mH1hAaeOLSTiZVVPVaI0P0yPgct" });
-        }
-    }
+      if (hasLXD && (utdVariant !== 'UTDEE')) {
+          if (lxdVariant?.includes('FLINK') && lxdVariant?.includes('IPE')) {
+              techSpecs.push({ name: "TS_LXD FLINK+IPE", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMt4VgDwBbSHbScqX___9fVqHlKhXWnm2Fae55SMM7fc9tUrmJtoGCyc19xa___3YGozWh___" });
+          } else if (lxdVariant?.includes('FLINK')) {
+              techSpecs.push({ name: "TS_LXD FLINK", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtgLqWFPdYXbhE14___Mu53BeKKXWoLf___4MSQSPVb7vmVoXjICTCkDzs5YJPLUSSIGNWDmL3s6___" });
+          } else {
+              techSpecs.push({ name: "TS_LXD", url: "https://eng2e.seismic.com/i/ovTkGm8yPiA6OqxgeQb3GZ7BWsurXdNFHBn6PLUSSIGNa55QQJIZlhafyQNpCw38LWggzMtB9PLUSSIGNXU4wChIjFDE15Pr5xxrFlXHbAJp3PLUSSIGNh3P42mH1hAaeOLSTiZVVPVaI0P0yPgct" });
+          }
+      }
 
-    const tsSpecs = techSpecs.filter(s => s.name.startsWith('TS_'));
-    const otherSpecs = techSpecs.filter(s => !s.name.startsWith('TS_'));
+      const tsSpecs = techSpecs.filter(s => s.name.startsWith('TS_'));
+      const otherSpecs = techSpecs.filter(s => !s.name.startsWith('TS_'));
 
-    const renderLinks = (specs: any[]) => {
-        doc.setFontSize(9);
-        doc.setTextColor(0, 0, 255); // Blue for links
-        specs.forEach(spec => {
-            if (finalY > 265) {
-                doc.addPage();
-                finalY = 55;
-            }
-            doc.textWithLink(`• ${spec.name}`, 14, finalY, { url: spec.url });
-            // Underline the link
-            const textWidth = doc.getTextWidth(`• ${spec.name}`);
-            doc.setDrawColor(0, 0, 255);
-            doc.line(14, finalY + 1, 14 + textWidth, finalY + 1);
-            finalY += 5;
-        });
-    };
+      const renderLinks = (specs: any[]) => {
+          doc.setFontSize(9);
+          doc.setTextColor(0, 0, 255); // Blue for links
+          specs.forEach(spec => {
+              if (finalY > 265) {
+                  doc.addPage();
+                  finalY = 55;
+              }
+              doc.textWithLink(`• ${spec.name}`, 14, finalY, { url: spec.url });
+              // Underline the link
+              const textWidth = doc.getTextWidth(`• ${spec.name}`);
+              doc.setDrawColor(0, 0, 255);
+              doc.line(14, finalY + 1, 14 + textWidth, finalY + 1);
+              finalY += 5;
+          });
+      };
 
-    if (tsSpecs.length > 0) {
-        renderLinks(tsSpecs);
-        finalY += 4;
-    }
+      if (tsSpecs.length > 0) {
+          renderLinks(tsSpecs);
+          finalY += 4;
+      }
 
-    if (otherSpecs.length > 0) {
-        if (finalY > 255) {
-            doc.addPage();
-            finalY = 55;
-        }
-        doc.setFontSize(14);
-        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-        doc.setFont(fontName, 'bold');
-        doc.text("Overview Documents", 14, finalY);
-        finalY += 6;
-        
-        doc.setFontSize(9);
-        doc.setFont(fontName, 'normal');
-        renderLinks(otherSpecs);
+      if (otherSpecs.length > 0) {
+          if (finalY > 255) {
+              doc.addPage();
+              finalY = 55;
+          }
+          doc.setFontSize(14);
+          doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+          doc.setFont(fontName, 'bold');
+          doc.text("Overview Documents", 14, finalY);
+          finalY += 6;
+          
+          doc.setFontSize(9);
+          doc.setFont(fontName, 'normal');
+          renderLinks(otherSpecs);
+      }
     }
 
     // Add Headers and Footers to all pages
@@ -969,7 +1011,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     doc.save(filename);
     } catch (error) {
       console.error("Error generating PDF:", error);
-      alert("An error occurred while generating the PDF. Please try again.");
+      setPdfError(error instanceof Error ? error.message : "An unknown error occurred while generating the PDF.");
     } finally {
       setIsPdfLoading(false);
     }
@@ -1340,29 +1382,49 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     }
   };
 
+  const handleStartDateCheckboxChange = (checked: boolean) => {
+    setUseStartDate(checked);
+    if (checked) {
+      setIsStartDateModalOpen(true);
+    }
+  };
+
   return (
     <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6">
       
+
+
       {/* Start Date Modal */}
       {isStartDateModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-sm w-full p-6 border border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Select Start Date</h3>
-            <div className="mb-6">
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Start Month & Year</label>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Month and Year
+              </label>
               <input 
                 type="month" 
                 value={startMonthYear}
                 onChange={(e) => setStartMonthYear(e.target.value)}
-                className="block w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans"
+                className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans"
               />
             </div>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setIsStartDateModalOpen(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            <div className="flex justify-end space-x-3">
+              <button 
+                onClick={() => {
+                  setUseStartDate(false);
+                  setIsStartDateModalOpen(false);
+                }}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
               >
-                Done
+                Cancel
+              </button>
+              <button 
+                onClick={() => setIsStartDateModalOpen(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+              >
+                Save
               </button>
             </div>
           </div>
@@ -1590,8 +1652,64 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         </div>
       </div>
       
-      {/* Designated Sites and Start Date */}
-      <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-6 mb-6 flex-wrap">
+      {/* Checkboxes Section */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+          {!isExtensionQuote && (
+            <>
+              <div className="flex items-center">
+                  <input 
+                    id="show-monthly-cost"
+                    type="checkbox" 
+                    checked={showMonthlyCost} 
+                    onChange={(e) => setShowMonthlyCost(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <label htmlFor="show-monthly-cost" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+                      Show Monthly Cost
+                  </label>
+              </div>
+
+              <div className="flex items-center">
+                  <input 
+                    id="show-totals"
+                    type="checkbox" 
+                    checked={showTotals} 
+                    onChange={(e) => setShowTotals(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <label htmlFor="show-totals" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+                      Show Totals
+                  </label>
+              </div>
+
+              <div className="flex items-center">
+                  <input 
+                    id="show-emr-integration"
+                    type="checkbox" 
+                    checked={showEmrIntegration} 
+                    onChange={(e) => setShowEmrIntegration(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <label htmlFor="show-emr-integration" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+                      Include EMR Term
+                  </label>
+              </div>
+
+              <div className="flex items-center">
+                  <input 
+                    id="has-opt-out"
+                    type="checkbox" 
+                    checked={hasOptOutClause} 
+                    onChange={(e) => setHasOptOutClause(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <label htmlFor="has-opt-out" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+                      Include Opt-out Clause
+                  </label>
+              </div>
+            </>
+          )}
+
           <div className="flex items-center">
               <input 
                 id="designated-sites-check"
@@ -1601,7 +1719,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
               />
               <label htmlFor="designated-sites-check" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
-                  More than one designated site?
+                  Add designated sites
               </label>
               {hasDesignatedSites && (
                   <button 
@@ -1614,15 +1732,24 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           </div>
 
           <div className="flex items-center">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                Start Date: {startMonthYear}
-              </span>
-              <button 
-                onClick={() => setIsStartDateModalOpen(true)}
-                className="ml-2 text-[10px] text-blue-600 underline hover:text-blue-800"
-              >
-                (Edit Date)
-              </button>
+              <input 
+                id="start-date-check"
+                type="checkbox" 
+                checked={useStartDate} 
+                onChange={(e) => handleStartDateCheckboxChange(e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+              />
+              <label htmlFor="start-date-check" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+                  Include Start Date
+              </label>
+              {useStartDate && (
+                  <button 
+                    onClick={() => setIsStartDateModalOpen(true)}
+                    className="ml-2 text-[10px] text-blue-600 underline hover:text-blue-800"
+                  >
+                    (Edit Date)
+                  </button>
+              )}
           </div>
       </div>
 
@@ -1642,6 +1769,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           {isPdfLoading ? 'Processing...' : (isFontLoading ? 'Loading Fonts...' : 'Export PDF Quote')}
         </button>
       </div>
+      {pdfError && (
+        <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md text-sm font-sans">
+          <strong>Error generating PDF:</strong> {pdfError}
+        </div>
+      )}
     </div>
   );
 };
