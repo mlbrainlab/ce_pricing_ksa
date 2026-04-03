@@ -1,15 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { APP_VERSION } from '../constants';
+import { APP_VERSION, CHANGELOG } from '../constants';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [themePref, setThemePref] = useState<'light' | 'dark' | 'system'>('system');
   const [mounted, setMounted] = useState(false);
+  const [showReleaseAlert, setShowReleaseAlert] = useState(false);
+  const [showReleaseModal, setShowReleaseModal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system' | null;
     if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
       setThemePref(savedTheme);
+    }
+
+    // Check for version update
+    const lastSeenVersion = localStorage.getItem('lastSeenVersion');
+    if (lastSeenVersion !== APP_VERSION) {
+      setShowReleaseAlert(true);
     }
   }, []);
 
@@ -47,13 +55,36 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     localStorage.setItem('theme', nextTheme);
   };
 
+  const dismissAlert = () => {
+    setShowReleaseAlert(false);
+    localStorage.setItem('lastSeenVersion', APP_VERSION);
+  };
+
+  const openReleaseModal = () => {
+    setShowReleaseAlert(false);
+    setShowReleaseModal(true);
+    localStorage.setItem('lastSeenVersion', APP_VERSION);
+  };
+
   if (!mounted) {
     return null; // Prevent hydration mismatch if using SSR, though this is CRA-like
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans transition-colors duration-200">
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 transition-colors duration-200">
+        {showReleaseAlert && (
+          <div className="bg-blue-600 text-white px-4 py-2 flex items-center justify-between text-sm">
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <span>CE Pricing KSA has been updated to v{APP_VERSION}!</span>
+              <button onClick={openReleaseModal} className="underline font-medium hover:text-blue-100 ml-2">View Changes</button>
+            </div>
+            <button onClick={dismissAlert} className="text-white hover:text-blue-200">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
+        )}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3">
              {/* Logo Placeholder */}
@@ -94,9 +125,54 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </div>
         </div>
       </header>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
         {children}
       </main>
+
+      <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto transition-colors duration-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-center">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            &copy; Wolters Kluwer Arabia Regional Headquarters Limited.
+          </p>
+        </div>
+      </footer>
+
+      {/* Release Notes Modal */}
+      {showReleaseModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6 border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4 border-b border-gray-200 dark:border-gray-700 pb-4">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">What's New</h3>
+              <button onClick={() => setShowReleaseModal(false)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 pr-2">
+              {CHANGELOG.map((release, index) => (
+                <div key={release.version} className={`mb-6 ${index !== CHANGELOG.length - 1 ? 'border-b border-gray-100 dark:border-gray-700 pb-6' : ''}`}>
+                  <div className="flex items-baseline space-x-2 mb-2">
+                    <h4 className="text-lg font-bold text-blue-600 dark:text-blue-400">v{release.version}</h4>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">{release.date}</span>
+                  </div>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                    {release.changes.map((change, i) => (
+                      <li key={i}>{change}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+              <button 
+                onClick={() => setShowReleaseModal(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

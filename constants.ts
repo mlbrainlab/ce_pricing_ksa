@@ -1,7 +1,52 @@
 
 import { ProductDefinition } from './types';
 
-export const APP_VERSION = '6.5.2';
+export const APP_VERSION = '6.5.3';
+
+export const CHANGELOG = [
+  {
+    version: '6.5.3',
+    date: '2026-04-03',
+    changes: [
+      'Logic Update: UTD Renewal calculations now strictly follow the new rules for Anywhere, Advanced, and EE.',
+      'Logic Update: Added EE eligibility check. Clients are ineligible for EE if their Anywhere/Advanced renewal is under $30k.',
+      'Logic Update: Added recommendation to upgrade to EE if renewal exceeds $30k.'
+    ]
+  },
+  {
+    version: '6.5.2',
+    date: '2026-04-03',
+    changes: [
+      'Bug Fix: Duration field accepts clearing without RangeError.',
+      'Bug Fix: Reset Form now clears designated sites.',
+      'Bug Fix: "Include Start Date" auto-selects only for Renewal/Extension.',
+      'Feature: Customer Name is now mandatory for exports.',
+      'Feature: Added release notes alert for new version updates.'
+    ]
+  },
+  {
+    version: '6.5.1',
+    date: '2026-04-01',
+    changes: [
+      'UI Refinements: Extension months navigation arrows.',
+      'UI Refinements: Numeric inputs format with comma separators.',
+      'PDF Fix: Product full names mapped correctly.',
+      'PDF Fix: Designated sites render for Extension Quotes.',
+      'PDF Fix: Font loading state clears on error.',
+      'PDF Fix: Footer alignment and table bolding adjusted.'
+    ]
+  },
+  {
+    version: '6.5.0',
+    date: '2026-03-31',
+    changes: [
+      'Feature: "Use Full Extension" logic.',
+      'Feature: Auto Credential Capture.',
+      'Patch/Fix: Fixed infinite "processing..." bug in PDF export.',
+      'Patch/Fix: Added "Reset Form" button.'
+    ]
+  }
+];
 
 export const WHT_FACTOR = 0.95;
 export const EXCHANGE_RATE_SAR = 3.76;

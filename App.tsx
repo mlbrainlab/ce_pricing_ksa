@@ -67,6 +67,8 @@ const App: React.FC = () => {
   const [flatPricing, setFlatPricing] = useState<boolean>(false); 
   const [rounding, setRounding] = useState<boolean>(false); // New Rounding Option
   const [notification, setNotification] = useState<string | null>(null); // Notification State
+  const [resetKey, setResetKey] = useState<number>(0); // Key to reset child components
+  const [isArchitectNotesOpen, setIsArchitectNotesOpen] = useState<boolean>(false); // Accordion state
   
   // Extension Quote State
   const isExtensionQuote = dealType === DealType.EXTENSION;
@@ -80,8 +82,17 @@ const App: React.FC = () => {
   const [useFullExtension, setUseFullExtension] = useState<boolean>(false);
 
   // Start Date State
-  const [useStartDate, setUseStartDate] = useState<boolean>(true);
+  const [useStartDate, setUseStartDate] = useState<boolean>(false);
   const [startMonthYear, setStartMonthYear] = useState<string>(new Date().toISOString().slice(0, 7));
+
+  // Update useStartDate based on dealType
+  useEffect(() => {
+    if (dealType === DealType.RENEWAL || dealType === DealType.EXTENSION) {
+      setUseStartDate(true);
+    } else {
+      setUseStartDate(false);
+    }
+  }, [dealType]);
   
   // Structure Rates (Multi-Year logic: FPI or Reverse Discount)
   const [applyAnnualRate, setApplyAnnualRate] = useState<boolean>(false); // Toggle for Renewal MYFPI
@@ -118,6 +129,7 @@ const App: React.FC = () => {
     setExtensionFPI(null);
     setExtensionVariant('ANYWHERE');
     setUseFullExtension(false);
+    setResetKey(prev => prev + 1);
     
     setStartMonthYear(new Date().toISOString().slice(0, 7));
     setApplyAnnualRate(false);
@@ -175,7 +187,8 @@ const App: React.FC = () => {
 
   // Helper to generate rate array [val, val, val...]
   const generateRateArray = (val: number, count: number) => {
-    return new Array(count).fill(val);
+    const safeCount = Math.max(0, isNaN(count) ? 0 : count);
+    return new Array(safeCount).fill(val);
   };
 
   // Derived Config
@@ -1555,40 +1568,8 @@ const App: React.FC = () => {
           </>
           )}
 
-          {!isExtensionQuote && (
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-md p-4 transition-colors">
-               <div className="flex justify-between items-start">
-                 <h4 className="text-sm font-bold text-yellow-800 dark:text-yellow-200">Architect Notes</h4>
-                 {utdEeWarning && (
-                   <span className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded">
-                     {utdEeWarning}
-                   </span>
-                 )}
-               </div>
-               <ul className="mt-2 text-xs text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-1">
-                  <li><strong>Base Calculation:</strong> UTD (HC × Rate) / LXD (BC × Rate).</li>
-                  <li><strong>WHT Adjustment:</strong> {applyWHT ? "Prices grossed up (divided by 0.95)." : "No WHT gross up applied."}</li>
-                  <li><strong>Floor Rules:</strong> Single Deal Min $6,842. Combo Deal LXD Min $4,210. (Adjusted dynamically for WHT).</li>
-                  <li><strong>Recognized Revenue:</strong> Applied {dealType} {channel} factor. 
-                     {channel !== ChannelType.DIRECT && dealType === DealType.NEW_LOGO && " (Y1 vs Y2+ margins applied)."}
-                  </li>
-                  {dealType === DealType.RENEWAL && (
-                    <li><strong>Renewal Split:</strong> Renewal Base calculated as sum of [Product Expiring × (1 + Product Uplift Rate)]. Upsell is the remainder of ACV.</li>
-                  )}
-                  {results.yearlyResults[0].floorAdjusted && (
-                    <li><strong>Auto-Adjustment:</strong> Pricing was automatically raised to meet the minimum floor requirements.</li>
-                  )}
-                  {/* Monthly Cost Analysis */}
-                  {monthlyCosts.length > 0 && (
-                     <li className="font-semibold italic pt-1 text-yellow-900 dark:text-yellow-100">
-                       Unit Economics: {monthlyCosts.join(', ')}.
-                     </li>
-                  )}
-               </ul>
-            </div>
-          )}
-
           <ExportSection 
+            key={resetKey}
             data={results} 
             config={config} 
             useStartDate={useStartDate}
@@ -1598,6 +1579,57 @@ const App: React.FC = () => {
             isExtensionQuote={isExtensionQuote}
             extensionResults={extensionResults}
           />
+
+          {!isExtensionQuote && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-md transition-colors">
+               <button 
+                 onClick={() => setIsArchitectNotesOpen(!isArchitectNotesOpen)}
+                 className="w-full flex justify-between items-center p-4 focus:outline-none"
+               >
+                 <div className="flex items-center space-x-2">
+                   <h4 className="text-sm font-bold text-yellow-800 dark:text-yellow-200">Architect Notes</h4>
+                   {utdEeWarning && (
+                     <span className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded">
+                       {utdEeWarning}
+                     </span>
+                   )}
+                 </div>
+                 <svg 
+                   className={`w-5 h-5 text-yellow-700 dark:text-yellow-300 transform transition-transform duration-200 ${isArchitectNotesOpen ? 'rotate-180' : ''}`} 
+                   fill="none" 
+                   stroke="currentColor" 
+                   viewBox="0 0 24 24"
+                 >
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                 </svg>
+               </button>
+               
+               {isArchitectNotesOpen && (
+                 <div className="px-4 pb-4 border-t border-yellow-200 dark:border-yellow-700/50 mt-2 pt-2">
+                   <ul className="text-xs text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-1">
+                      <li><strong>Base Calculation:</strong> UTD (HC × Rate) / LXD (BC × Rate).</li>
+                      <li><strong>WHT Adjustment:</strong> {applyWHT ? "Prices grossed up (divided by 0.95)." : "No WHT gross up applied."}</li>
+                      <li><strong>Floor Rules:</strong> Single Deal Min $6,842. Combo Deal LXD Min $4,210. (Adjusted dynamically for WHT).</li>
+                      <li><strong>Recognized Revenue:</strong> Applied {dealType} {channel} factor. 
+                         {channel !== ChannelType.DIRECT && dealType === DealType.NEW_LOGO && " (Y1 vs Y2+ margins applied)."}
+                      </li>
+                      {dealType === DealType.RENEWAL && (
+                        <li><strong>Renewal Split:</strong> Renewal Base calculated as sum of [Product Expiring × (1 + Product Uplift Rate)]. Upsell is the remainder of ACV.</li>
+                      )}
+                      {results.yearlyResults[0].floorAdjusted && (
+                        <li><strong>Auto-Adjustment:</strong> Pricing was automatically raised to meet the minimum floor requirements.</li>
+                      )}
+                      {/* Monthly Cost Analysis */}
+                      {monthlyCosts.length > 0 && (
+                         <li className="font-semibold italic pt-1 text-yellow-900 dark:text-yellow-100">
+                           Unit Economics: {monthlyCosts.join(', ')}.
+                         </li>
+                      )}
+                   </ul>
+                 </div>
+               )}
+            </div>
+          )}
         </div>
       </div>
     </Layout>

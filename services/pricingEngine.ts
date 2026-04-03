@@ -139,35 +139,58 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
       if (prodId === 'utd') {
          // UTD Logic
          let pathBasedPrice = 0;
+         let finalTarget = target;
          
-         // 1. Determine Path-Based Renewal Price (Baseline before Stats check)
-         if (existing === target) {
+         const effectiveStats = (inputs.changeInStats && inputs.count > 0) ? inputs.count : (inputs.existingCount || 1);
+         const expiringRate = inputs.existingCount && inputs.existingCount > 0 ? (expiring / inputs.existingCount) : expiring;
+         
+         // Calculate the value for their current variant
+         const calcCurrent = effectiveStats * expiringRate * (1 + (upliftVal / 100));
+         
+         // Calculate the value if they upgraded to Advanced (only applicable if currently Anywhere)
+         const calcAdvanced = existing === 'ANYWHERE' 
+            ? effectiveStats * expiringRate * (1 + (upliftVal / 100) + 0.08)
+            : calcCurrent;
+            
+         // Check EE Eligibility
+         let isEligibleForEE = false;
+         if (existing === 'UTDEE') {
+             isEligibleForEE = true;
+         } else if (existing === 'ANYWHERE') {
+             if (calcCurrent > 30000 || calcAdvanced > 30000) isEligibleForEE = true;
+         } else if (existing === 'UTDADV') {
+             if (calcCurrent > 30000) isEligibleForEE = true;
+         }
+         
+         if (target === 'UTDEE' && !isEligibleForEE) {
+             productNotes.push(`UTD: Ineligible for EE (Renewal < $30k). Reverting to ${existing}.`);
+             finalTarget = existing;
+         } else if (finalTarget !== 'UTDEE' && isEligibleForEE) {
+             productNotes.push(`UTD: Renewal > $30k. Recommend upgrading to UTD EE.`);
+         }
+         
+         // 1. Determine Path-Based Renewal Price
+         if (existing === finalTarget) {
             // Same Variant
             if (existing === 'UTDEE') {
-                // Fixed 8% as per rules for UTDEE Renewal (usually upliftVal covers this if set to 8)
-                pathBasedPrice = expiring * 1.08;
+                pathBasedPrice = effectiveStats * expiringRate * 1.08;
             } else {
-                pathBasedPrice = standardBase;
+                pathBasedPrice = effectiveStats * expiringRate * (1 + (upliftVal / 100));
             }
          } else {
             // Variant Upgrade
-            if (existing === 'ANYWHERE' && target === 'UTDADV') {
-                // "add the annual rate + 8%"
-                pathBasedPrice = standardBase * 1.08;
-                productNotes.push(`UTD: Upsell Anywhere -> Adv (Uplift + 8% applied)`);
-
-            } else if (existing === 'ANYWHERE' && target === 'UTDEE') {
-                // "change the annual rate to 11%"
-                pathBasedPrice = expiring * 1.11;
+            if (existing === 'ANYWHERE' && finalTarget === 'UTDADV') {
+                pathBasedPrice = effectiveStats * expiringRate * (1 + (upliftVal / 100) + 0.08);
+                productNotes.push(`UTD: Upsell Anywhere -> Adv (+8% applied)`);
+            } else if (existing === 'ANYWHERE' && finalTarget === 'UTDEE') {
+                pathBasedPrice = effectiveStats * expiringRate * 1.11;
                 productNotes.push(`UTD: Upsell Anywhere -> EE (11% applied)`);
-
-            } else if (existing === 'UTDADV' && target === 'UTDEE') {
-                // "add the annual rate of 8% only"
-                pathBasedPrice = expiring * 1.08;
-                productNotes.push(`UTD: Upsell Adv -> EE (8% applied)`);
+            } else if (existing === 'UTDADV' && finalTarget === 'UTDEE') {
+                pathBasedPrice = effectiveStats * expiringRate * 1.11;
+                productNotes.push(`UTD: Upsell Adv -> EE (11% applied)`);
             } else {
-                // Fallback for undefined paths
-                pathBasedPrice = standardBase;
+                // Fallback
+                pathBasedPrice = effectiveStats * expiringRate * (1 + (upliftVal / 100));
             }
          }
 
@@ -181,13 +204,9 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
          }
 
          // 3. Define Renewal Base
-         // Rule: If new headcount results in higher value (baseNet used), Renewal Base is Standard Base.
-         // If variants differ, Renewal Base is Standard Base.
-         // If variants match and NO override, Renewal Base absorbs calculation.
-         
          const isHigherValueOverride = inputs.changeInStats && baseNet > pathBasedPrice;
 
-         if (existing === target && !isHigherValueOverride) {
+         if (existing === finalTarget && !isHigherValueOverride && !inputs.changeInStats) {
              renewalBase = actualY1Price; // Absorb entire price as base (Upsell = 0)
          } else {
              // Variant Changed OR Stats Change triggered higher price
