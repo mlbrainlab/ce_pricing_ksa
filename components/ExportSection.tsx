@@ -149,6 +149,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   // ... (existing code)
 
   const handlePDFExport = async () => {
+    if (!customerName.trim()) {
+      alert("Please enter a Customer Name before exporting.");
+      return;
+    }
     setIsPdfLoading(true);
     setPdfError(null);
     try {
@@ -1018,6 +1022,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   };
 
   const handleExcelExport = async () => {
+    if (!customerName.trim()) {
+      alert("Please enter a Customer Name before exporting.");
+      return;
+    }
     setIsExcelLoading(true);
     
     try {
