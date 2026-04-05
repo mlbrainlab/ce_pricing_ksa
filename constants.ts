@@ -8,11 +8,15 @@ export const CHANGELOG = [
     version: '6.5.4',
     date: '2026-04-05',
     changes: [
+      'Feature: Added 10-minute idle auto log-out for security.',
+      'Feature: Support for split pricing methods (e.g., UTD on MYPP, LXD on MYFPI).',
+      'Feature: Enforced $10,000 minimum Y1 value for MYPP (automatically reverts to MYFPI if not met).',
       'Feature: Auto-switch annual increase percentages when toggling between MYPP and MYFPI.',
       'Feature: Added Exception Form alert for out-of-bounds MYPP and MYFPI rates.',
       'Feature: MYPP default rate automatically sets to 8%.',
       'UI Fix: MYPP and FPI fields now accept 0 as a valid override.',
       'UI Fix: Fixed RangeError when the number of years is left blank.',
+      'Bug Fix: Resolved PostHog client rate limiting errors by optimizing event capture.',
       'Product Update (UTD SM): Changed product name to "UpToDate® Subscriber Manager".',
       'Product Update (UTD SM): Added specific terms to PDF and disabled irrelevant export checkboxes.'
     ]

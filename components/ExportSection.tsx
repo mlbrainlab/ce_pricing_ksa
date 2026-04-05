@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { CalculationOutput, DealConfiguration, ChannelType, DealType, PricingMethod } from '../types';
+import { CalculationOutput, DealConfiguration, ChannelType, DealType } from '../types';
 import { AVAILABLE_PRODUCTS, EXCHANGE_RATE_SAR } from '../constants';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -1058,7 +1058,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       sheet.addRow(['Deal Type', config.dealType]);
       sheet.addRow(['Channel', config.channel]);
       sheet.addRow(['Duration', `${config.years} Years`]);
-      sheet.addRow(['Pricing Method', config.method]);
+      const showSplitRates = config.selectedProducts.includes('utd') && config.selectedProducts.includes('lxd');
+      const methodText = showSplitRates && config.productMethods 
+        ? `UTD: ${config.productMethods.utd}, LXD: ${config.productMethods.lxd}`
+        : config.method;
+      sheet.addRow(['Pricing Method', methodText]);
       sheet.addRow(['Flat Pricing', config.flatPricing ? 'Yes' : 'No']);
       sheet.addRow(['Rounding', config.rounding ? 'Yes' : 'No']);
       sheet.addRow(['Apply WHT', config.applyWHT ? 'Yes' : 'No']);
@@ -1139,7 +1143,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       rateHeaderRow.eachCell(cell => cell.style = headerStyle);
       
       // Row 1: Annual Increase/Discount Rate
-      const structureRateRowData: any[] = [config.method === PricingMethod.MYFPI ? 'Annual FPI %' : 'Annual Discount %'];
+      const structureRateRowData: any[] = ['Annual Rate %'];
       config.selectedProducts.forEach(pid => {
           const rates = config.productRates[pid] || config.rates;
           structureRateRowData.push((rates[0] || 0) / 100);

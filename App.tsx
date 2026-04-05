@@ -58,12 +58,46 @@ const App: React.FC = () => {
     posthog.capture('user_logged_in', { name });
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('wk_auth_month');
+    localStorage.removeItem('wk_auth_name');
+    setIsAuthenticated(false);
+    posthog.reset();
+  };
+
+  // Idle timeout logic (10 minutes)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        handleLogout();
+      }, 10 * 60 * 1000); // 10 minutes
+    };
+
+    // Initialize timer
+    resetTimer();
+
+    // Event listeners for user activity
+    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+    events.forEach(event => window.addEventListener(event, resetTimer));
+
+    return () => {
+      clearTimeout(timeoutId);
+      events.forEach(event => window.removeEventListener(event, resetTimer));
+    };
+  }, [isAuthenticated]);
+
   // Deal State
   const [dealType, setDealType] = useState<DealType>(DealType.NEW_LOGO);
   const [channel, setChannel] = useState<ChannelType>(ChannelType.DIRECT);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [years, setYears] = useState<number>(3);
   const [method, setMethod] = useState<PricingMethod>(PricingMethod.MYFPI);
+  const [productMethods, setProductMethods] = useState<Record<string, PricingMethod>>({ utd: PricingMethod.MYFPI, lxd: PricingMethod.MYFPI });
   const [applyWHT, setApplyWHT] = useState<boolean>(true); // Default true for KSA
   const [flatPricing, setFlatPricing] = useState<boolean>(false); 
   const [rounding, setRounding] = useState<boolean>(false); // New Rounding Option
@@ -118,6 +152,7 @@ const App: React.FC = () => {
     setSelectedProductIds([]);
     setYears(3);
     setMethod(PricingMethod.MYFPI);
+    setProductMethods({ utd: PricingMethod.MYFPI, lxd: PricingMethod.MYFPI });
     setApplyWHT(true);
     setFlatPricing(false);
     setRounding(false);
@@ -188,6 +223,7 @@ const App: React.FC = () => {
 
   const handleMethodChange = (newMethod: PricingMethod) => {
     setMethod(newMethod);
+    setProductMethods({ utd: newMethod, lxd: newMethod });
     if (newMethod === PricingMethod.MYPP) {
       setGlobalRateVal(8);
       setUtdRateVal(8);
@@ -203,6 +239,17 @@ const App: React.FC = () => {
     }
   };
 
+  const handleProductMethodChange = (productId: string, newMethod: PricingMethod) => {
+    setProductMethods(prev => ({ ...prev, [productId]: newMethod }));
+    if (newMethod === PricingMethod.MYPP) {
+      if (productId === 'utd') setUtdRateVal(8);
+      if (productId === 'lxd') setLxdRateVal(8);
+    } else if (newMethod === PricingMethod.MYFPI) {
+      if (productId === 'utd') setUtdRateVal(8);
+      if (productId === 'lxd') setLxdRateVal(5);
+    }
+  };
+
   // Helper to generate rate array [val, val, val...]
   const generateRateArray = (val: number, count: number) => {
     const safeCount = Math.max(0, Math.floor(Number(count) || 0));
@@ -212,12 +259,17 @@ const App: React.FC = () => {
   // Derived Config
   const config: DealConfiguration = useMemo(() => {
     // Determine effective structure rates based on toggle
-    const useAnnualRate = (dealType === DealType.RENEWAL && method === PricingMethod.MYFPI) ? applyAnnualRate : true;
-    
-    // Override values if disabled
-    const effGlobal = useAnnualRate ? globalRateVal : 0;
-    const effUtd = useAnnualRate ? utdRateVal : 0;
-    const effLxd = useAnnualRate ? lxdRateVal : 0;
+    // For MYFPI in Renewal, we check applyAnnualRate. For MYPP, we always apply the rate.
+    const getEffRate = (prodId: string, val: number) => {
+      const prodMethod = showSplitRates ? productMethods[prodId] : method;
+      if (prodMethod === PricingMethod.MYPP) return val;
+      if (dealType === DealType.RENEWAL && !applyAnnualRate) return 0;
+      return val;
+    };
+
+    const effGlobal = getEffRate('global', globalRateVal); // 'global' is just a fallback, we'll use the method
+    const effUtd = getEffRate('utd', utdRateVal);
+    const effLxd = getEffRate('lxd', lxdRateVal);
 
     // Generate arrays based on effective single input values (Structure Rates)
     const rates = generateRateArray(effGlobal, years);
@@ -255,6 +307,7 @@ const App: React.FC = () => {
       productInputs,
       years,
       method,
+      productMethods,
       rates, 
       productRates,
       renewalUpliftRates,
@@ -264,7 +317,7 @@ const App: React.FC = () => {
       useStartDate,
       startMonthYear
     };
-  }, [dealType, channel, selectedProductIds, productInputs, years, method, globalRateVal, utdRateVal, lxdRateVal, renewalUpliftGlobal, renewalUpliftUTD, renewalUpliftLXD, showSplitRates, applyWHT, flatPricing, rounding, applyAnnualRate, useStartDate, startMonthYear]);
+  }, [dealType, channel, selectedProductIds, productInputs, years, method, productMethods, globalRateVal, utdRateVal, lxdRateVal, renewalUpliftGlobal, renewalUpliftUTD, renewalUpliftLXD, showSplitRates, applyWHT, flatPricing, rounding, applyAnnualRate, useStartDate, startMonthYear]);
 
   // Results
   const results = useMemo(() => calculatePricing(config), [config]);
@@ -571,15 +624,16 @@ const App: React.FC = () => {
 
   // Label Logic for Annual Rate
   const getAnnualRateLabel = () => {
+     if (showSplitRates && productMethods.utd !== productMethods.lxd) return "Annual Rates %";
      if (method === PricingMethod.MYPP) return "Annual Reverse Discount %";
      if (dealType === DealType.RENEWAL) return "Annual Increase % (Year 2+)";
      return "Annual Increase %";
   };
 
   // Determine if rate inputs should be shown
-  const shouldShowAnnualRateInputs = (dealType === DealType.RENEWAL && method === PricingMethod.MYFPI) 
-    ? applyAnnualRate 
-    : true;
+  const isUtdRateVisible = dealType !== DealType.RENEWAL || (showSplitRates ? productMethods.utd === PricingMethod.MYPP : method === PricingMethod.MYPP) || applyAnnualRate;
+  const isLxdRateVisible = dealType !== DealType.RENEWAL || (showSplitRates ? productMethods.lxd === PricingMethod.MYPP : method === PricingMethod.MYPP) || applyAnnualRate;
+  const shouldShowAnnualRateInputs = isUtdRateVisible || isLxdRateVisible;
 
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
@@ -1025,22 +1079,65 @@ const App: React.FC = () => {
                  </div>
                  <div className="w-2/3">
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Method</label>
-                    <div className="flex items-center space-x-3 mt-2">
-                       <label className="inline-flex items-center">
-                         <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600" 
-                           checked={method === PricingMethod.MYFPI}
-                           onChange={() => handleMethodChange(PricingMethod.MYFPI)}
-                         />
-                         <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYFPI</span>
-                       </label>
-                       <label className="inline-flex items-center">
-                         <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600"
-                           checked={method === PricingMethod.MYPP}
-                           onChange={() => handleMethodChange(PricingMethod.MYPP)}
-                         />
-                         <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYPP</span>
-                       </label>
-                    </div>
+                    {showSplitRates ? (
+                      <div className="flex flex-col space-y-2 mt-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-700 dark:text-gray-300 w-12">UTD:</span>
+                          <div className="flex items-center space-x-3">
+                             <label className="inline-flex items-center">
+                               <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600" 
+                                 checked={productMethods.utd === PricingMethod.MYFPI}
+                                 onChange={() => handleProductMethodChange('utd', PricingMethod.MYFPI)}
+                               />
+                               <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYFPI</span>
+                             </label>
+                             <label className="inline-flex items-center">
+                               <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600"
+                                 checked={productMethods.utd === PricingMethod.MYPP}
+                                 onChange={() => handleProductMethodChange('utd', PricingMethod.MYPP)}
+                               />
+                               <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYPP</span>
+                             </label>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-700 dark:text-gray-300 w-12">LXD:</span>
+                          <div className="flex items-center space-x-3">
+                             <label className="inline-flex items-center">
+                               <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600" 
+                                 checked={productMethods.lxd === PricingMethod.MYFPI}
+                                 onChange={() => handleProductMethodChange('lxd', PricingMethod.MYFPI)}
+                               />
+                               <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYFPI</span>
+                             </label>
+                             <label className="inline-flex items-center">
+                               <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600"
+                                 checked={productMethods.lxd === PricingMethod.MYPP}
+                                 onChange={() => handleProductMethodChange('lxd', PricingMethod.MYPP)}
+                               />
+                               <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYPP</span>
+                             </label>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-3 mt-2">
+                         <label className="inline-flex items-center">
+                           <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600" 
+                             checked={method === PricingMethod.MYFPI}
+                             onChange={() => handleMethodChange(PricingMethod.MYFPI)}
+                           />
+                           <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYFPI</span>
+                         </label>
+                         <label className="inline-flex items-center">
+                           <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600"
+                             checked={method === PricingMethod.MYPP}
+                             onChange={() => handleMethodChange(PricingMethod.MYPP)}
+                           />
+                           <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYPP</span>
+                         </label>
+                      </div>
+                    )}
                  </div>
                </div>
                
@@ -1064,7 +1161,7 @@ const App: React.FC = () => {
                {/* Annual Rate Logic */}
                <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
                   {/* Conditional Checkbox for Renewal MYFPI */}
-                  {dealType === DealType.RENEWAL && method === PricingMethod.MYFPI && (
+                  {dealType === DealType.RENEWAL && (method === PricingMethod.MYFPI || (showSplitRates && (productMethods.utd === PricingMethod.MYFPI || productMethods.lxd === PricingMethod.MYFPI))) && (
                      <div className="flex items-center mb-4">
                         <input
                            id="apply-annual-rate"
@@ -1087,26 +1184,32 @@ const App: React.FC = () => {
                         </div>
                         {showSplitRates ? (
                             <>
-                              {renderRateInput("UTD Rate", utdRateVal, setUtdRateVal, "Annual %", "border-blue-200 dark:border-blue-800")}
-                              {renderRateInput("LXD Rate", lxdRateVal, setLxdRateVal, "Annual %", "border-green-200 dark:border-green-800")}
+                              {isUtdRateVisible && renderRateInput("UTD Rate", utdRateVal, setUtdRateVal, productMethods.utd === PricingMethod.MYPP ? "Reverse %" : "Annual %", "border-blue-200 dark:border-blue-800")}
+                              {isLxdRateVisible && renderRateInput("LXD Rate", lxdRateVal, setLxdRateVal, productMethods.lxd === PricingMethod.MYPP ? "Reverse %" : "Annual %", "border-green-200 dark:border-green-800")}
                             </>
                           ) : (
-                            renderRateInput("Rate", globalRateVal, setGlobalRateVal, "Annual %")
+                            isUtdRateVisible && renderRateInput("Rate", globalRateVal, setGlobalRateVal, method === PricingMethod.MYPP ? "Reverse %" : "Annual %")
                         )}
                         
                         {/* Exception Form Alert */}
                         {(() => {
                             let showExceptionAlert = false;
-                            if (method === PricingMethod.MYPP) {
-                                if (showSplitRates) {
-                                    if (utdRateVal < 8 || utdRateVal > 25 || lxdRateVal < 8 || lxdRateVal > 25) showExceptionAlert = true;
-                                } else {
-                                    if (globalRateVal < 8 || globalRateVal > 25) showExceptionAlert = true;
+                            if (showSplitRates) {
+                                if (productMethods.utd === PricingMethod.MYPP) {
+                                    if (utdRateVal < 8 || utdRateVal > 25) showExceptionAlert = true;
+                                } else if (productMethods.utd === PricingMethod.MYFPI) {
+                                    if (utdRateVal < 8) showExceptionAlert = true;
                                 }
-                            } else if (method === PricingMethod.MYFPI) {
-                                if (showSplitRates) {
-                                    if (utdRateVal < 8 || lxdRateVal < 5) showExceptionAlert = true;
-                                } else {
+                                
+                                if (productMethods.lxd === PricingMethod.MYPP) {
+                                    if (lxdRateVal < 8 || lxdRateVal > 25) showExceptionAlert = true;
+                                } else if (productMethods.lxd === PricingMethod.MYFPI) {
+                                    if (lxdRateVal < 5) showExceptionAlert = true;
+                                }
+                            } else {
+                                if (method === PricingMethod.MYPP) {
+                                    if (globalRateVal < 8 || globalRateVal > 25) showExceptionAlert = true;
+                                } else if (method === PricingMethod.MYFPI) {
                                     if (selectedProductIds.includes('utd') && globalRateVal < 8) showExceptionAlert = true;
                                     if (selectedProductIds.includes('lxd') && !selectedProductIds.includes('utd') && globalRateVal < 5) showExceptionAlert = true;
                                 }
@@ -1116,6 +1219,46 @@ const App: React.FC = () => {
                                 return (
                                     <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700 font-medium">
                                         Exception Form is required for this discount
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })()}
+
+                        {/* MYPP Threshold Alert */}
+                        {(() => {
+                            const y1Breakdown = results.yearlyResults[0]?.breakdown || [];
+                            const alerts = [];
+                            
+                            if (showSplitRates) {
+                                if (productMethods.utd === PricingMethod.MYPP) {
+                                    const utdY1 = y1Breakdown.find(p => p.id === 'utd')?.net || 0;
+                                    if (utdY1 < 10000) alerts.push("UTD MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.");
+                                }
+                                if (productMethods.lxd === PricingMethod.MYPP) {
+                                    const lxdY1 = y1Breakdown.find(p => p.id === 'lxd')?.net || 0;
+                                    if (lxdY1 < 10000) alerts.push("LXD MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.");
+                                }
+                            } else {
+                                if (method === PricingMethod.MYPP) {
+                                    selectedProductIds.forEach(pid => {
+                                        const y1 = y1Breakdown.find(p => p.id === pid)?.net || 0;
+                                        if (y1 < 10000) {
+                                            const name = AVAILABLE_PRODUCTS.find(p => p.id === pid)?.shortName || pid.toUpperCase();
+                                            alerts.push(`${name} MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.`);
+                                        }
+                                    });
+                                }
+                            }
+                            
+                            if (alerts.length > 0) {
+                                return (
+                                    <div className="mt-2 space-y-1">
+                                        {alerts.map((alert, idx) => (
+                                            <div key={idx} className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 font-medium">
+                                                {alert}
+                                            </div>
+                                        ))}
                                     </div>
                                 );
                             }
