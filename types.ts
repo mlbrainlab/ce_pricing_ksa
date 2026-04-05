@@ -63,7 +63,8 @@ export interface DealConfiguration {
   selectedProducts: string[]; // IDs
   productInputs: Record<string, ProductInput>; // Map of product ID to inputs
   years: number;
-  method: PricingMethod;
+  method: PricingMethod; // Keep for backwards compatibility or default
+  productMethods?: Record<string, PricingMethod>; // New: Per product method
   rates: number[]; // Global fallback
   productRates: Record<string, number[]>; // Per product rates
   renewalUpliftRates: Record<string, number>; // New: Specific Uplift for Renewal Base

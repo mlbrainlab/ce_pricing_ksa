@@ -57,7 +57,7 @@ const convertToSAR = (usdAmount: number): number => {
 };
 
 export const calculatePricing = (config: DealConfiguration): CalculationOutput => {
-  const { dealType, channel, selectedProducts, productInputs, years, method, rates, productRates, renewalUpliftRates, applyWHT, flatPricing, rounding } = config;
+  const { dealType, channel, selectedProducts, productInputs, years, method, productMethods, rates, productRates, renewalUpliftRates, applyWHT, flatPricing, rounding } = config;
   
   // Define Floors based on WHT setting
   const activeStandardFloor = applyWHT ? (STANDARD_FLOOR_RAW / WHT_FACTOR) : STANDARD_FLOOR_RAW;
@@ -443,8 +443,14 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
     const schedule = new Array(safeYears).fill(0);
     
     const specificRates = productRates[prodId] || rates;
+    let specificMethod = productMethods?.[prodId] || method;
 
-    if (method === PricingMethod.MYFPI) {
+    if (specificMethod === PricingMethod.MYPP && y1Value < 10000) {
+      specificMethod = PricingMethod.MYFPI;
+      productNotes.push(`${prodId.toUpperCase()} MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.`);
+    }
+
+    if (specificMethod === PricingMethod.MYFPI) {
       // Forward
       schedule[0] = y1Value;
       for (let i = 1; i < years; i++) {
