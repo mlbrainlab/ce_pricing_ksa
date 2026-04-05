@@ -1,9 +1,22 @@
 
 import { ProductDefinition } from './types';
 
-export const APP_VERSION = '6.5.3';
+export const APP_VERSION = '6.5.4';
 
 export const CHANGELOG = [
+  {
+    version: '6.5.4',
+    date: '2026-04-05',
+    changes: [
+      'Feature: Auto-switch annual increase percentages when toggling between MYPP and MYFPI.',
+      'Feature: Added Exception Form alert for out-of-bounds MYPP and MYFPI rates.',
+      'Feature: MYPP default rate automatically sets to 8%.',
+      'UI Fix: MYPP and FPI fields now accept 0 as a valid override.',
+      'UI Fix: Fixed RangeError when the number of years is left blank.',
+      'Product Update (UTD SM): Changed product name to "UpToDate® Subscriber Manager".',
+      'Product Update (UTD SM): Added specific terms to PDF and disabled irrelevant export checkboxes.'
+    ]
+  },
   {
     version: '6.5.3',
     date: '2026-04-03',

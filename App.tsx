@@ -185,9 +185,26 @@ const App: React.FC = () => {
     }
   }, [selectedProductIds]);
 
+  const handleMethodChange = (newMethod: PricingMethod) => {
+    setMethod(newMethod);
+    if (newMethod === PricingMethod.MYPP) {
+      setGlobalRateVal(8);
+      setUtdRateVal(8);
+      setLxdRateVal(8);
+    } else if (newMethod === PricingMethod.MYFPI) {
+      setUtdRateVal(8);
+      setLxdRateVal(5);
+      if (selectedProductIds.includes('utd')) {
+        setGlobalRateVal(8);
+      } else if (selectedProductIds.includes('lxd')) {
+        setGlobalRateVal(5);
+      }
+    }
+  };
+
   // Helper to generate rate array [val, val, val...]
   const generateRateArray = (val: number, count: number) => {
-    const safeCount = Math.max(0, isNaN(count) ? 0 : count);
+    const safeCount = Math.max(0, Math.floor(Number(count) || 0));
     return new Array(safeCount).fill(val);
   };
 
@@ -539,11 +556,9 @@ const App: React.FC = () => {
     <div className="mb-4">
       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{label}</label>
       <div className="flex items-center">
-        <input
-          type="number"
-          step="1" 
+        <FormattedNumberInput
           value={value}
-          onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
+          onChange={onChange}
           className={`w-24 text-sm rounded p-2 text-left bg-white dark:bg-gray-700 text-gray-900 dark:text-white border ${colorClass} dark:border-gray-600 focus:ring-2 focus:ring-blue-500 font-sans tabular-nums`}
         />
         <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
@@ -1013,14 +1028,14 @@ const App: React.FC = () => {
                        <label className="inline-flex items-center">
                          <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600" 
                            checked={method === PricingMethod.MYFPI}
-                           onChange={() => setMethod(PricingMethod.MYFPI)}
+                           onChange={() => handleMethodChange(PricingMethod.MYFPI)}
                          />
                          <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYFPI</span>
                        </label>
                        <label className="inline-flex items-center">
                          <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600"
                            checked={method === PricingMethod.MYPP}
-                           onChange={() => setMethod(PricingMethod.MYPP)}
+                           onChange={() => handleMethodChange(PricingMethod.MYPP)}
                          />
                          <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYPP</span>
                        </label>
@@ -1077,6 +1092,34 @@ const App: React.FC = () => {
                           ) : (
                             renderRateInput("Rate", globalRateVal, setGlobalRateVal, "Annual %")
                         )}
+                        
+                        {/* Exception Form Alert */}
+                        {(() => {
+                            let showExceptionAlert = false;
+                            if (method === PricingMethod.MYPP) {
+                                if (showSplitRates) {
+                                    if (utdRateVal < 8 || utdRateVal > 25 || lxdRateVal < 8 || lxdRateVal > 25) showExceptionAlert = true;
+                                } else {
+                                    if (globalRateVal < 8 || globalRateVal > 25) showExceptionAlert = true;
+                                }
+                            } else if (method === PricingMethod.MYFPI) {
+                                if (showSplitRates) {
+                                    if (utdRateVal < 8 || lxdRateVal < 5) showExceptionAlert = true;
+                                } else {
+                                    if (selectedProductIds.includes('utd') && globalRateVal < 8) showExceptionAlert = true;
+                                    if (selectedProductIds.includes('lxd') && !selectedProductIds.includes('utd') && globalRateVal < 5) showExceptionAlert = true;
+                                }
+                            }
+                            
+                            if (showExceptionAlert) {
+                                return (
+                                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700 font-medium">
+                                        Exception Form is required for this discount
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })()}
                       </>
                   )}
                </div>
