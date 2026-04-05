@@ -22,14 +22,15 @@ const formatCurrency = (amount: number, currency: 'USD' | 'SAR') => {
 };
 
 // Initialize PostHog outside the component so it runs immediately
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && !(window as any).__POSTHOG_INITIALIZED__) {
   posthog.init('phc_CxbCQgNgpx8NLdaWIQcW92rCssMtanf6RZXGTeab0iC', {
     api_host: window.location.origin + '/p', // Use absolute URL for the proxy endpoint
     ui_host: 'https://eu.posthog.com', // Keep the UI host pointing to PostHog
-    autocapture: true,
+    autocapture: false, // Disabled to prevent client rate limiting from rapid UI interactions
     capture_pageview: true, // Enable automatic pageview capture
     capture_pageleave: true // Track when users leave
   });
+  (window as any).__POSTHOG_INITIALIZED__ = true;
 }
 
 const App: React.FC = () => {
@@ -978,7 +979,7 @@ const App: React.FC = () => {
                                min="0"
                                max="100"
                                disabled={shouldDisableLXDDiscount}
-                               className={`block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums ${shouldDisableLXDDiscount ? 'opacity-50 cursor-not-allowed' : ''}`}
+                               className={`block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums ph-no-capture ${shouldDisableLXDDiscount ? 'opacity-50 cursor-not-allowed' : ''}`}
                                value={input.baseDiscount}
                                onChange={(e) => handleInputChange(product.id, 'baseDiscount', parseFloat(e.target.value) || 0)}
                              />
@@ -1019,7 +1020,7 @@ const App: React.FC = () => {
                       type="number" min="1" max="7" 
                       value={years} 
                       onChange={(e) => setYears(parseInt(e.target.value))}
-                      className="mt-1 block w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
+                      className="mt-1 block w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums ph-no-capture"
                     />
                  </div>
                  <div className="w-2/3">
