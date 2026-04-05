@@ -98,7 +98,7 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
   return (
     <input
       type="text"
-      className={className}
+      className={`${className} ph-no-capture`}
       disabled={disabled}
       value={internalValue}
       onChange={handleChange}
