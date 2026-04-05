@@ -43,7 +43,7 @@ export const PRODUCT_FULL_NAMES: Record<string, string> = {
   "ANYWHERE": "UpToDate® Anywhere",
   "UTDADV": "UpToDate® Advanced™",
   "UTDEE": "UpToDate® Enterprise™",
-  "SM": "UpToDate® Small Market",
+  "SM": "UpToDate® Subscriber Manager",
   "BASE PKG": "Lexidrug® Base Package",
   "BASE PKG+FLINK": "Lexidrug® Base Package + Formulary Link",
   "BASE PKG+FLINK+IPE": "Lexidrug® Base Package + Formulary Link + IPE",
@@ -106,6 +106,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const [pdfError, setPdfError] = useState<string | null>(null);
 
   // PDF Options
+  const isUtdSm = config.selectedProducts.includes('utd') && config.productInputs['utd']?.variant === 'SM';
   const [showMonthlyCost, setShowMonthlyCost] = useState(true);
   const [showTotals, setShowTotals] = useState(true);
   const [showEmrIntegration, setShowEmrIntegration] = useState(true); // Default true for EMR term
@@ -284,6 +285,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         if (variant === 'ANYWHERE') title = "UpToDate\u00AE Anywhere";
         if (variant === 'UTDADV') title = "UpToDate\u00AE Advanced";
         if (variant === 'UTDEE') title = "UpToDate\u00AE Enterprise";
+        if (variant === 'SM') title = "UpToDate\u00AE Subscriber Manager";
         doc.setFontSize(22);
         doc.setFont(fontName, 'bold');
         doc.text(title, 105, currentY, { align: 'center' });
@@ -855,6 +857,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         const hasHospitalPharmacyModel = config.selectedProducts.includes('lxd') && config.productInputs['lxd']?.variant === 'Hospital Pharmacy Model';
         if (hasHospitalPharmacyModel) {
             terms.push({ text: "This subscription is limited to the above number of seats." });
+        }
+
+        if (isUtdSm) {
+            terms.push({ text: "This subscription is limited to the number of seats mentioned above." });
         }
     }
 
@@ -1668,11 +1674,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                   <input 
                     id="show-monthly-cost"
                     type="checkbox" 
-                    checked={showMonthlyCost} 
+                    checked={isUtdSm ? false : showMonthlyCost} 
                     onChange={(e) => setShowMonthlyCost(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                    disabled={isUtdSm}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
-                  <label htmlFor="show-monthly-cost" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+                  <label htmlFor="show-monthly-cost" className={`ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 ${isUtdSm ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                       Show Monthly Cost
                   </label>
               </div>
@@ -1694,11 +1701,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                   <input 
                     id="show-emr-integration"
                     type="checkbox" 
-                    checked={showEmrIntegration} 
+                    checked={isUtdSm ? false : showEmrIntegration} 
                     onChange={(e) => setShowEmrIntegration(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                    disabled={isUtdSm}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
-                  <label htmlFor="show-emr-integration" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+                  <label htmlFor="show-emr-integration" className={`ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 ${isUtdSm ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                       Include EMR Term
                   </label>
               </div>
@@ -1707,11 +1715,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                   <input 
                     id="has-opt-out"
                     type="checkbox" 
-                    checked={hasOptOutClause} 
+                    checked={isUtdSm ? false : hasOptOutClause} 
                     onChange={(e) => setHasOptOutClause(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                    disabled={isUtdSm}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
-                  <label htmlFor="has-opt-out" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+                  <label htmlFor="has-opt-out" className={`ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 ${isUtdSm ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                       Include Opt-out Clause
                   </label>
               </div>
@@ -1722,14 +1731,15 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               <input 
                 id="designated-sites-check"
                 type="checkbox" 
-                checked={hasDesignatedSites} 
+                checked={isUtdSm ? false : hasDesignatedSites} 
                 onChange={(e) => handleSiteCheckboxChange(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                disabled={isUtdSm}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
               />
-              <label htmlFor="designated-sites-check" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+              <label htmlFor="designated-sites-check" className={`ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 ${isUtdSm ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                   Add designated sites
               </label>
-              {hasDesignatedSites && (
+              {hasDesignatedSites && !isUtdSm && (
                   <button 
                     onClick={() => setIsSiteModalOpen(true)}
                     className="ml-2 text-[10px] text-blue-600 underline hover:text-blue-800"

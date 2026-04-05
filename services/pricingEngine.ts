@@ -436,9 +436,11 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
   
   const productSchedules: Record<string, number[]> = {};
 
+  const safeYears = Math.max(0, Math.floor(Number(years) || 0));
+
   selectedProducts.forEach(prodId => {
     const y1Value = year1ProductNets[prodId];
-    const schedule = new Array(years).fill(0);
+    const schedule = new Array(safeYears).fill(0);
     
     const specificRates = productRates[prodId] || rates;
 
@@ -468,9 +470,9 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
       // Calculate sum of projected years
       const totalPeriodCost = schedule.reduce((acc, val) => acc + val, 0);
       // Average it
-      const averageAnnual = totalPeriodCost / years;
+      const averageAnnual = safeYears > 0 ? totalPeriodCost / safeYears : 0;
       // Overwrite schedule with flat values
-      productSchedules[prodId] = new Array(years).fill(averageAnnual);
+      productSchedules[prodId] = new Array(safeYears).fill(averageAnnual);
     });
   }
 

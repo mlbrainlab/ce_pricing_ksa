@@ -37,14 +37,12 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
     
     // If the parsed internal value matches the prop value, don't update to avoid cursor jumping
     const parsedInternal = parseFloat(internalValue.replace(/,/g, ''));
-    if (!isNaN(parsedInternal) && parsedInternal === value && internalValue.endsWith('.')) {
-      return;
-    }
-    if (!isNaN(parsedInternal) && parsedInternal === value && internalValue.endsWith('.0')) {
+    if (!isNaN(parsedInternal) && parsedInternal === value) {
+      // If it's just "0" or ends with "." or ".0", keep the internal value
       return;
     }
 
-    if (value === 0) {
+    if (value === 0 && internalValue !== "0") {
       setInternalValue("");
     } else {
       setInternalValue(formatWithCommas(value.toString()));
@@ -52,7 +50,7 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
   }, [value]);
 
   const handleFocus = () => {
-    if (value === 0) {
+    if (value === 0 && internalValue !== "0") {
       setInternalValue("");
     }
   };
