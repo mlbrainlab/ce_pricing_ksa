@@ -144,67 +144,62 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
          const effectiveStats = (inputs.changeInStats && inputs.count > 0) ? inputs.count : (inputs.existingCount || 1);
          const expiringRate = inputs.existingCount && inputs.existingCount > 0 ? (expiring / inputs.existingCount) : expiring;
          
-         // Calculate the value for their current variant
-         const calcCurrent = effectiveStats * expiringRate * (1 + (upliftVal / 100));
-         
-         // Calculate the value if they upgraded to Advanced (only applicable if currently Anywhere)
-         const calcAdvanced = existing === 'ANYWHERE' 
-            ? effectiveStats * expiringRate * (1 + (upliftVal / 100) + 0.08)
-            : calcCurrent;
-            
+         const calculatePriceForTarget = (currentTarget: string) => {
+             if (inputs.changeInStats && inputs.count > (inputs.existingCount || 0)) {
+                 // If stats changed and are higher, use the list price (baseNet)
+                 const gross = UTD_VARIANTS[currentTarget] * inputs.count;
+                 const net = gross * (1 - ((inputs.baseDiscount || 0) / 100));
+                 return applyWHT ? net / WHT_FACTOR : net;
+             } else if (existing === currentTarget) {
+                 // Same Variant (or stats decreased)
+                 if (existing === 'UTDEE') return effectiveStats * expiringRate * 1.08;
+                 return effectiveStats * expiringRate * (1 + (upliftVal / 100));
+             } else {
+                 // Variant Upgrade (or stats decreased)
+                 if (existing === 'ANYWHERE' && currentTarget === 'UTDADV') {
+                     return effectiveStats * expiringRate * (1 + (upliftVal / 100) + 0.08);
+                 } else if (existing === 'ANYWHERE' && currentTarget === 'UTDEE') {
+                     return effectiveStats * expiringRate * 1.11;
+                 } else if (existing === 'UTDADV' && currentTarget === 'UTDEE') {
+                     return effectiveStats * expiringRate * 1.11;
+                 } else {
+                     return effectiveStats * expiringRate * (1 + (upliftVal / 100));
+                 }
+             }
+         };
+
+         pathBasedPrice = calculatePriceForTarget(target);
+
          // Check EE Eligibility
          let isEligibleForEE = false;
          if (existing === 'UTDEE') {
              isEligibleForEE = true;
-         } else if (existing === 'ANYWHERE') {
-             if (calcCurrent > 30000 || calcAdvanced > 30000) isEligibleForEE = true;
-         } else if (existing === 'UTDADV') {
-             if (calcCurrent > 30000) isEligibleForEE = true;
+         } else if (pathBasedPrice > 30000) {
+             isEligibleForEE = true;
          }
          
          if (target === 'UTDEE' && !isEligibleForEE) {
              productNotes.push(`UTD: Ineligible for EE (Renewal < $30k). Reverting to ${existing}.`);
              finalTarget = existing;
+             pathBasedPrice = calculatePriceForTarget(finalTarget);
          } else if (finalTarget !== 'UTDEE' && isEligibleForEE) {
              productNotes.push(`UTD: Renewal > $30k. Recommend upgrading to UTD EE.`);
          }
-         
-         // 1. Determine Path-Based Renewal Price
-         if (existing === finalTarget) {
-            // Same Variant
-            if (existing === 'UTDEE') {
-                pathBasedPrice = effectiveStats * expiringRate * 1.08;
-            } else {
-                pathBasedPrice = effectiveStats * expiringRate * (1 + (upliftVal / 100));
-            }
-         } else {
-            // Variant Upgrade
-            if (existing === 'ANYWHERE' && finalTarget === 'UTDADV') {
-                pathBasedPrice = effectiveStats * expiringRate * (1 + (upliftVal / 100) + 0.08);
-                productNotes.push(`UTD: Upsell Anywhere -> Adv (+8% applied)`);
-            } else if (existing === 'ANYWHERE' && finalTarget === 'UTDEE') {
-                pathBasedPrice = effectiveStats * expiringRate * 1.11;
-                productNotes.push(`UTD: Upsell Anywhere -> EE (11% applied)`);
-            } else if (existing === 'UTDADV' && finalTarget === 'UTDEE') {
-                pathBasedPrice = effectiveStats * expiringRate * 1.11;
-                productNotes.push(`UTD: Upsell Adv -> EE (11% applied)`);
-            } else {
-                // Fallback
-                pathBasedPrice = effectiveStats * expiringRate * (1 + (upliftVal / 100));
-            }
+
+         if (inputs.changeInStats && inputs.count > (inputs.existingCount || 0)) {
+             productNotes.push(`UTD: Stats Increased - Using list price ($${pathBasedPrice.toFixed(0)})`);
+         } else if (existing !== finalTarget) {
+             if (existing === 'ANYWHERE' && finalTarget === 'UTDADV') {
+                 productNotes.push(`UTD: Upsell Anywhere -> Adv (+8% applied)`);
+             } else if (finalTarget === 'UTDEE') {
+                 productNotes.push(`UTD: Upsell to EE (11% applied)`);
+             }
          }
 
-         // 2. Universal "Stats Change" Check
-         // "at any time... prioritize the new stats... if it's only higher"
-         if (inputs.changeInStats && baseNet > pathBasedPrice) {
-            actualY1Price = baseNet;
-            productNotes.push(`UTD: Stats Change Override ($${baseNet.toFixed(0)})`);
-         } else {
-            actualY1Price = pathBasedPrice;
-         }
+         actualY1Price = pathBasedPrice;
 
          // 3. Define Renewal Base
-         const isHigherValueOverride = inputs.changeInStats && baseNet > pathBasedPrice;
+         const isHigherValueOverride = inputs.changeInStats && inputs.count > (inputs.existingCount || 0);
 
          if (existing === finalTarget && !isHigherValueOverride && !inputs.changeInStats) {
              renewalBase = actualY1Price; // Absorb entire price as base (Upsell = 0)
