@@ -610,10 +610,12 @@ const App: React.FC = () => {
     <div className="mb-4">
       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{label}</label>
       <div className="flex items-center">
-        <FormattedNumberInput
+        <input
+          type="number"
+          step="0.1"
           value={value}
-          onChange={onChange}
-          className={`w-24 text-sm rounded p-2 text-left bg-white dark:bg-gray-700 text-gray-900 dark:text-white border ${colorClass} dark:border-gray-600 focus:ring-2 focus:ring-blue-500 font-sans tabular-nums`}
+          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+          className={`w-24 text-sm rounded p-2 text-left bg-white dark:bg-gray-700 text-gray-900 dark:text-white border ${colorClass} dark:border-gray-600 focus:ring-2 focus:ring-blue-500 font-sans tabular-nums ph-no-capture`}
         />
         <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
            {suffixText}
@@ -625,7 +627,7 @@ const App: React.FC = () => {
   // Label Logic for Annual Rate
   const getAnnualRateLabel = () => {
      if (showSplitRates && productMethods.utd !== productMethods.lxd) return "Annual Rates %";
-     if (method === PricingMethod.MYPP) return "Annual Reverse Discount %";
+     if (method === PricingMethod.MYPP) return "MYPP reverse discount %";
      if (dealType === DealType.RENEWAL) return "Annual Increase % (Year 2+)";
      return "Annual Increase %";
   };
@@ -1095,8 +1097,9 @@ const App: React.FC = () => {
                                <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600"
                                  checked={productMethods.utd === PricingMethod.MYPP}
                                  onChange={() => handleProductMethodChange('utd', PricingMethod.MYPP)}
+                                 disabled={dealType === DealType.RENEWAL && !(productInputs.utd?.variant === 'UTDEE' && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0))}
                                />
-                               <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYPP</span>
+                               <span className={`ml-2 text-xs ${dealType === DealType.RENEWAL && !(productInputs.utd?.variant === 'UTDEE' && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0)) ? 'text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>MYPP</span>
                              </label>
                           </div>
                         </div>
@@ -1133,8 +1136,9 @@ const App: React.FC = () => {
                            <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600"
                              checked={method === PricingMethod.MYPP}
                              onChange={() => handleMethodChange(PricingMethod.MYPP)}
+                             disabled={dealType === DealType.RENEWAL && selectedProductIds.includes('utd') && !(productInputs.utd?.variant === 'UTDEE' && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0))}
                            />
-                           <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYPP</span>
+                           <span className={`ml-2 text-xs ${dealType === DealType.RENEWAL && selectedProductIds.includes('utd') && !(productInputs.utd?.variant === 'UTDEE' && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0)) ? 'text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>MYPP</span>
                          </label>
                       </div>
                     )}
@@ -1149,11 +1153,11 @@ const App: React.FC = () => {
                     </div>
                     {showSplitRates ? (
                       <>
-                        {renderRateInput("UTD Uplift", renewalUpliftUTD, setRenewalUpliftUTD, "Uplift %", "border-blue-200 dark:border-blue-800")}
-                        {renderRateInput("LXD Uplift", renewalUpliftLXD, setRenewalUpliftLXD, "Uplift %", "border-green-200 dark:border-green-800")}
+                        {productMethods.utd !== PricingMethod.MYPP && renderRateInput("UTD Uplift", renewalUpliftUTD, setRenewalUpliftUTD, "Uplift %", "border-blue-200 dark:border-blue-800")}
+                        {productMethods.lxd !== PricingMethod.MYPP && renderRateInput("LXD Uplift", renewalUpliftLXD, setRenewalUpliftLXD, "Uplift %", "border-green-200 dark:border-green-800")}
                       </>
                     ) : (
-                      renderRateInput("Uplift", renewalUpliftGlobal, setRenewalUpliftGlobal, "Uplift %")
+                      method !== PricingMethod.MYPP && renderRateInput("Uplift", renewalUpliftGlobal, setRenewalUpliftGlobal, "Uplift %")
                     )}
                  </div>
                )}
