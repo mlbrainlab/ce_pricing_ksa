@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "tsc && vite build && esbuild server.ts --bundle --platform=node --format=esm --external:express --external:cookie-parser --external:jsonwebtoken --external:lightningcss --external:vite --outfile=server-build.js",
-    "start": "node server-build.js",
+    "build": "tsc && vite build && esbuild server.ts app.ts --bundle --platform=node --format=esm --external:express --external:cookie-parser --external:jsonwebtoken --external:lightningcss --external:vite --outdir=dist-server",
+    "start": "node dist-server/server.js",
     "preview": "vite preview",
     "lint": "tsc --noEmit"
   },
