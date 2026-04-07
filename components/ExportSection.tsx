@@ -70,9 +70,9 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   extensionResults
 }) => {
   const [customerName, setCustomerName] = useState('');
-  const [repName, setRepName] = useState('');
-  const [repPhone, setRepPhone] = useState('');
-  const [repEmail, setRepEmail] = useState('');
+  const [repName, setRepName] = useState(() => localStorage.getItem('wk_rep_name') || '');
+  const [repPhone, setRepPhone] = useState(() => localStorage.getItem('wk_rep_phone') || '');
+  const [repEmail, setRepEmail] = useState(() => localStorage.getItem('wk_rep_email') || '');
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [isExcelLoading, setIsExcelLoading] = useState(false);
   
@@ -80,19 +80,9 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   React.useEffect(() => {
     const authName = localStorage.getItem('wk_auth_name');
     if (authName) {
-      const initials = authName.toLowerCase();
-      const credentials: Record<string, { name: string, email: string, phone: string }> = {
-        'aa': { name: 'REDACTED', email: 'REDACTED', phone: 'REDACTED' },
-        'ma': { name: 'REDACTED', email: 'REDACTED', phone: 'REDACTED' },
-        'ai': { name: 'REDACTED', email: 'REDACTED', phone: 'REDACTED' },
-        'mn': { name: 'REDACTED', email: 'REDACTED', phone: 'REDACTED' }
-      };
-      
-      if (credentials[initials]) {
-        setRepName(credentials[initials].name);
-        setRepEmail(credentials[initials].email);
-        setRepPhone(credentials[initials].phone);
-      }
+      // PII removed for security compliance. 
+      // Users will need to manually enter their details or we can integrate a secure backend/SSO later.
+      setRepName(authName.toUpperCase());
     }
   }, []);
   
@@ -1644,8 +1634,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             type="text" 
             placeholder="Enter Rep Name"
             value={repName}
-            readOnly
-            className="block w-full text-sm border-gray-300 rounded-md shadow-sm border p-2 bg-gray-100 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-300 font-sans cursor-not-allowed"
+            onChange={(e) => {
+              setRepName(e.target.value);
+              localStorage.setItem('wk_rep_name', e.target.value);
+            }}
+            className="block w-full text-sm border-gray-300 rounded-md shadow-sm border p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white font-sans focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <div>
@@ -1654,8 +1647,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
              type="email" 
              placeholder="first.last@wolterskluwer.com"
              value={repEmail}
-             readOnly
-             className="block w-full text-sm border-gray-300 rounded-md shadow-sm border p-2 bg-gray-100 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-300 font-sans cursor-not-allowed"
+             onChange={(e) => {
+               setRepEmail(e.target.value);
+               localStorage.setItem('wk_rep_email', e.target.value);
+             }}
+             className="block w-full text-sm border-gray-300 rounded-md shadow-sm border p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white font-sans focus:ring-2 focus:ring-blue-500"
            />
         </div>
         <div>
@@ -1664,8 +1660,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
              type="tel" 
              placeholder="+966..."
              value={repPhone}
-             readOnly
-             className="block w-full text-sm border-gray-300 rounded-md shadow-sm border p-2 bg-gray-100 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-300 font-sans cursor-not-allowed"
+             onChange={(e) => {
+               setRepPhone(e.target.value);
+               localStorage.setItem('wk_rep_phone', e.target.value);
+             }}
+             className="block w-full text-sm border-gray-300 rounded-md shadow-sm border p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white font-sans focus:ring-2 focus:ring-blue-500"
            />
         </div>
       </div>

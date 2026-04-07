@@ -3,7 +3,7 @@ import posthog from 'posthog-js';
 import Login from './components/Login';
 import { Layout } from './components/Layout';
 import { ExportSection } from './components/ExportSection';
-import { calculatePricing } from './services/pricingEngine';
+import { logout } from './components/auth';
 import { FormattedNumberInput } from './components/FormattedNumberInput';
 import { 
   DealType, 
@@ -36,30 +36,29 @@ if (typeof window !== 'undefined' && !(window as any).__POSTHOG_INITIALIZED__) {
 const App: React.FC = () => {
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthChecked, setIsAuthChecked] = useState(false);
 
   useEffect(() => {
-    // Check if user is already authenticated for the current month
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const authMonth = localStorage.getItem('wk_auth_month');
-    const authName = localStorage.getItem('wk_auth_name');
-
-    if (authMonth === currentMonth && authName) {
-      setIsAuthenticated(true);
-      posthog.identify(authName);
-    }
+    // Check if user is already authenticated via backend cookie
+    fetch('/api/verify')
+      .then(res => {
+        if (res.ok) {
+          setIsAuthenticated(true);
+        }
+      })
+      .catch(err => console.error('Auth verification failed:', err))
+      .finally(() => setIsAuthChecked(true));
   }, []);
 
   const handleLogin = (name: string) => {
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    localStorage.setItem('wk_auth_month', currentMonth);
     localStorage.setItem('wk_auth_name', name);
     setIsAuthenticated(true);
     posthog.identify(name);
     posthog.capture('user_logged_in', { name });
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('wk_auth_month');
+  const handleLogout = async () => {
+    await logout();
     localStorage.removeItem('wk_auth_name');
     setIsAuthenticated(false);
     posthog.reset();
@@ -320,7 +319,30 @@ const App: React.FC = () => {
   }, [dealType, channel, selectedProductIds, productInputs, years, method, productMethods, globalRateVal, utdRateVal, lxdRateVal, renewalUpliftGlobal, renewalUpliftUTD, renewalUpliftLXD, showSplitRates, applyWHT, flatPricing, rounding, applyAnnualRate, useStartDate, startMonthYear]);
 
   // Results
-  const results = useMemo(() => calculatePricing(config), [config]);
+  const [results, setResults] = useState<any>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const fetchPricing = async () => {
+      try {
+        const res = await fetch('/api/calculate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setResults(data);
+        }
+      } catch (error) {
+        console.error('Calculation failed:', error);
+      }
+    };
+
+    const timeoutId = setTimeout(fetchPricing, 300);
+    return () => clearTimeout(timeoutId);
+  }, [config, isAuthenticated]);
 
   // Extension Quote Logic
   const extensionResults = useMemo(() => {
@@ -423,7 +445,7 @@ const App: React.FC = () => {
        if (inputs.variant === 'UTDEE') {
          // Check Year 1 Gross USD for UTD
          // We can find it in yearlyResults[0].breakdown
-         const utdY1 = results.yearlyResults[0]?.breakdown.find(p => p.id === 'utd');
+         const utdY1 = results?.yearlyResults?.[0]?.breakdown.find((p: any) => p.id === 'utd');
          if (utdY1 && utdY1.gross < 30000) {
            return "Warning: UTDEE deals under $30k/year require additional approval.";
          }
@@ -443,14 +465,14 @@ const App: React.FC = () => {
     if (config.selectedProducts.includes('utd')) {
         const count = config.productInputs['utd'].count || 1; 
         if (config.productInputs['utd'].count > 0) {
-            const totalGrossUSD = results.yearlyResults.reduce((sum, r) => {
-                const bd = r.breakdown.find(x => x.id === 'utd');
+            const totalGrossUSD = results?.yearlyResults?.reduce((sum: number, r: any) => {
+                const bd = r.breakdown.find((x: any) => x.id === 'utd');
                 return sum + (bd ? bd.gross : 0);
-            }, 0);
-            const totalGrossSAR = results.yearlyResults.reduce((sum, r) => {
-                const bd = r.breakdown.find(x => x.id === 'utd');
+            }, 0) || 0;
+            const totalGrossSAR = results?.yearlyResults?.reduce((sum: number, r: any) => {
+                const bd = r.breakdown.find((x: any) => x.id === 'utd');
                 return sum + (bd ? bd.grossSAR : 0);
-            }, 0);
+            }, 0) || 0;
 
             const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
             const monthlyPerUnit = acv / count / 12;
@@ -461,14 +483,14 @@ const App: React.FC = () => {
     if (config.selectedProducts.includes('lxd')) {
         const count = config.productInputs['lxd'].count || 1;
         if (config.productInputs['lxd'].count > 0) {
-            const totalGrossUSD = results.yearlyResults.reduce((sum, r) => {
-                const bd = r.breakdown.find(x => x.id === 'lxd');
+            const totalGrossUSD = results?.yearlyResults?.reduce((sum: number, r: any) => {
+                const bd = r.breakdown.find((x: any) => x.id === 'lxd');
                 return sum + (bd ? bd.gross : 0);
-            }, 0);
-            const totalGrossSAR = results.yearlyResults.reduce((sum, r) => {
-                const bd = r.breakdown.find(x => x.id === 'lxd');
+            }, 0) || 0;
+            const totalGrossSAR = results?.yearlyResults?.reduce((sum: number, r: any) => {
+                const bd = r.breakdown.find((x: any) => x.id === 'lxd');
                 return sum + (bd ? bd.grossSAR : 0);
-            }, 0);
+            }, 0) || 0;
 
             const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
             const monthlyPerUnit = acv / count / 12;
@@ -636,6 +658,10 @@ const App: React.FC = () => {
   const isUtdRateVisible = dealType !== DealType.RENEWAL || (showSplitRates ? productMethods.utd === PricingMethod.MYPP : method === PricingMethod.MYPP) || applyAnnualRate;
   const isLxdRateVisible = dealType !== DealType.RENEWAL || (showSplitRates ? productMethods.lxd === PricingMethod.MYPP : method === PricingMethod.MYPP) || applyAnnualRate;
   const shouldShowAnnualRateInputs = isUtdRateVisible || isLxdRateVisible;
+
+  if (!isAuthChecked) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-500">Loading...</div>;
+  }
 
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
@@ -1231,22 +1257,22 @@ const App: React.FC = () => {
 
                         {/* MYPP Threshold Alert */}
                         {(() => {
-                            const y1Breakdown = results.yearlyResults[0]?.breakdown || [];
+                            const y1Breakdown = results?.yearlyResults?.[0]?.breakdown || [];
                             const alerts = [];
                             
                             if (showSplitRates) {
                                 if (productMethods.utd === PricingMethod.MYPP) {
-                                    const utdY1 = y1Breakdown.find(p => p.id === 'utd')?.net || 0;
+                                    const utdY1 = y1Breakdown.find((p: any) => p.id === 'utd')?.net || 0;
                                     if (utdY1 < 10000) alerts.push("UTD MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.");
                                 }
                                 if (productMethods.lxd === PricingMethod.MYPP) {
-                                    const lxdY1 = y1Breakdown.find(p => p.id === 'lxd')?.net || 0;
+                                    const lxdY1 = y1Breakdown.find((p: any) => p.id === 'lxd')?.net || 0;
                                     if (lxdY1 < 10000) alerts.push("LXD MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.");
                                 }
                             } else {
                                 if (method === PricingMethod.MYPP) {
                                     selectedProductIds.forEach(pid => {
-                                        const y1 = y1Breakdown.find(p => p.id === pid)?.net || 0;
+                                        const y1 = y1Breakdown.find((p: any) => p.id === pid)?.net || 0;
                                         if (y1 < 10000) {
                                             const name = AVAILABLE_PRODUCTS.find(p => p.id === pid)?.shortName || pid.toUpperCase();
                                             alerts.push(`${name} MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.`);
@@ -1317,6 +1343,13 @@ const App: React.FC = () => {
         {/* Right Column: Output */}
         <div className="xl:col-span-2 space-y-6 xl:sticky xl:top-24 h-fit">
           
+          {isExtensionQuote && !extensionResults && (
+            <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-12 flex flex-col items-center justify-center border border-gray-200 dark:border-gray-700">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+              <p className="text-gray-500 dark:text-gray-400">Calculating extension...</p>
+            </div>
+          )}
+
           {isExtensionQuote && extensionResults && (
             <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 transition-colors">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
@@ -1505,7 +1538,14 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {!isExtensionQuote && (
+          {!isExtensionQuote && !results && (
+            <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-12 flex flex-col items-center justify-center border border-gray-200 dark:border-gray-700">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+              <p className="text-gray-500 dark:text-gray-400">Calculating pricing...</p>
+            </div>
+          )}
+
+          {!isExtensionQuote && results && (
             <>
           <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 transition-colors">
              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
@@ -1571,13 +1611,13 @@ const App: React.FC = () => {
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
-                     {results.yearlyResults.map((r, i) => (
+                     {results?.yearlyResults?.map((r: any, i: number) => (
                         <tr key={r.year} className={i % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700/50'}>
                            <td className="px-4 py-4 text-center text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">Year {r.year}</td>
                            
                            {/* Product Columns Data Gross USD */}
                            {selectedProductIds.map(pid => {
-                             const pData = r.breakdown.find(d => d.id === pid);
+                             const pData = r.breakdown.find((d: any) => d.id === pid);
                              return (
                                <td key={pid} className="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-300 font-sans tabular-nums whitespace-nowrap">
                                  {pData ? formatCurrency(pData.gross, 'USD') : '-'}
@@ -1592,7 +1632,7 @@ const App: React.FC = () => {
 
                            {/* Product Columns Data Gross SAR (Indirect only) */}
                            {isIndirect && selectedProductIds.map(pid => {
-                             const pData = r.breakdown.find(d => d.id === pid);
+                             const pData = r.breakdown.find((d: any) => d.id === pid);
                              return (
                                <td key={`${pid}-sar`} className="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-300 font-sans tabular-nums whitespace-nowrap">
                                  {pData ? formatCurrency(pData.grossSAR, 'SAR') : '-'}
@@ -1634,7 +1674,7 @@ const App: React.FC = () => {
 
                         {/* Total USD */}
                         <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums whitespace-nowrap">
-                           {formatCurrency(results.totalGrossUSD, 'USD')}
+                           {formatCurrency(results?.totalGrossUSD || 0, 'USD')}
                         </td>
 
                         {/* Empty cells for breakdown columns SAR */}
@@ -1645,7 +1685,7 @@ const App: React.FC = () => {
                          {/* Total SAR */}
                         {isIndirect && (
                            <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums text-yellow-300 whitespace-nowrap">
-                              {formatCurrency(results.totalGrossSAR, 'SAR')}
+                              {formatCurrency(results?.totalGrossSAR || 0, 'SAR')}
                            </td>
                         )}
 
@@ -1653,16 +1693,16 @@ const App: React.FC = () => {
                         {isIndirect && (
                            <>
                               <td className="px-4 py-4 text-center text-sm font-sans tabular-nums text-gray-300 whitespace-nowrap">
-                                 {formatCurrency(results.totalVatSAR, 'SAR')}
+                                 {formatCurrency(results?.totalVatSAR || 0, 'SAR')}
                               </td>
                               <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums text-yellow-300 whitespace-nowrap">
-                                 {formatCurrency(results.totalGrandTotalSAR, 'SAR')}
+                                 {formatCurrency(results?.totalGrandTotalSAR || 0, 'SAR')}
                               </td>
                            </>
                         )}
 
                         <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums text-gray-300 whitespace-nowrap">
-                           {formatCurrency(results.totalNetUSD, 'USD')}
+                           {formatCurrency(results?.totalNetUSD || 0, 'USD')}
                         </td>
                      </tr>
                   </tbody>
@@ -1675,11 +1715,11 @@ const App: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-blue-500 dark:border-blue-400 transition-colors">
                   <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Customer TCV</div>
-                  <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(results.totalGrossUSD, 'USD')}</div>
+                  <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(results?.totalGrossUSD || 0, 'USD')}</div>
                </div>
                <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-indigo-500 dark:border-indigo-400 transition-colors">
                   <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Customer ACV</div>
-                  <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(results.acvUSD, 'USD')}</div>
+                  <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(results?.acvUSD || 0, 'USD')}</div>
                </div>
                
                {/* Net Metrics (Only for Indirect Channels) */}
@@ -1687,11 +1727,11 @@ const App: React.FC = () => {
                  <>
                    <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-gray-500 dark:border-gray-400 transition-colors">
                       <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">Net TCV</div>
-                      <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(results.totalNetUSD, 'USD')}</div>
+                      <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(results?.totalNetUSD || 0, 'USD')}</div>
                    </div>
                    <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-gray-500 dark:border-gray-400 transition-colors">
                       <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">Net ACV</div>
-                      <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(results.netACV, 'USD')}</div>
+                      <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(results?.netACV || 0, 'USD')}</div>
                    </div>
                  </>
                )}
@@ -1701,28 +1741,28 @@ const App: React.FC = () => {
                    {/* Renewal Base ACV (Gross) */}
                    <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-green-500 dark:border-green-400 transition-colors">
                       <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Renewal Base ACV</div>
-                      <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(results.renewalBaseACV, 'USD')}</div>
+                      <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(results?.renewalBaseACV || 0, 'USD')}</div>
                    </div>
 
                    {/* Net Renewal Base ACV (New for Indirect) */}
                    {isIndirect && (
                       <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-green-500 dark:border-green-400 transition-colors">
                           <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">Net Renewal Base</div>
-                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(results.netRenewalBaseACV, 'USD')}</div>
+                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(results?.netRenewalBaseACV || 0, 'USD')}</div>
                       </div>
                    )}
 
                    {/* Upsell ACV (Gross) */}
                    <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-orange-500 dark:border-orange-400 transition-colors">
                       <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Upsell ACV</div>
-                      <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(results.upsellACV, 'USD')}</div>
+                      <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(results?.upsellACV || 0, 'USD')}</div>
                    </div>
 
                    {/* Net Upsell ACV (New for Indirect) */}
                    {isIndirect && (
                       <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-orange-500 dark:border-orange-400 transition-colors">
                           <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">Net Upsell</div>
-                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(results.netUpsellACV, 'USD')}</div>
+                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(results?.netUpsellACV || 0, 'USD')}</div>
                       </div>
                    )}
                  </>
@@ -1736,7 +1776,7 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {selectedProductIds.map(pid => {
                      const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-                     const tcv = results.productNetTotals[pid] || 0;
+                     const tcv = results?.productNetTotals?.[pid] || 0;
                      const acv = tcv / config.years;
                      return (
                        <div key={pid} className="border border-gray-100 dark:border-gray-700 rounded p-3 bg-gray-50 dark:bg-gray-700">
@@ -1807,7 +1847,7 @@ const App: React.FC = () => {
                       {dealType === DealType.RENEWAL && (
                         <li><strong>Renewal Split:</strong> Renewal Base calculated as sum of [Product Expiring × (1 + Product Uplift Rate)]. Upsell is the remainder of ACV.</li>
                       )}
-                      {results.yearlyResults[0].floorAdjusted && (
+                      {results?.yearlyResults?.[0]?.floorAdjusted && (
                         <li><strong>Auto-Adjustment:</strong> Pricing was automatically raised to meet the minimum floor requirements.</li>
                       )}
                       {/* Monthly Cost Analysis */}

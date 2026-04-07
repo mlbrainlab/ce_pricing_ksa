@@ -4,15 +4,18 @@
   "version": "6.5.4",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "tsx server.ts",
+    "build": "tsc && vite build && esbuild server.ts --bundle --platform=node --format=esm --external:express --external:cookie-parser --external:jsonwebtoken --external:lightningcss --outfile=dist/server.js",
+    "start": "node dist/server.js",
     "preview": "vite preview",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "cookie-parser": "^1.4.7",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "http-proxy-middleware": "^3.0.5",
+    "jsonwebtoken": "^9.0.3",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
     "posthog-js": "^1.360.2",
@@ -20,11 +23,14 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.19",
+    "esbuild": "^0.28.0",
     "jimp": "^1.6.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
