@@ -7,7 +7,13 @@ import { calculatePricing } from './services/pricingEngine';
 
 const app = express();
 app.set('trust proxy', 1);
-app.use(express.json());
+app.use((req, res, next) => {
+    if (req.body && Object.keys(req.body).length > 0) {
+        next();
+    } else {
+        express.json()(req, res, next);
+    }
+});
 app.use(cookieParser());
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-for-dev-only-do-not-use-in-prod';
@@ -32,26 +38,34 @@ function hashPasscodeNode(passcode: string) {
 }
 
 app.post('/api/login', (req, res) => {
-    const { passcode } = req.body;
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const expectedHash = MONTHLY_HASHES[currentMonth];
+    try {
+        const { passcode } = req.body;
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const expectedHash = MONTHLY_HASHES[currentMonth];
 
-    if (!expectedHash) {
-        return res.status(401).json({ error: 'No hash for current month' });
-    }
+        if (!expectedHash) {
+            return res.status(401).json({ error: 'No hash for current month' });
+        }
 
-    const inputHash = hashPasscodeNode(passcode);
-    if (inputHash === expectedHash) {
-        const token = jwt.sign({ authenticated: true }, JWT_SECRET, { expiresIn: '12h' });
-        res.cookie('auth_token', token, { 
-            httpOnly: true, 
-            secure: true, 
-            sameSite: 'none',
-            maxAge: 12 * 60 * 60 * 1000 // 12 hours
-        });
-        res.json({ success: true });
-    } else {
-        res.status(401).json({ error: 'Invalid passcode' });
+        if (typeof passcode !== 'string') {
+            return res.status(400).json({ error: 'Passcode must be a string', body: req.body });
+        }
+
+        const inputHash = hashPasscodeNode(passcode);
+        if (inputHash === expectedHash) {
+            const token = jwt.sign({ authenticated: true }, JWT_SECRET, { expiresIn: '12h' });
+            res.cookie('auth_token', token, { 
+                httpOnly: true, 
+                secure: true, 
+                sameSite: 'none',
+                maxAge: 12 * 60 * 60 * 1000 // 12 hours
+            });
+            res.json({ success: true });
+        } else {
+            res.status(401).json({ error: 'Invalid passcode' });
+        }
+    } catch (err: any) {
+        res.status(500).json({ error: err.message, stack: err.stack });
     }
 });
 
