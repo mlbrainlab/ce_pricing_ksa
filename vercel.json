@@ -9,6 +9,10 @@
       "destination": "https://eu.i.posthog.com/:path"
     },
     {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
