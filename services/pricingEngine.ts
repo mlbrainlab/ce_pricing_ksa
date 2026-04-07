@@ -7,7 +7,7 @@ import {
   ChannelType, 
   PricingMethod,
   ProductYearlyData
-} from '../types';
+} from '../types.js';
 import { 
   WHT_FACTOR, 
   EXCHANGE_RATE_SAR, 
@@ -18,7 +18,7 @@ import {
   LXD_VARIANTS,
   LXD_ADDONS,
   UTD_SM_BUCKETS
-} from '../constants';
+} from '../constants.js';
 
 // Dynamic Net Factor Calculation based on Year index and Deal Type
 const getNetFactor = (dealType: DealType, channel: ChannelType, yearIndex: number): number => {

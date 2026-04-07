@@ -1,5 +1,5 @@
 
-import { ProductDefinition } from './types';
+import { ProductDefinition } from './types.js';
 
 export const APP_VERSION = '6.5.5';
 
