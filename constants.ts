@@ -1,9 +1,19 @@
 
 import { ProductDefinition } from './types';
 
-export const APP_VERSION = '6.5.4';
+export const APP_VERSION = '6.5.5';
 
 export const CHANGELOG = [
+  {
+    version: '6.5.5',
+    date: '2026-04-07',
+    changes: [
+      'Security: Migrated pricing engine to backend to protect proprietary algorithms.',
+      'Security: Implemented secure backend authentication and session management.',
+      'Feature: Rep details are now securely stored in local storage for convenience.',
+      'UI Update: Removed initials requirement from login screen.'
+    ]
+  },
   {
     version: '6.5.4',
     date: '2026-04-05',

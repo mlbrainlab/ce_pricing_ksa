@@ -45,8 +45,8 @@ app.post('/api/login', (req, res) => {
         const token = jwt.sign({ authenticated: true }, JWT_SECRET, { expiresIn: '12h' });
         res.cookie('auth_token', token, { 
             httpOnly: true, 
-            secure: process.env.NODE_ENV === 'production', 
-            sameSite: 'strict',
+            secure: true, 
+            sameSite: 'none',
             maxAge: 12 * 60 * 60 * 1000 // 12 hours
         });
         res.json({ success: true });
@@ -56,7 +56,11 @@ app.post('/api/login', (req, res) => {
 });
 
 app.post('/api/logout', (_req, res) => {
-    res.clearCookie('auth_token');
+    res.clearCookie('auth_token', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none'
+    });
     res.json({ success: true });
 });
 

@@ -3,6 +3,7 @@ export async function verifyPasscode(passcode: string): Promise<boolean> {
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ passcode })
     });
     return res.ok;
@@ -14,7 +15,7 @@ export async function verifyPasscode(passcode: string): Promise<boolean> {
 
 export async function logout(): Promise<void> {
   try {
-    await fetch('/api/logout', { method: 'POST' });
+    await fetch('/api/logout', { method: 'POST', credentials: 'include' });
   } catch (error) {
     console.error('Logout error:', error);
   }

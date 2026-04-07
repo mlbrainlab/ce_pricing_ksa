@@ -40,7 +40,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     // Check if user is already authenticated via backend cookie
-    fetch('/api/verify')
+    fetch('/api/verify', { credentials: 'include' })
       .then(res => {
         if (res.ok) {
           setIsAuthenticated(true);
@@ -50,16 +50,13 @@ const App: React.FC = () => {
       .finally(() => setIsAuthChecked(true));
   }, []);
 
-  const handleLogin = (name: string) => {
-    localStorage.setItem('wk_auth_name', name);
+  const handleLogin = () => {
     setIsAuthenticated(true);
-    posthog.identify(name);
-    posthog.capture('user_logged_in', { name });
+    posthog.capture('user_logged_in');
   };
 
   const handleLogout = async () => {
     await logout();
-    localStorage.removeItem('wk_auth_name');
     setIsAuthenticated(false);
     posthog.reset();
   };
@@ -329,11 +326,16 @@ const App: React.FC = () => {
         const res = await fetch('/api/calculate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify(config)
         });
         if (res.ok) {
           const data = await res.json();
           setResults(data);
+        } else if (res.status === 401) {
+          handleLogout();
+        } else {
+          console.error('Calculation failed with status:', res.status);
         }
       } catch (error) {
         console.error('Calculation failed:', error);
