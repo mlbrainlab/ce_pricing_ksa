@@ -1,5 +1,4 @@
 import express from 'express';
-import { createServer as createViteServer } from 'vite';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import path from 'path';
@@ -7,6 +6,7 @@ import crypto from 'crypto';
 import { calculatePricing } from './services/pricingEngine';
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(cookieParser());
 
@@ -93,6 +93,7 @@ app.post('/api/calculate', requireAuth, (req, res) => {
 
 async function startServer() {
     if (process.env.NODE_ENV !== 'production') {
+        const { createServer: createViteServer } = await import('vite');
         const vite = await createViteServer({
             server: { middlewareMode: true },
             appType: 'spa'
