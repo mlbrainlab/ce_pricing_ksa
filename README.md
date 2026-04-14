@@ -28,8 +28,12 @@ A comprehensive web-based pricing calculator for Clinical Effectiveness (CE) pro
 * Introduced "Extension" as a brand new Deal Type alongside New Logo and Renewal.
 * Added Option A (Pro-rated) and Option B (Flat Rate) calculation logic.
 
-**v6.5.0: Automation & Refinements (Current Version)**
+**v6.5.0: Automation & Refinements**
 * Feature: "Use Full Extension" logic (calculating exact days, months, and suggesting percentages).
 * Feature: Auto Credential Capture (mapping initials to full name, email, and phone automatically).
 * Patch/Fix: Fixed the infinite "processing..." bug in the PDF export.
 * Patch/Fix: Added the "Reset Form" button and removed the default UTD product selection.
+
+**v6.5.5: Export & Validation Refinements (Current Version)**
+* Feature: Added core product mix (UTD/LXD) to the exported PDF and Excel filenames.
+* Patch/Fix: "Include Start Date" is now unselected by default for all deal types, and exporting is disabled until a start date is explicitly selected.

@@ -1005,9 +1005,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         addFooter(i);
     }
 
+    const productMix = config.selectedProducts.map(p => p.toUpperCase()).join('_');
     const filename = customerName 
-       ? `Quote_${customerName.replace(/\s+/g,'_')}_${config.dealType}_${new Date().toISOString().slice(0,10)}.pdf`
-       : `Quote_${config.dealType}_${new Date().toISOString().slice(0,10)}.pdf`;
+       ? `Quote_${customerName.replace(/\s+/g,'_')}_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.pdf`
+       : `Quote_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.pdf`;
     doc.save(filename);
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -1358,9 +1359,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const link = document.createElement('a');
       link.href = window.URL.createObjectURL(blob);
+      const productMix = config.selectedProducts.map(p => p.toUpperCase()).join('_');
       const filename = customerName 
-       ? `Quote_${customerName.replace(/\s+/g,'_')}_${config.dealType}_${new Date().toISOString().slice(0,10)}.xlsx`
-       : `Quote_${config.dealType}_${new Date().toISOString().slice(0,10)}.xlsx`;
+       ? `Quote_${customerName.replace(/\s+/g,'_')}_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.xlsx`
+       : `Quote_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.xlsx`;
       link.download = filename;
       link.click();
 
@@ -1777,19 +1779,24 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       <div className="flex space-x-4">
         <button 
           onClick={handleExcelExport}
-          disabled={isExcelLoading}
-          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isExcelLoading ? 'bg-green-400' : 'bg-green-600 hover:bg-green-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 font-sans`}
+          disabled={isExcelLoading || (config.dealType !== DealType.NEW_LOGO && !useStartDate)}
+          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isExcelLoading || (config.dealType !== DealType.NEW_LOGO && !useStartDate) ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 font-sans`}
         >
           {isExcelLoading ? 'Generating...' : 'Export Excel (.xlsx)'}
         </button>
         <button 
           onClick={handlePDFExport}
-          disabled={isPdfLoading || isFontLoading}
-          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isPdfLoading || isFontLoading ? 'bg-red-400' : 'bg-red-600 hover:bg-red-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 font-sans`}
+          disabled={isPdfLoading || isFontLoading || (config.dealType !== DealType.NEW_LOGO && !useStartDate)}
+          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isPdfLoading || isFontLoading || (config.dealType !== DealType.NEW_LOGO && !useStartDate) ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 font-sans`}
         >
           {isPdfLoading ? 'Processing...' : (isFontLoading ? 'Loading Fonts...' : 'Export PDF Quote')}
         </button>
       </div>
+      {(config.dealType !== DealType.NEW_LOGO && !useStartDate) && (
+        <div className="mt-2 text-xs text-red-500 font-medium font-sans">
+          Please select "Include Start Date" to enable exporting for Renewals and Extensions.
+        </div>
+      )}
       {pdfError && (
         <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md text-sm font-sans">
           <strong>Error generating PDF:</strong> {pdfError}

@@ -115,15 +115,6 @@ const App: React.FC = () => {
   // Start Date State
   const [useStartDate, setUseStartDate] = useState<boolean>(false);
   const [startMonthYear, setStartMonthYear] = useState<string>(new Date().toISOString().slice(0, 7));
-
-  // Update useStartDate based on dealType
-  useEffect(() => {
-    if (dealType === DealType.RENEWAL || dealType === DealType.EXTENSION) {
-      setUseStartDate(true);
-    } else {
-      setUseStartDate(false);
-    }
-  }, [dealType]);
   
   // Structure Rates (Multi-Year logic: FPI or Reverse Discount)
   const [applyAnnualRate, setApplyAnnualRate] = useState<boolean>(false); // Toggle for Renewal MYFPI
