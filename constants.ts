@@ -5,6 +5,17 @@ export const APP_VERSION = '6.5.6';
 
 export const CHANGELOG = [
   {
+    version: '6.5.6',
+    date: '2026-04-16',
+    changes: [
+      'UI: Updated Duration and Rate inputs to feature touch-friendly + and - buttons.',
+      'UI: Replaced decimals with whole integers for rate fields.',
+      'Feature: Added Architect Notes for renewals comparing Customer ACV directly against expiring amounts.',
+      'Feature: Added optional check to attach renewal increase/decrease information within the PDF Export.',
+      'Export Update: Added exact product mix IDs into exported filenames.'
+    ]
+  },
+  {
     version: '6.5.5',
     date: '2026-04-07',
     changes: [
