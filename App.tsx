@@ -493,6 +493,26 @@ const App: React.FC = () => {
     return analysisParts;
   }, [config, results]);
 
+  const renewalNotes = useMemo(() => {
+    if (config.dealType !== DealType.RENEWAL || !results) return [];
+
+    const notes: string[] = [];
+    const totalExpiringUSD = Object.values(config.productInputs).reduce((sum, p) => sum + (p.expiringAmount || 0), 0);
+    
+    if (totalExpiringUSD > 0) {
+      const customerACV = results.acvUSD;
+      const pct1 = ((customerACV - totalExpiringUSD) / totalExpiringUSD) * 100;
+      const pct1Text = pct1 > 0 ? `${pct1.toFixed(1)}% more` : `${Math.abs(pct1).toFixed(1)}% less`;
+      notes.push(`This renewal proposal is ${pct1Text} compared to current spend.`);
+      
+      const y1GrossUSD = results.yearlyResults[0]?.grossUSD || 0;
+      const pct2 = ((y1GrossUSD - totalExpiringUSD) / totalExpiringUSD) * 100;
+      const pct2Text = pct2 >= 0 ? `increase is ${pct2.toFixed(1)}%` : `decrease is ${Math.abs(pct2).toFixed(1)}%`;
+      notes.push(`The first-year ${pct2Text} compared to current spend.`);
+    }
+
+    return notes;
+  }, [config, results]);
 
   // Handlers
   const toggleProduct = (id: string) => {
@@ -625,13 +645,26 @@ const App: React.FC = () => {
     <div className="mb-4">
       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{label}</label>
       <div className="flex items-center">
-        <input
-          type="number"
-          step="0.1"
-          value={value}
-          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-          className={`w-24 text-sm rounded p-2 text-left bg-white dark:bg-gray-700 text-gray-900 dark:text-white border ${colorClass} dark:border-gray-600 focus:ring-2 focus:ring-blue-500 font-sans tabular-nums ph-no-capture`}
-        />
+        <div className={`flex items-center border ${colorClass} dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 w-32`}>
+          <button 
+            type="button" 
+            onClick={() => onChange(value - 1)} 
+            className="px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+          >-</button>
+          <input
+            type="number"
+            step="1"
+            value={value}
+            onChange={(e) => onChange(parseInt(e.target.value) || 0)}
+            className="w-full text-center text-sm p-2 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
+            style={{ appearance: 'textfield', MozAppearance: 'textfield' }}
+          />
+          <button 
+            type="button" 
+            onClick={() => onChange(value + 1)} 
+            className="px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+          >+</button>
+        </div>
         <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
            {suffixText}
         </span>
@@ -1091,12 +1124,17 @@ const App: React.FC = () => {
                <div className="flex space-x-4">
                  <div className="w-1/3">
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Duration</label>
-                    <input 
-                      type="number" min="1" max="7" 
-                      value={years} 
-                      onChange={(e) => setYears(parseInt(e.target.value))}
-                      className="mt-1 block w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums ph-no-capture"
-                    />
+                    <div className="mt-1 flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700">
+                      <button type="button" onClick={() => setYears(Math.max(1, years - 1))} className="px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none">-</button>
+                      <input 
+                        type="number" min="1" max="7" 
+                        value={years} 
+                        onChange={(e) => setYears(parseInt(e.target.value) || 1)}
+                        className="w-full text-center text-sm p-2 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
+                        style={{ appearance: 'textfield', MozAppearance: 'textfield' }}
+                      />
+                      <button type="button" onClick={() => setYears(Math.min(7, years + 1))} className="px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none">+</button>
+                    </div>
                  </div>
                  <div className="w-2/3">
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Method</label>
@@ -1802,6 +1840,7 @@ const App: React.FC = () => {
             setStartMonthYear={setStartMonthYear}
             isExtensionQuote={isExtensionQuote}
             extensionResults={extensionResults}
+            renewalNotes={renewalNotes}
           />
 
           {!isExtensionQuote && (
@@ -1848,6 +1887,15 @@ const App: React.FC = () => {
                          <li className="font-semibold italic pt-1 text-yellow-900 dark:text-yellow-100">
                            Unit Economics: {monthlyCosts.join(', ')}.
                          </li>
+                      )}
+                      {renewalNotes.length > 0 && (
+                        <>
+                          {renewalNotes.map((note, idx) => (
+                             <li key={`ren-note-${idx}`} className="font-semibold pt-1 text-yellow-900 dark:text-yellow-100">
+                               {note}
+                             </li>
+                          ))}
+                        </>
                       )}
                    </ul>
                  </div>

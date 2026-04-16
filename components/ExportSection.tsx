@@ -18,6 +18,7 @@ interface ExportSectionProps {
   setStartMonthYear: (val: string) => void;
   isExtensionQuote?: boolean;
   extensionResults?: any;
+  renewalNotes?: string[];
 }
 
 // Logo URLs
@@ -67,7 +68,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   startMonthYear,
   setStartMonthYear,
   isExtensionQuote,
-  extensionResults
+  extensionResults,
+  renewalNotes = []
 }) => {
   const [customerName, setCustomerName] = useState('');
   const [repName, setRepName] = useState(() => localStorage.getItem('wk_rep_name') || '');
@@ -76,7 +78,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [isExcelLoading, setIsExcelLoading] = useState(false);
   
-  // Auto Credential Capture
+  // PDF Options
+  const [includeRenewalIncreaseInfo, setIncludeRenewalIncreaseInfo] = useState(false);
   React.useEffect(() => {
     const authName = localStorage.getItem('wk_auth_name');
     if (authName) {
@@ -638,6 +641,17 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           const splitStats = doc.splitTextToSize(statsText, 180);
           doc.text(splitStats, 14, finalY);
           finalY += (splitStats.length * 4) + 1.5;
+      }
+
+      if (config.dealType === DealType.RENEWAL && includeRenewalIncreaseInfo && renewalNotes.length > 0) {
+          finalY += 2;
+          doc.setFont(fontName, 'normal');
+          renewalNotes.forEach(note => {
+              const splitNote = doc.splitTextToSize(`* ${note}`, 180);
+              doc.text(splitNote, 14, finalY);
+              finalY += (splitNote.length * 4);
+          });
+          finalY += 1.5;
       }
 
       // 3. Monthly Cost (Moved to bottom)
@@ -1774,6 +1788,21 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                   </button>
               )}
           </div>
+          
+          {config.dealType === DealType.RENEWAL && renewalNotes.length > 0 && (
+            <div className="flex items-center">
+                <input 
+                  id="renewal-notes-check"
+                  type="checkbox" 
+                  checked={includeRenewalIncreaseInfo} 
+                  onChange={(e) => setIncludeRenewalIncreaseInfo(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                />
+                <label htmlFor="renewal-notes-check" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+                    Include Renewal Increase Info
+                </label>
+            </div>
+          )}
       </div>
 
       <div className="flex space-x-4">

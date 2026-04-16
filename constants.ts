@@ -1,7 +1,7 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.5.5';
+export const APP_VERSION = '6.5.6';
 
 export const CHANGELOG = [
   {

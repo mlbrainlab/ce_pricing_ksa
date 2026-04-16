@@ -34,6 +34,11 @@ A comprehensive web-based pricing calculator for Clinical Effectiveness (CE) pro
 * Patch/Fix: Fixed the infinite "processing..." bug in the PDF export.
 * Patch/Fix: Added the "Reset Form" button and removed the default UTD product selection.
 
-**v6.5.5: Export & Validation Refinements (Current Version)**
+**v6.5.5: Export & Validation Refinements**
 * Feature: Added core product mix (UTD/LXD) to the exported PDF and Excel filenames.
 * Patch/Fix: "Include Start Date" is now unselected by default for all deal types, and exporting is disabled until a start date is explicitly selected.
+
+**v6.5.6: UI Touch Improvements & Renewal Architect Notes (Current Version)**
+* UI: Updated Duration and Rate inputs (MYFPI/MYPP/Uplift) to feature touch-friendly `+` and `-` adjustment buttons. Replaced decimals with whole integers for rate fields.
+* Feature: Added logic to compute percentage increases/decreases comparing Customer ACV and Year 1 Price against expiring amount for renewals.
+* Feature: Injected the new Renewal Architect Notes directly into the web UI summary, with a checkbox to opt-in for printing these notes below the Operating Statistics in the PDF export.
