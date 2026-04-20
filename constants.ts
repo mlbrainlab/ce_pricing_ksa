@@ -8,10 +8,13 @@ export const CHANGELOG = [
     version: '6.5.6',
     date: '2026-04-16',
     changes: [
-      'UI: Updated Duration and Rate inputs to feature touch-friendly + and - buttons.',
-      'UI: Replaced decimals with whole integers for rate fields.',
-      'Feature: Added Architect Notes for renewals comparing Customer ACV directly against expiring amounts.',
-      'Feature: Added optional check to attach renewal increase/decrease information within the PDF Export.',
+      'UI: Replaced MYFPI/MYPP radio buttons with touch-friendly segmented pills.',
+      'UI: Color-coded product backgrounds (Green for UTD, Blue for LXD) to improve visual hierarchy in configuration and commercial schedules.',
+      'UI: Standardized Duration and Rate step-inputs to identical squared sizes with centered text.',
+      'UI: Replaced standard number inputs for Base Discount and Combo Discount with touch-friendly step buttons.',
+      'Feature: Fixed Android PWA top bar to dynamically inherit the application theme color (Dark/Light).',
+      'Feature: Changed the Architectural Note to use Customer ACV rather than TCV for comparing against Expiring Amount.',
+      'Feature: Appended Architectural Note directly into the PDF Export.',
       'Export Update: Added exact product mix IDs into exported filenames.'
     ]
   },

@@ -645,24 +645,24 @@ const App: React.FC = () => {
     <div className="mb-4">
       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{label}</label>
       <div className="flex items-center">
-        <div className={`flex items-center border ${colorClass} dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 w-32`}>
+        <div className={`flex items-center border ${colorClass} dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 w-32 h-9`}>
           <button 
             type="button" 
             onClick={() => onChange(value - 1)} 
-            className="px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+            className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
           >-</button>
           <input
             type="number"
             step="1"
             value={value}
             onChange={(e) => onChange(parseInt(e.target.value) || 0)}
-            className="w-full text-center text-sm p-2 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
+            className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
             style={{ appearance: 'textfield', MozAppearance: 'textfield' }}
           />
           <button 
             type="button" 
             onClick={() => onChange(value + 1)} 
-            className="px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+            className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
           >+</button>
         </div>
         <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
@@ -935,23 +935,23 @@ const App: React.FC = () => {
                 const isLXDSeats = product.id === 'lxd' && (input.variant.includes('Seats') || input.variant === 'Hospital Pharmacy Model');
 
                 return (
-                  <div key={product.id} className={`border rounded-md transition-colors ${isSelected ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-200 dark:border-gray-700'}`}>
+                  <div key={product.id} className={`border rounded-md transition-colors ${isSelected ? (product.id === 'utd' ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30' : 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30') : 'border-gray-200 dark:border-gray-700'}`}>
                     {/* Header Row */}
                     <div className="flex items-center p-3">
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => toggleProduct(product.id)}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-500"
+                        className={`h-4 w-4 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-500 ${product.id === 'utd' ? 'text-green-600 focus:ring-green-500' : 'text-blue-600 focus:ring-blue-500'}`}
                       />
-                      <span className={`ml-3 text-sm font-medium ${isSelected ? 'text-blue-900 dark:text-blue-200' : 'text-gray-500 dark:text-gray-400'}`}>
+                      <span className={`ml-3 text-sm font-medium ${isSelected ? (product.id === 'utd' ? 'text-green-900 dark:text-green-200' : 'text-blue-900 dark:text-blue-200') : 'text-gray-500 dark:text-gray-400'}`}>
                         {product.name}
                       </span>
                     </div>
                     
                     {/* Expanded Input Row */}
                     {isSelected && (
-                      <div className="px-3 pb-3 pt-0 border-t border-blue-100 dark:border-blue-800 mt-1 grid grid-cols-1 gap-3">
+                      <div className={`px-3 pb-3 pt-0 border-t mt-1 grid grid-cols-1 gap-3 ${product.id === 'utd' ? 'border-green-100 dark:border-green-800' : 'border-blue-100 dark:border-blue-800'}`}>
                         <div className="grid grid-cols-2 gap-3 mt-2">
                            
                            {/* Renewal: Expiring Amount (Primary) */}
@@ -1082,15 +1082,31 @@ const App: React.FC = () => {
                            {/* Discount Input */}
                            <div className={product.countLabel ? '' : 'col-span-2'}>
                              <label className="block text-xs text-blue-700 dark:text-blue-300 mb-1">{discountLabel}</label>
-                             <input
-                               type="number"
-                               min="0"
-                               max="100"
-                               disabled={shouldDisableLXDDiscount}
-                               className={`block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums ph-no-capture ${shouldDisableLXDDiscount ? 'opacity-50 cursor-not-allowed' : ''}`}
-                               value={input.baseDiscount}
-                               onChange={(e) => handleInputChange(product.id, 'baseDiscount', parseFloat(e.target.value) || 0)}
-                             />
+                             <div className={`flex items-center border border-gray-300 dark:border-gray-600 rounded shadow-sm overflow-hidden bg-white dark:bg-gray-700 h-7 ${shouldDisableLXDDiscount ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                               <button 
+                                 type="button" 
+                                 onClick={() => { if(!shouldDisableLXDDiscount) handleInputChange(product.id, 'baseDiscount', Math.max(0, (input.baseDiscount || 0) - 1)) }} 
+                                 className="w-7 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+                                 disabled={shouldDisableLXDDiscount}
+                               >-</button>
+                               <input
+                                 type="number"
+                                 min="0"
+                                 max="100"
+                                 step="1"
+                                 disabled={shouldDisableLXDDiscount}
+                                 className="w-full h-full text-center text-xs p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
+                                 value={input.baseDiscount}
+                                 onChange={(e) => handleInputChange(product.id, 'baseDiscount', parseInt(e.target.value) || 0)}
+                                 style={{ appearance: 'textfield', MozAppearance: 'textfield' }}
+                               />
+                               <button 
+                                 type="button" 
+                                 onClick={() => { if(!shouldDisableLXDDiscount) handleInputChange(product.id, 'baseDiscount', Math.min(100, (input.baseDiscount || 0) + 1)) }} 
+                                 className="w-7 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+                                 disabled={shouldDisableLXDDiscount}
+                               >+</button>
+                             </div>
                            </div>
                         </div>
                       </div>
@@ -1122,81 +1138,81 @@ const App: React.FC = () => {
                </div>
 
                <div className="flex space-x-4">
-                 <div className="w-1/3">
+                  <div className="w-1/3">
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Duration</label>
-                    <div className="mt-1 flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700">
-                      <button type="button" onClick={() => setYears(Math.max(1, years - 1))} className="px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none">-</button>
+                    <div className="mt-1 flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 h-9">
+                      <button type="button" onClick={() => setYears(Math.max(1, years - 1))} className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none">-</button>
                       <input 
                         type="number" min="1" max="7" 
                         value={years} 
                         onChange={(e) => setYears(parseInt(e.target.value) || 1)}
-                        className="w-full text-center text-sm p-2 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
+                        className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
                         style={{ appearance: 'textfield', MozAppearance: 'textfield' }}
                       />
-                      <button type="button" onClick={() => setYears(Math.min(7, years + 1))} className="px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none">+</button>
+                      <button type="button" onClick={() => setYears(Math.min(7, years + 1))} className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none">+</button>
                     </div>
                  </div>
                  <div className="w-2/3">
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Method</label>
                     {showSplitRates ? (
-                      <div className="flex flex-col space-y-2 mt-2">
+                      <div className="flex flex-col space-y-2 mt-1">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-700 dark:text-gray-300 w-12">UTD:</span>
-                          <div className="flex items-center space-x-3">
-                             <label className="inline-flex items-center">
-                               <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600" 
-                                 checked={productMethods.utd === PricingMethod.MYFPI}
-                                 onChange={() => handleProductMethodChange('utd', PricingMethod.MYFPI)}
-                               />
-                               <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYFPI</span>
-                             </label>
-                             <label className="inline-flex items-center">
-                               <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600"
-                                 checked={productMethods.utd === PricingMethod.MYPP}
-                                 onChange={() => handleProductMethodChange('utd', PricingMethod.MYPP)}
-                                 disabled={dealType === DealType.RENEWAL && !(productInputs.utd?.variant === 'UTDEE' && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0))}
-                               />
-                               <span className={`ml-2 text-xs ${dealType === DealType.RENEWAL && !(productInputs.utd?.variant === 'UTDEE' && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0)) ? 'text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>MYPP</span>
-                             </label>
+                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300 w-8">UTD:</span>
+                          <div className="flex-1 flex bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded p-1 h-8 ml-2">
+                            <button
+                              type="button"
+                              onClick={() => handleProductMethodChange('utd', PricingMethod.MYFPI)}
+                              className={`flex-1 rounded text-[11px] font-semibold tracking-wide transition-all duration-200 ${productMethods.utd === PricingMethod.MYFPI ? 'bg-white dark:bg-gray-600 text-green-600 dark:text-green-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                            >
+                              MYFPI
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleProductMethodChange('utd', PricingMethod.MYPP)}
+                              disabled={dealType === DealType.RENEWAL && !(productInputs.utd?.variant === 'UTDEE' && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0))}
+                              className={`flex-1 rounded text-[11px] font-semibold tracking-wide transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${productMethods.utd === PricingMethod.MYPP ? 'bg-white dark:bg-gray-600 text-green-600 dark:text-green-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                            >
+                              MYPP
+                            </button>
                           </div>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-700 dark:text-gray-300 w-12">LXD:</span>
-                          <div className="flex items-center space-x-3">
-                             <label className="inline-flex items-center">
-                               <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600" 
-                                 checked={productMethods.lxd === PricingMethod.MYFPI}
-                                 onChange={() => handleProductMethodChange('lxd', PricingMethod.MYFPI)}
-                               />
-                               <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYFPI</span>
-                             </label>
-                             <label className="inline-flex items-center">
-                               <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600"
-                                 checked={productMethods.lxd === PricingMethod.MYPP}
-                                 onChange={() => handleProductMethodChange('lxd', PricingMethod.MYPP)}
-                               />
-                               <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYPP</span>
-                             </label>
+                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300 w-8">LXD:</span>
+                          <div className="flex-1 flex bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded p-1 h-8 ml-2">
+                            <button
+                              type="button"
+                              onClick={() => handleProductMethodChange('lxd', PricingMethod.MYFPI)}
+                              className={`flex-1 rounded text-[11px] font-semibold tracking-wide transition-all duration-200 ${productMethods.lxd === PricingMethod.MYFPI ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                            >
+                              MYFPI
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleProductMethodChange('lxd', PricingMethod.MYPP)}
+                              className={`flex-1 rounded text-[11px] font-semibold tracking-wide transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${productMethods.lxd === PricingMethod.MYPP ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                            >
+                              MYPP
+                            </button>
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center space-x-3 mt-2">
-                         <label className="inline-flex items-center">
-                           <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600" 
-                             checked={method === PricingMethod.MYFPI}
-                             onChange={() => handleMethodChange(PricingMethod.MYFPI)}
-                           />
-                           <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">MYFPI</span>
-                         </label>
-                         <label className="inline-flex items-center">
-                           <input type="radio" className="form-radio h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 dark:border-gray-600"
-                             checked={method === PricingMethod.MYPP}
-                             onChange={() => handleMethodChange(PricingMethod.MYPP)}
-                             disabled={dealType === DealType.RENEWAL && selectedProductIds.includes('utd') && !(productInputs.utd?.variant === 'UTDEE' && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0))}
-                           />
-                           <span className={`ml-2 text-xs ${dealType === DealType.RENEWAL && selectedProductIds.includes('utd') && !(productInputs.utd?.variant === 'UTDEE' && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0)) ? 'text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>MYPP</span>
-                         </label>
+                      <div className="mt-1 flex bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md p-1 h-9">
+                        <button
+                          type="button"
+                          onClick={() => handleMethodChange(PricingMethod.MYFPI)}
+                          className={`flex-1 rounded text-xs font-semibold tracking-wide transition-all duration-200 ${method === PricingMethod.MYFPI ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                        >
+                          MYFPI
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMethodChange(PricingMethod.MYPP)}
+                          disabled={dealType === DealType.RENEWAL && selectedProductIds.includes('utd') && !(productInputs.utd?.variant === 'UTDEE' && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0))}
+                          className={`flex-1 rounded text-xs font-semibold tracking-wide transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${method === PricingMethod.MYPP ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                        >
+                          MYPP
+                        </button>
                       </div>
                     )}
                  </div>
@@ -1597,23 +1613,25 @@ const App: React.FC = () => {
                         {/* Dynamic Product Columns - Gross USD */}
                         {selectedProductIds.map(pid => {
                            const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                           const colorClass = pid === 'utd' ? 'text-green-600 dark:text-green-300 bg-green-50 dark:bg-green-900/20' : 'text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20';
                            return (
-                             <th key={pid} className="px-4 py-3 text-center text-xs font-bold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">
+                             <th key={pid} className={`px-4 py-3 text-center text-xs font-bold uppercase whitespace-nowrap ${colorClass}`}>
                                {p?.shortName || p?.name} (USD)
                              </th>
                            );
                         })}
 
                         {/* Always show USD Total */}
-                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-800 dark:text-gray-200 uppercase bg-gray-200 dark:bg-gray-600 whitespace-nowrap">
+                        <th className="px-4 py-3 text-center text-xs font-bold text-orange-800 dark:text-orange-200 uppercase bg-orange-100 dark:bg-orange-900/40 whitespace-nowrap">
                            Total (USD)
                         </th>
 
                         {/* Dynamic Product Columns - Gross SAR (Indirect only) */}
                         {isIndirect && selectedProductIds.map(pid => {
                             const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                            const colorClass = pid === 'utd' ? 'text-green-600 dark:text-green-300 bg-green-50/50 dark:bg-green-900/10' : 'text-blue-600 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-900/10';
                             return (
-                              <th key={`${pid}-sar`} className="px-4 py-3 text-center text-xs font-bold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">
+                              <th key={`${pid}-sar`} className={`px-4 py-3 text-center text-xs font-bold uppercase whitespace-nowrap ${colorClass}`}>
                                 {p?.shortName || p?.name} (SAR)
                               </th>
                             );
@@ -1621,7 +1639,7 @@ const App: React.FC = () => {
 
                         {/* Conditionally show SAR Total */}
                         {isIndirect && (
-                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-800 dark:text-gray-200 uppercase bg-yellow-100 dark:bg-yellow-900/40 whitespace-nowrap">
+                          <th className="px-4 py-3 text-center text-xs font-bold text-orange-800 dark:text-orange-200 uppercase bg-orange-100 dark:bg-orange-900/40 whitespace-nowrap">
                              Total (SAR)
                           </th>
                         )}
@@ -1649,23 +1667,25 @@ const App: React.FC = () => {
                            {/* Product Columns Data Gross USD */}
                            {selectedProductIds.map(pid => {
                              const pData = r.breakdown.find((d: any) => d.id === pid);
+                             const colorClass = pid === 'utd' ? 'text-green-700 dark:text-green-300 bg-green-50/30 dark:bg-green-900/10' : 'text-blue-700 dark:text-blue-300 bg-blue-50/30 dark:bg-blue-900/10';
                              return (
-                               <td key={pid} className="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-300 font-sans tabular-nums whitespace-nowrap">
+                               <td key={pid} className={`px-4 py-4 text-center text-sm font-sans tabular-nums whitespace-nowrap ${colorClass}`}>
                                  {pData ? formatCurrency(pData.gross, 'USD') : '-'}
                                </td>
                              );
                            })}
 
                            {/* Total USD */}
-                           <td className="px-4 py-4 text-center text-sm font-bold text-blue-700 dark:text-blue-300 font-sans tabular-nums bg-blue-50 dark:bg-blue-900/20 whitespace-nowrap">
+                           <td className="px-4 py-4 text-center text-sm font-bold text-orange-700 dark:text-orange-300 font-sans tabular-nums bg-orange-50 dark:bg-orange-900/20 whitespace-nowrap">
                               {formatCurrency(r.grossUSD, 'USD')}
                            </td>
 
                            {/* Product Columns Data Gross SAR (Indirect only) */}
                            {isIndirect && selectedProductIds.map(pid => {
                              const pData = r.breakdown.find((d: any) => d.id === pid);
+                             const colorClass = pid === 'utd' ? 'text-green-700 dark:text-green-300 bg-green-50/20 dark:bg-green-900/5' : 'text-blue-700 dark:text-blue-300 bg-blue-50/20 dark:bg-blue-900/5';
                              return (
-                               <td key={`${pid}-sar`} className="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-300 font-sans tabular-nums whitespace-nowrap">
+                               <td key={`${pid}-sar`} className={`px-4 py-4 text-center text-sm font-sans tabular-nums whitespace-nowrap ${colorClass}`}>
                                  {pData ? formatCurrency(pData.grossSAR, 'SAR') : '-'}
                                </td>
                              );
@@ -1673,7 +1693,7 @@ const App: React.FC = () => {
 
                            {/* Total SAR (if Indirect) */}
                            {isIndirect && (
-                             <td className="px-4 py-4 text-center text-sm font-bold text-gray-800 dark:text-gray-200 font-sans tabular-nums bg-yellow-50 dark:bg-yellow-900/20 whitespace-nowrap">
+                             <td className="px-4 py-4 text-center text-sm font-bold text-orange-800 dark:text-orange-200 font-sans tabular-nums bg-orange-50 dark:bg-orange-900/20 whitespace-nowrap">
                                 {formatCurrency(r.grossSAR, 'SAR')}
                              </td>
                            )}
@@ -1715,7 +1735,7 @@ const App: React.FC = () => {
 
                          {/* Total SAR */}
                         {isIndirect && (
-                           <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums text-yellow-300 whitespace-nowrap">
+                           <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums text-orange-300 whitespace-nowrap">
                               {formatCurrency(results?.totalGrossSAR || 0, 'SAR')}
                            </td>
                         )}
