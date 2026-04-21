@@ -1,9 +1,22 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.5.6';
+export const APP_VERSION = '6.6.0';
 
 export const CHANGELOG = [
+  {
+    version: '6.6.0',
+    date: '2026-04-21',
+    changes: [
+      'Feature: Added specific "Channel Partner" (CP) export flow for Fulfillment and Partner-Sourced queries.',
+      'Feature: Intercepts PDF generation for CP deals to ask if the proposal is "Direct" or "CP".',
+      'Feature: Applies automated overriding data for Samir Group (Rep Name, Email, Phone) upon CP PDF selection.',
+      'Feature: Integrates exact Session-based CP quote counter tracking (AH/DDMMYY/XX) referencing logic in CP generated PDFs.',
+      'Feature: Injects Noto Sans Arabic fonts strictly via the PDF exporter to faithfully render localized CP footer phrasing.',
+      'Feature: Enhances dynamic PDF layout to offset CP-centric footer headers/border margins without occluding standard content like footnotes (EMR/Opt-out logic).',
+      'System: Updated PostHog analytical tracking SDK engine version for Doctor compliance (v1.369.5).'
+    ]
+  },
   {
     version: '6.5.6',
     date: '2026-04-16',

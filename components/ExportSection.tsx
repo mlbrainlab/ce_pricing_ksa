@@ -35,10 +35,14 @@ const FONT_URLS = {
   FiraSans: {
     regular: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/firasans/FiraSans-Regular.ttf",
     bold: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/firasans/FiraSans-Bold.ttf"
+  },
+  NotoSansArabic: {
+    regular: "https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/unhinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf",
+    bold: "https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/unhinted/ttf/NotoSansArabic/NotoSansArabic-Bold.ttf"
   }
 };
 
-type FontType = 'Inter' | 'FiraSans';
+type FontType = 'Inter' | 'FiraSans' | 'NotoSansArabic';
 
 export const PRODUCT_FULL_NAMES: Record<string, string> = {
   "ANYWHERE": "UpToDate® Anywhere",
@@ -93,7 +97,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const [selectedFont] = useState<FontType>('FiraSans');
   const [fontCache, setFontCache] = useState<Record<FontType, { regular: string | null, bold: string | null }>>({
     Inter: { regular: null, bold: null },
-    FiraSans: { regular: null, bold: null }
+    FiraSans: { regular: null, bold: null },
+    NotoSansArabic: { regular: null, bold: null }
   });
   const [isFontLoading, setIsFontLoading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
@@ -116,6 +121,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const [showSitesOnly, setShowSitesOnly] = useState(false); // New state for showing sites only
   const [siteBreakdown, setSiteBreakdown] = useState<SiteBreakdownItem[]>([]);
   const [bulkPasteText, setBulkPasteText] = useState(''); // State for bulk pasting
+
+  const [showCpModal, setShowCpModal] = useState(false);
 
   // ... (existing code)
 
@@ -142,11 +149,20 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
   // ... (existing code)
 
-  const handlePDFExport = async () => {
+  const handlePDFExport = () => {
     if (!customerName.trim()) {
       alert("Please enter a Customer Name before exporting.");
       return;
     }
+    if (config.channel === ChannelType.FULFILMENT || config.channel === ChannelType.PARTNER_SOURCED) {
+      setShowCpModal(true);
+    } else {
+      executePDFExport(false);
+    }
+  };
+
+  const executePDFExport = async (isCp: boolean) => {
+    setShowCpModal(false);
     setIsPdfLoading(true);
     setPdfError(null);
     try {
@@ -159,8 +175,14 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       try {
           let regularFontB64 = fontCache[fontName].regular;
           let boldFontB64 = fontCache[fontName].bold;
+          
+          let arabicRegB64 = fontCache['NotoSansArabic'].regular;
+          let arabicBoldB64 = fontCache['NotoSansArabic'].bold;
 
-          if (!regularFontB64 || !boldFontB64) {
+          const needsMain = !regularFontB64 || !boldFontB64;
+          const needsArabic = isCp && (!arabicRegB64 || !arabicBoldB64);
+
+          if (needsMain || needsArabic) {
                setIsFontLoading(true);
                
                const fetchWithTimeout = (url: string, timeout = 5000) => {
@@ -174,12 +196,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                        )
                    ]);
                };
-
-               const [regBlob, boldBlob] = await Promise.all([
-                   fetchWithTimeout(FONT_URLS[fontName].regular),
-                   fetchWithTimeout(FONT_URLS[fontName].bold)
-               ]);
-
+               
                const blobToBase64 = (blob: Blob) => new Promise<string>((resolve, reject) => {
                    const reader = new FileReader();
                    reader.onloadend = () => {
@@ -190,13 +207,33 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                    reader.readAsDataURL(blob);
                });
 
-               regularFontB64 = (await blobToBase64(regBlob)).split(',')[1];
-               boldFontB64 = (await blobToBase64(boldBlob)).split(',')[1];
-
-               setFontCache(prev => ({
-                   ...prev,
-                   [fontName]: { regular: regularFontB64, bold: boldFontB64 }
-               }));
+               if (needsMain) {
+                   const [regBlob, boldBlob] = await Promise.all([
+                       fetchWithTimeout(FONT_URLS[fontName].regular),
+                       fetchWithTimeout(FONT_URLS[fontName].bold)
+                   ]);
+                   regularFontB64 = (await blobToBase64(regBlob)).split(',')[1];
+                   boldFontB64 = (await blobToBase64(boldBlob)).split(',')[1];
+                   
+                   setFontCache(prev => ({
+                       ...prev,
+                       [fontName]: { regular: regularFontB64, bold: boldFontB64 }
+                   }));
+               }
+               
+               if (needsArabic) {
+                   const [arRegBlob, arBoldBlob] = await Promise.all([
+                       fetchWithTimeout(FONT_URLS['NotoSansArabic'].regular),
+                       fetchWithTimeout(FONT_URLS['NotoSansArabic'].bold)
+                   ]);
+                   arabicRegB64 = (await blobToBase64(arRegBlob)).split(',')[1];
+                   arabicBoldB64 = (await blobToBase64(arBoldBlob)).split(',')[1];
+                   
+                   setFontCache(prev => ({
+                       ...prev,
+                       'NotoSansArabic': { regular: arabicRegB64, bold: arabicBoldB64 }
+                   }));
+               }
           }
 
           if (regularFontB64 && boldFontB64) {
@@ -204,6 +241,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               doc.addFont(`${fontName}-Regular.ttf`, fontName, 'normal');
               doc.addFileToVFS(`${fontName}-Bold.ttf`, boldFontB64);
               doc.addFont(`${fontName}-Bold.ttf`, fontName, 'bold');
+          }
+          
+          if (isCp && arabicRegB64 && arabicBoldB64) {
+              doc.addFileToVFS(`NotoSansArabic-Regular.ttf`, arabicRegB64);
+              doc.addFont(`NotoSansArabic-Regular.ttf`, 'NotoSansArabic', 'normal');
+              doc.addFileToVFS(`NotoSansArabic-Bold.ttf`, arabicBoldB64);
+              doc.addFont(`NotoSansArabic-Bold.ttf`, 'NotoSansArabic', 'bold');
           }
       } catch (e) {
           console.error("Font loading error", e);
@@ -244,10 +288,56 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
       const addFooter = (pageNumber: number) => {
           const pageHeight = doc.internal.pageSize.height || 297;
-          doc.setFontSize(8);
-          doc.setTextColor(150, 150, 150);
-          doc.text(`Page ${pageNumber}`, 196, pageHeight - 10, { align: 'right' });
-          doc.text(`©${new Date().getFullYear()} UpToDate, Inc. and its affiliates and/or licensors. All rights reserved.`, 14, pageHeight - 10);
+          
+          if (isCp) {
+              const footerY = pageHeight - 16;
+              doc.setDrawColor(220, 38, 38); // Red line (tailwind red-600 approx)
+              doc.setLineWidth(0.5);
+              doc.line(14, footerY - 4, 196, footerY - 4);
+              
+              doc.setFontSize(8);
+              doc.setTextColor(50, 50, 50);
+              doc.setFont(fontName, 'normal');
+              
+              const p1 = "Samir Trading & Marketing - CJSC. Tel: ";
+              const p2 = "9200 00062";
+              const p3 = " - www.samirgroup.com";
+              
+              const w1 = doc.getTextWidth(p1);
+              doc.setFont(fontName, 'bold');
+              const w2 = doc.getTextWidth(p2);
+              doc.setFont(fontName, 'normal');
+              const w3 = doc.getTextWidth(p3);
+              
+              const totalW = w1 + w2 + w3;
+              const startX = 105 - (totalW / 2);
+              
+              doc.text(p1, startX, footerY);
+              
+              doc.setTextColor(220, 38, 38);
+              doc.setFont(fontName, 'bold');
+              doc.text(p2, startX + w1, footerY);
+              
+              doc.setTextColor(50, 50, 50);
+              doc.setFont(fontName, 'normal');
+              doc.text(p3, startX + w1 + w2, footerY);
+              
+              doc.setFontSize(6);
+              doc.text(`C.R. 4030045960 C.O.C. 21625. Capital S.R. 75,000,000. Jeddah P.O. Box 599, Jeddah 21421. Tel: (012) 682-8219. Fax: (012) 683-0820.`, 105, footerY + 4, { align: 'center' });
+              
+              // Arabic text
+              doc.setFont('NotoSansArabic', 'normal');
+              doc.text(`شركة سمير للتجارة والتسويق - مساهمة مقفلة. سابقاً شركة سمير لمعدات التصوير - مساهمة مقفلة.`, 105, footerY + 8, { align: 'center' });
+              
+              doc.setFont(fontName, 'normal');
+              doc.setTextColor(150, 150, 150);
+              doc.text(`Page ${pageNumber}`, 196, footerY + 8, { align: 'right' });
+          } else {
+              doc.setFontSize(8);
+              doc.setTextColor(150, 150, 150);
+              doc.text(`Page ${pageNumber}`, 196, pageHeight - 10, { align: 'right' });
+              doc.text(`©${new Date().getFullYear()} UpToDate, Inc. and its affiliates and/or licensors. All rights reserved.`, 14, pageHeight - 10);
+          }
       };
 
       const formatMoney = (amount: number, currency: string) => {
@@ -303,23 +393,31 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         doc.text(subHeading, 105, currentY, { align: 'center' });
         currentY += 15;
     }
+    const finalRepName = isCp ? "Alaa Hanafy" : repName;
+    const finalRepEmail = isCp ? "alaa.hanafy@samirgroup.com" : repEmail;
+    
+    let finalRepPhone = repPhone;
+    if (isCp) {
+        finalRepPhone = "0566872868";
+    }
+
     doc.setFontSize(10);
     doc.setTextColor(50, 50, 50);
     doc.setFont(fontName, 'normal');
     let currentFooterY = 250;
     doc.text(`Customer: ${customerName || 'N/A'}`, 14, currentFooterY);
     currentFooterY += 5;
-    doc.text(`Prepared by: ${repName || 'N/A'}`, 14, currentFooterY);
+    doc.text(`Prepared by: ${finalRepName || 'N/A'}`, 14, currentFooterY);
     currentFooterY += 5;
     
-    if (repEmail) {
-        doc.text(`Email: ${repEmail}`, 14, currentFooterY);
+    if (finalRepEmail) {
+        doc.text(`Email: ${finalRepEmail}`, 14, currentFooterY);
         currentFooterY += 5;
     }
-    if (repPhone) {
+    if (finalRepPhone) {
         // Format Saudi Phone: +966 xx xxx xxxx
-        let formattedPhone = repPhone;
-        const digits = repPhone.replace(/\D/g, '');
+        let formattedPhone = finalRepPhone;
+        const digits = finalRepPhone.replace(/\D/g, '');
         if ((digits.startsWith('05') && digits.length === 10) || (digits.startsWith('5') && digits.length === 9)) {
              const core = digits.startsWith('05') ? digits.substring(1) : digits;
              formattedPhone = `+966 ${core.substring(0, 2)} ${core.substring(2, 5)} ${core.substring(5, 9)}`;
@@ -330,7 +428,25 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     
     doc.text(`Date: ${docDate}`, 14, currentFooterY);
     currentFooterY += 5;
-    doc.text(`Ref: ${refId}`, 14, currentFooterY);
+    
+    // AH Reference ID Counter for CP
+    let displayRef = refId;
+    if (isCp) {
+        const storedCounter = sessionStorage.getItem('wk_ah_counter');
+        const currentCounter = storedCounter ? parseInt(storedCounter, 10) : 1;
+        
+        const padCounter = currentCounter.toString().padStart(2, '0');
+        const d = new Date();
+        const dd = d.getDate().toString().padStart(2, '0');
+        const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+        const yy = d.getFullYear().toString().slice(-2);
+        displayRef = `AH/${dd}${mm}${yy}/${padCounter}`;
+        
+        // We will increment ah counter AT THE VERY END where doc.save() succeeds, or right here since we are generating.
+        sessionStorage.setItem('wk_ah_counter', (currentCounter + 1).toString());
+    }
+    
+    doc.text(`Ref: ${displayRef}`, 14, currentFooterY);
 
     doc.addPage();
     // Header rendered in loop at end
@@ -869,7 +985,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     }
 
     terms.forEach(term => {
-      if (finalY > 260) {
+      if (finalY > (isCp ? 245 : 260)) {
         doc.addPage();
         // Header rendered in loop at end
         finalY = 55;
@@ -886,7 +1002,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       }
     });
 
-    if (finalY > 260) {
+    if (finalY > (isCp ? 250 : 260)) {
         doc.addPage();
         // Header rendered in loop at end
         finalY = 55;
@@ -899,14 +1015,14 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         const footnote = "* Some EMR providers put additional charges to integrate our solutions, we’re neither responsible nor covering these costs. It has to be discussed with the EMR provider directly.";
         const splitFootnote = doc.splitTextToSize(footnote, 180);
         const pageHeight = doc.internal.pageSize.height || 297;
-        doc.text(splitFootnote, 14, pageHeight - 22);
+        doc.text(splitFootnote, 14, pageHeight - (isCp ? 28 : 22));
     } else {
         finalY += 4;
     }
 
     // --- TECHNICAL SPECIFICATIONS SECTION ---
     if (!isExtensionQuote) {
-      if (finalY > 245) {
+      if (finalY > (isCp ? 230 : 245)) {
           doc.addPage();
           // Header rendered in loop at end
           finalY = 55;
@@ -1829,6 +1945,40 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       {pdfError && (
         <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md text-sm font-sans">
           <strong>Error generating PDF:</strong> {pdfError}
+        </div>
+      )}
+
+      {/* CP Modal */}
+      {showCpModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] font-sans">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-96 max-w-full">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Sending via CP or Direct?</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+              You selected a fulfillment or partner-sourced channel. Will this proposal be sent through the Channel Partner (Samir Group) or Direct?
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowCpModal(false);
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => executePDFExport(false)}
+                className="px-4 py-2 text-sm font-medium text-white bg-gray-600 border border-transparent rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                Direct
+              </button>
+              <button
+                onClick={() => executePDFExport(true)}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                CP
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
