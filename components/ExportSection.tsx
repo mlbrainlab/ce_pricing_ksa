@@ -866,7 +866,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                 theme: 'grid',
                 headStyles: { fillColor: [240, 240, 240], textColor: 0, font: fontName, fontStyle: 'bold', valign: 'middle' },
                 styles: { fontSize: 9, font: fontName, overflow: 'linebreak', cellPadding: 2, valign: 'middle', halign: 'left' },
-                margin: { top: 35, left: 14, right: 14, bottom: isCp ? 50 : 20 },
+                margin: { top: 35, left: 14, right: 14, bottom: isCp ? 25 : 20 },
             });
             
             finalY = (doc as any).lastAutoTable.finalY + 6;
@@ -902,7 +902,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                     0: { cellWidth: 90 },
                     1: { cellWidth: 90 }
                 },
-                margin: { top: 35, left: 14, right: 14, bottom: isCp ? 50 : 20 },
+                margin: { top: 35, left: 14, right: 14, bottom: isCp ? 25 : 20 },
                 didDrawCell: (data) => {
                     // Draw border for every cell to ensure grid look
                     doc.setDrawColor(220, 220, 220);
