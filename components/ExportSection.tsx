@@ -866,7 +866,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                 theme: 'grid',
                 headStyles: { fillColor: [240, 240, 240], textColor: 0, font: fontName, fontStyle: 'bold', valign: 'middle' },
                 styles: { fontSize: 9, font: fontName, overflow: 'linebreak', cellPadding: 2, valign: 'middle', halign: 'left' },
-                margin: { top: 35, left: 14, right: 14 },
+                margin: { top: 35, left: 14, right: 14, bottom: isCp ? 50 : 20 },
             });
             
             finalY = (doc as any).lastAutoTable.finalY + 6;
@@ -902,7 +902,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                     0: { cellWidth: 90 },
                     1: { cellWidth: 90 }
                 },
-                margin: { top: 35, left: 14, right: 14 },
+                margin: { top: 35, left: 14, right: 14, bottom: isCp ? 50 : 20 },
                 didDrawCell: (data) => {
                     // Draw border for every cell to ensure grid look
                     doc.setDrawColor(220, 220, 220);
@@ -1466,6 +1466,64 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           if (config.channel !== ChannelType.DIRECT) {
               sheet.addRow(['Net Upsell ACV (USD)', data.netUpsellACV]).getCell(2).numFmt = '"$"#,##0.00';
           }
+      }
+
+      // --- 6. Designated Sites ---
+      if (hasDesignatedSites && siteBreakdown.length > 0 && isBreakdownPerSite) {
+          sheet.addRow([]);
+          sheet.addRow(['PRICE BREAKDOWN PER SITE']).font = { ...fontStyle, bold: true, size: 14 };
+          
+          const siteHeaders = ['Site Name'];
+          config.selectedProducts.forEach(pid => {
+              const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+              siteHeaders.push(`${p?.shortName || p?.name} Count`);
+          });
+          
+          if (!showSitesOnly) {
+              siteHeaders.push(`Est. Annual Cost (${currency})`);
+          }
+          
+          const siteHeaderRow = sheet.addRow(siteHeaders);
+          siteHeaderRow.eachCell(cell => {
+              cell.style = headerStyle as ExcelJS.Style;
+          });
+
+          siteBreakdown.forEach(site => {
+              const rowData: any[] = [site.name];
+              let siteTotalCost = 0;
+
+              config.selectedProducts.forEach(pid => {
+                  const count = site.counts[pid] || 0;
+                  rowData.push(count);
+                  
+                  if (!showSitesOnly) {
+                      const totalCount = config.productInputs[pid]?.count || 1; 
+                      const productTotalNet = data.productNetTotals[pid] / config.years; 
+                      
+                      if (totalCount > 0) {
+                          const siteProductCost = (count / totalCount) * productTotalNet;
+                          siteTotalCost += siteProductCost;
+                      }
+                  }
+              });
+
+              if (!showSitesOnly) {
+                  const displayCost = isIndirect ? (siteTotalCost * EXCHANGE_RATE_SAR) : siteTotalCost; 
+                  rowData.push(displayCost);
+              }
+              
+              const addedRow = sheet.addRow(rowData);
+              if (!showSitesOnly) {
+                  addedRow.getCell(siteHeaders.length).numFmt = currencyFmt;
+              }
+          });
+      } else if (hasDesignatedSites && designatedSites.trim().length > 0) {
+          sheet.addRow([]);
+          sheet.addRow(['DESIGNATED SITES']).font = { ...fontStyle, bold: true, size: 14 };
+          const sites = designatedSites.split('\n').filter(s => s.trim().length > 0);
+          sites.forEach((site, index) => {
+              sheet.addRow([`${index + 1}. ${site.trim()}`]);
+          });
       }
 
       // Column Widths and Font Application
