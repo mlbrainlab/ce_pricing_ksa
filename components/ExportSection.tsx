@@ -105,10 +105,15 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
   // PDF Options
   const isUtdSm = config.selectedProducts.includes('utd') && config.productInputs['utd']?.variant === 'SM';
-  const [showMonthlyCost, setShowMonthlyCost] = useState(true);
+  const [showMonthlyCost, setShowMonthlyCost] = useState(false);
   const [showTotals, setShowTotals] = useState(true);
   const [showEmrIntegration, setShowEmrIntegration] = useState(true); // Default true for EMR term
   const [hasOptOutClause, setHasOptOutClause] = useState(false); // Opt-out clause for multi-year
+  
+  const canShowFLinkIntegration = config.selectedProducts.includes('utd') && 
+                                  config.selectedProducts.includes('lxd') && 
+                                  (config.productInputs['lxd']?.variant || '').includes('FLINK');
+  const [showFLinkIntegration, setShowFLinkIntegration] = useState(false);
 
   // Sites Logic
   const [hasDesignatedSites, setHasDesignatedSites] = useState(false);
@@ -154,7 +159,9 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       alert("Please enter a Customer Name before exporting.");
       return;
     }
-    if (config.channel === ChannelType.FULFILMENT || config.channel === ChannelType.PARTNER_SOURCED) {
+    if (config.channel === ChannelType.PARTNER_SOURCED) {
+      executePDFExport(true);
+    } else if (config.channel === ChannelType.FULFILMENT) {
       setShowCpModal(true);
     } else {
       executePDFExport(false);
@@ -972,6 +979,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         // Conditional EMR Term
         if (showEmrIntegration) {
             terms.push({ text: "Integrating UpToDate® or Lexidrug® with your EMR is included in the prices above, even if the EMR changed during the subscription.*" });
+        }
+
+        // Conditional FLINK Integration Term
+        if (canShowFLinkIntegration && showFLinkIntegration) {
+            terms.push({ text: "With this subscription, your formulary will be integrated into UpToDate directly at no additional cost." });
         }
 
         const hasHospitalPharmacyModel = config.selectedProducts.includes('lxd') && config.productInputs['lxd']?.variant === 'Hospital Pharmacy Model';
@@ -1917,6 +1929,21 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                       Include Opt-out Clause
                   </label>
               </div>
+
+              {canShowFLinkIntegration && (
+                <div className="flex items-center">
+                    <input 
+                      id="show-flink-integration"
+                      type="checkbox" 
+                      checked={showFLinkIntegration} 
+                      onChange={(e) => setShowFLinkIntegration(e.target.checked)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                    />
+                    <label htmlFor="show-flink-integration" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+                        Include Formulink Integration term
+                    </label>
+                </div>
+              )}
             </>
           )}
 
