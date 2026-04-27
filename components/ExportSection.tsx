@@ -105,6 +105,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
   // PDF Options
   const isUtdSm = config.selectedProducts.includes('utd') && config.productInputs['utd']?.variant === 'SM';
+  const [showStats, setShowStats] = useState(true);
   const [showMonthlyCost, setShowMonthlyCost] = useState(false);
   const [showTotals, setShowTotals] = useState(true);
   const [showEmrIntegration, setShowEmrIntegration] = useState(true); // Default true for EMR term
@@ -758,7 +759,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           }
       });
       
-      if(statsParts.length > 0) {
+      if(statsParts.length > 0 && showStats) {
           doc.setFont(fontName, 'normal');
           const statsText = `This proposal is based on the following statistics for ${customerName}: ${statsParts.join(', ')}.`;
           const splitStats = doc.splitTextToSize(statsText, 180);
@@ -1875,6 +1876,18 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
           {!isExtensionQuote && (
             <>
+              <div className="flex items-center">
+                  <input 
+                    id="show-stats"
+                    type="checkbox" 
+                    checked={showStats} 
+                    onChange={(e) => setShowStats(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <label htmlFor="show-stats" className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+                      Show Stats
+                  </label>
+              </div>
               <div className="flex items-center">
                   <input 
                     id="show-monthly-cost"
