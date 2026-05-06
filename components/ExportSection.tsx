@@ -902,9 +902,9 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden mt-8 transition-all duration-300">
-      <div className="px-6 py-4 bg-blue-600 dark:bg-blue-800 border-b border-blue-700 dark:border-blue-900">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <Download className="w-5 h-5 text-white" /> Export Options
+      <div className="px-6 py-3 bg-blue-600 dark:bg-blue-800 border-b border-blue-700 dark:border-blue-900">
+        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+          <Download className="w-4 h-4 text-white" /> Export Options
         </h2>
       </div>
 
@@ -912,55 +912,55 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         <div className="space-y-6 max-w-4xl">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Customer Information</h3>
+              <h3 className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Customer Information</h3>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer Name <span className="text-red-500">*</span></label>
-                <input type="text" required className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Enter customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Customer Name <span className="text-red-500">*</span></label>
+                <input type="text" required className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white" placeholder="Enter customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
               </div>
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Seller Information</h3>
+              <h3 className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Seller Information</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sales Rep Name</label>
-                  <input type="text" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white" value={repName} onChange={(e) => {setRepName(e.target.value); localStorage.setItem('wk_rep_name', e.target.value);}} />
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Sales Rep Name</label>
+                  <input type="text" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white" value={repName} onChange={(e) => {setRepName(e.target.value); localStorage.setItem('wk_rep_name', e.target.value);}} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
-                  <input type="tel" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white" value={repPhone} onChange={(e) => {setRepPhone(e.target.value); localStorage.setItem('wk_rep_phone', e.target.value);}} />
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
+                  <input type="tel" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white" value={repPhone} onChange={(e) => {setRepPhone(e.target.value); localStorage.setItem('wk_rep_phone', e.target.value);}} />
                 </div>
               </div>
             </div>
           </div>
 
           <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Export Contents</h3>
+            <h3 className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Export Contents</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {!isExtensionQuote && (
                 <>
-                  <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                     <input type="checkbox" checked={showStats} onChange={(e) => setShowStats(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                     <span>Include Statistics</span>
                   </label>
-                  <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <label className={`flex items-center space-x-2 text-xs ${isUtdSm ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}>
                     <input type="checkbox" checked={isUtdSm ? false : showMonthlyCost} onChange={(e) => setShowMonthlyCost(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                     <span>Show Monthly Cost</span>
                   </label>
-                  <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                     <input type="checkbox" checked={showTotals} onChange={(e) => setShowTotals(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                     <span>Show Grand Totals</span>
                   </label>
-                  <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                     <input type="checkbox" checked={isUtdSm ? false : showEmrIntegration} onChange={(e) => setShowEmrIntegration(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                     <span>Include EMR Term</span>
                   </label>
-                  <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                     <input type="checkbox" checked={isUtdSm ? false : hasOptOutClause} onChange={(e) => setHasOptOutClause(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                     <span>Opt-Out Clause</span>
                   </label>
                   {canShowFLinkIntegration && (
-                    <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                       <input type="checkbox" checked={showFLinkIntegration} onChange={(e) => setShowFLinkIntegration(e.target.checked)} className="rounded text-purple-600 focus:ring-purple-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                       <span>Formulink Term</span>
                     </label>
@@ -968,14 +968,14 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                 </>
               )}
               {config.dealType === DealType.RENEWAL && renewalNotes.length > 0 && (
-                <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                   <input type="checkbox" checked={includeRenewalIncreaseInfo} onChange={(e) => setIncludeRenewalIncreaseInfo(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                   <span>Renewal Increase Info</span>
                 </label>
               )}
               
               <div className="flex items-center space-x-2">
-                <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                   <input type="checkbox" checked={hasDesignatedSites} onChange={handleSiteCheckboxChange} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                   <span>Add Designated Sites</span>
                 </label>
@@ -990,7 +990,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               </div>
 
               <div className="flex items-center space-x-2">
-                <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                   <input type="checkbox" checked={useStartDate} onChange={handleStartDateCheckboxChange} className="rounded text-green-600 focus:ring-green-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                   <span>Include Start Date</span>
                 </label>
@@ -1173,31 +1173,31 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                 </div>
                 <div className="flex-1 flex flex-col md:flex-row bg-gray-100 dark:bg-gray-700 overflow-hidden">
                     <div className="w-full md:w-64 p-6 flex flex-col gap-4 overflow-y-auto bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-2">Export Options</h4>
+                        <h4 className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-2">Export Options</h4>
                         {!isExtensionQuote && (
                           <>
-                            <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                            <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                                 <input type="checkbox" checked={showStats} onChange={(e) => setShowStats(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                                 <span>Include Statistics</span>
                             </label>
-                            <label className={`flex items-center space-x-2 text-sm ${isUtdSm ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}>
+                            <label className={`flex items-center space-x-2 text-xs ${isUtdSm ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}>
                                 <input type="checkbox" checked={isUtdSm ? false : showMonthlyCost} onChange={(e) => setShowMonthlyCost(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                                 <span>Show Monthly Cost</span>
                             </label>
-                            <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                            <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                                 <input type="checkbox" checked={showTotals} onChange={(e) => setShowTotals(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                                 <span>Show Grand Totals</span>
                             </label>
-                            <label className={`flex items-center space-x-2 text-sm ${isUtdSm ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}>
+                            <label className={`flex items-center space-x-2 text-xs ${isUtdSm ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}>
                                 <input type="checkbox" checked={isUtdSm ? false : showEmrIntegration} onChange={(e) => setShowEmrIntegration(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                                 <span>Include EMR Term</span>
                             </label>
-                            <label className={`flex items-center space-x-2 text-sm ${isUtdSm ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}>
+                            <label className={`flex items-center space-x-2 text-xs ${isUtdSm ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}>
                                 <input type="checkbox" checked={isUtdSm ? false : hasOptOutClause} onChange={(e) => setHasOptOutClause(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                                 <span>Opt-Out Clause</span>
                             </label>
                             {canShowFLinkIntegration && (
-                                <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                                     <input type="checkbox" checked={showFLinkIntegration} onChange={(e) => setShowFLinkIntegration(e.target.checked)} className="rounded text-purple-600 focus:ring-purple-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                                     <span>Formulink Term</span>
                                 </label>
@@ -1205,7 +1205,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                           </>
                         )}
                         {config.dealType === DealType.RENEWAL && renewalNotes.length > 0 && (
-                          <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                          <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                             <input type="checkbox" checked={includeRenewalIncreaseInfo} onChange={(e) => setIncludeRenewalIncreaseInfo(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                             <span>Renewal Increase Info</span>
                           </label>
@@ -1213,13 +1213,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                         
                         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                            <div className="flex items-center justify-between">
-                              <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                              <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                                 <input type="checkbox" checked={hasDesignatedSites} onChange={handleSiteCheckboxChange} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                                 <span>Designated Sites</span>
                               </label>
                            </div>
                            <div className="flex items-center justify-between mt-2">
-                              <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                              <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                                 <input type="checkbox" checked={useStartDate} onChange={handleStartDateCheckboxChange} className="rounded text-green-600 focus:ring-green-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                                 <span>Include Start Date</span>
                               </label>
