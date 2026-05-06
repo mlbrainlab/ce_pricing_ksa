@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import posthog from 'posthog-js';
+import { Analytics } from '@vercel/analytics/react';
 import Login from './components/Login';
 import { Layout } from './components/Layout';
 import { ExportSection } from './components/ExportSection';
@@ -701,6 +702,7 @@ const App: React.FC = () => {
   }
 
   return (
+    <>
     <Layout>
       {notification && (
         <div className="fixed top-4 right-4 z-50 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded shadow-lg animate-fade-in-down">
@@ -1932,6 +1934,8 @@ const App: React.FC = () => {
         </div>
       </div>
     </Layout>
+    <Analytics />
+    </>
   );
 };
 
