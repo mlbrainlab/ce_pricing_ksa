@@ -18,6 +18,19 @@
     <script>
       // Critical Fix: Polyfill for libraries (like ExcelJS) that expect 'global' to exist
       window.global = window;
+
+      // Auto theming script to prevent FOUC and ensure the initial login screen has a theme
+      (function() {
+        try {
+          var savedTheme = localStorage.getItem('theme');
+          var systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (savedTheme === 'dark' || (savedTheme === 'system' && systemPrefersDark) || (!savedTheme && systemPrefersDark)) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {}
+      })();
     </script>
   <script type="importmap">
 {
