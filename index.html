@@ -23,8 +23,12 @@
       (function() {
         try {
           var savedTheme = localStorage.getItem('theme');
+          if (!savedTheme) {
+            localStorage.setItem('theme', 'system');
+            savedTheme = 'system';
+          }
           var systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          if (savedTheme === 'dark' || (savedTheme === 'system' && systemPrefersDark) || (!savedTheme && systemPrefersDark)) {
+          if (savedTheme === 'dark' || (savedTheme === 'system' && systemPrefersDark)) {
             document.documentElement.classList.add('dark');
           } else {
             document.documentElement.classList.remove('dark');

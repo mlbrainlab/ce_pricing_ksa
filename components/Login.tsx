@@ -16,9 +16,13 @@ export default function Login({ onLogin }: LoginProps) {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     
     const applyTheme = () => {
-      const savedTheme = localStorage.getItem('theme');
+      let savedTheme = localStorage.getItem('theme');
+      if (!savedTheme) {
+        localStorage.setItem('theme', 'system');
+        savedTheme = 'system';
+      }
       const systemPrefersDark = mediaQuery.matches;
-      const shouldUseDark = savedTheme === 'dark' || (savedTheme === 'system' && systemPrefersDark) || (!savedTheme && systemPrefersDark);
+      const shouldUseDark = savedTheme === 'dark' || (savedTheme === 'system' && systemPrefersDark);
       
       if (shouldUseDark) {
         document.documentElement.classList.add('dark');
@@ -28,6 +32,7 @@ export default function Login({ onLogin }: LoginProps) {
     };
 
     mediaQuery.addEventListener('change', applyTheme);
+    applyTheme();
     return () => mediaQuery.removeEventListener('change', applyTheme);
   }, []);
 

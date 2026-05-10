@@ -55,16 +55,21 @@ const App: React.FC = () => {
       .then(res => {
         if (res.ok) {
           setIsAuthenticated(true);
-          // Fetch metadata once authenticated
-          fetch('/api/metadata')
-            .then(m => m.json())
-            .then(setMetadata)
-            .catch(err => console.error('Metadata fetch failed:', err));
         }
       })
       .catch(err => console.error('Auth verification failed:', err))
       .finally(() => setIsAuthChecked(true));
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Fetch metadata once authenticated
+      fetch('/api/metadata')
+        .then(m => m.json())
+        .then(setMetadata)
+        .catch(err => console.error('Metadata fetch failed:', err));
+    }
+  }, [isAuthenticated]);
 
   const handleLogin = () => {
     setIsAuthenticated(true);
