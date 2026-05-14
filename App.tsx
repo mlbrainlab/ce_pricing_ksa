@@ -10,9 +10,11 @@ import {
   ChannelType, 
   PricingMethod, 
   ProductInput, 
-  DealConfiguration 
+  DealConfiguration,
+  ProductDefinition
 } from './types';
-import { AVAILABLE_PRODUCTS, UTD_VARIANTS, LXD_VARIANTS, EXCHANGE_RATE_SAR } from './constants';
+// Removed direct constants import to protect sensitive pricing data
+// Metadata is now fetched from the secure backend API
 
 const formatCurrency = (amount: number, currency: 'USD' | 'SAR') => {
   if (currency === 'USD') {
@@ -37,6 +39,15 @@ const App: React.FC = () => {
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthChecked, setIsAuthChecked] = useState(false);
+  const [metadata, setMetadata] = useState<{
+    availableProducts: ProductDefinition[];
+    utdVariants: Record<string, number>;
+    lxdVariants: Record<string, number>;
+    exchangeRateSAR: number;
+    whtFactor: number;
+  } | null>(null);
+
+  const sarRate = metadata?.exchangeRateSAR || 3.75;
 
   useEffect(() => {
     // Check if user is already authenticated via backend cookie
@@ -49,6 +60,16 @@ const App: React.FC = () => {
       .catch(err => console.error('Auth verification failed:', err))
       .finally(() => setIsAuthChecked(true));
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Fetch metadata once authenticated
+      fetch('/api/metadata')
+        .then(m => m.json())
+        .then(setMetadata)
+        .catch(err => console.error('Metadata fetch failed:', err));
+    }
+  }, [isAuthenticated]);
 
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -345,98 +366,7 @@ const App: React.FC = () => {
   }, [config, isAuthenticated]);
 
   // Extension Quote Logic
-  const extensionResults = useMemo(() => {
-    if (!isExtensionQuote) return null;
-
-    const tcv = expiringTerm === 'multi' ? expiringTCV : currentSpend;
-    const monthlyCost = currentSpend / 12;
-    
-    // Net Factor for Extension Quotes (Renewal + Indirect)
-    let netFactor = 1.0;
-    if (channel === ChannelType.FULFILMENT) netFactor = 0.95;
-    if (channel === ChannelType.PARTNER_SOURCED) netFactor = 0.90;
-
-    if (extensionOption === 'A') {
-      const customerExtension = tcv * (extensionPercentage / 100);
-      const monthsAvailable = monthlyCost > 0 ? customerExtension / monthlyCost : 0;
-      let integerMonths = Math.floor(monthsAvailable);
-      let nMonthsCost = integerMonths * monthlyCost;
-      
-      let fpiPercentage = 0;
-      let endUserPrice = 0;
-      let days = 0;
-      let extraDays = 0;
-      let percentageLess = 0;
-      let percentageMore = 0;
-
-      if (useFullExtension) {
-        const expiringDays = expiringTerm === 'multi' ? 1095 : 365;
-        const dailyCost = tcv / expiringDays;
-        const exactDays = dailyCost > 0 ? customerExtension / dailyCost : 0;
-        days = Math.floor(exactDays);
-        integerMonths = Math.floor(days / 30);
-        extraDays = days % 30;
-        endUserPrice = customerExtension;
-        
-        percentageLess = tcv > 0 ? (integerMonths * monthlyCost) / tcv * 100 : 0;
-        percentageMore = tcv > 0 ? ((integerMonths + 1) * monthlyCost) / tcv * 100 : 0;
-      } else {
-        if (extensionFPI !== null) {
-          fpiPercentage = extensionFPI;
-        } else {
-          fpiPercentage = nMonthsCost > 0 ? ((customerExtension / nMonthsCost) - 1) * 100 : 0;
-        }
-        endUserPrice = nMonthsCost * (1 + (fpiPercentage / 100));
-      }
-
-      const netPrice = endUserPrice * netFactor;
-      const commission = endUserPrice - netPrice;
-
-      return {
-        type: 'A' as const,
-        variant: extensionVariant,
-        customerTCV: tcv,
-        extensionPercentage,
-        customerExtension,
-        currentSpend,
-        monthlyCost,
-        monthsAvailable,
-        integerMonths,
-        nMonthsCost,
-        fpiPercentage,
-        endUserPrice,
-        commission,
-        netPrice,
-        useFullExtension,
-        days,
-        extraDays,
-        percentageLess,
-        percentageMore
-      };
-    } else {
-      // Option B
-      const maxSAR = 100000;
-      const maxSARExVAT = maxSAR / 1.15; // 86956.52
-      const monthlyCostSAR = monthlyCost * EXCHANGE_RATE_SAR;
-      const monthsCovered = monthlyCostSAR > 0 ? Math.floor(maxSARExVAT / monthlyCostSAR) : 0;
-      const endUserPrice = monthsCovered * monthlyCost;
-      const netPrice = endUserPrice * netFactor;
-      const commission = endUserPrice - netPrice;
-
-      return {
-        type: 'B' as const,
-        variant: extensionVariant,
-        currentSpend,
-        monthlyCost,
-        monthlyCostSAR,
-        monthsCovered,
-        maxSARExVAT,
-        endUserPrice,
-        commission,
-        netPrice
-      };
-    }
-  }, [isExtensionQuote, extensionOption, expiringTerm, expiringTCV, currentSpend, extensionPercentage, extensionFPI, channel, extensionVariant, useFullExtension]);
+  const extensionResults = results?.extensionResults;
 
   // Validation Logic for UTDEE
   const utdEeWarning = useMemo(() => {
@@ -636,7 +566,7 @@ const App: React.FC = () => {
 
           if (existingVariant === 'Hospital Pharmacy Model') return ['Hospital Pharmacy Model'];
           
-          return Object.keys(LXD_VARIANTS); // Fallback
+          return Object.keys(metadata?.lxdVariants || {}); // Fallback
       }
       return [existingVariant]; // Default
   };
@@ -783,10 +713,10 @@ const App: React.FC = () => {
                     value={extensionVariant}
                     onChange={(e) => setExtensionVariant(e.target.value)}
                   >
-                    {Object.keys(UTD_VARIANTS).map(v => (
+                    {Object.keys(metadata?.utdVariants || {}).map(v => (
                       <option key={v} value={v}>{v}</option>
                     ))}
-                    {Object.keys(LXD_VARIANTS).map(v => (
+                    {Object.keys(metadata?.lxdVariants || {}).map(v => (
                       <option key={v} value={v}>{v}</option>
                     ))}
                   </select>
@@ -885,7 +815,7 @@ const App: React.FC = () => {
               <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-5 border border-gray-100 dark:border-gray-700 transition-colors">
                 <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mb-4">2. Product Mix</h2>
             <div className="space-y-4">
-              {AVAILABLE_PRODUCTS.map(product => {
+              {(metadata?.availableProducts || []).map(product => {
                 const isSelected = selectedProductIds.includes(product.id);
                 const input = productInputs[product.id] || { count: 0, variant: '', baseDiscount: 0 };
                 
@@ -936,7 +866,7 @@ const App: React.FC = () => {
                 // Variants Filtering
                 const allowedTargetVariants = isRenewal 
                    ? getAllowedTargetVariants(product.id, existingVariant) 
-                   : (product.id === 'utd' ? Object.keys(UTD_VARIANTS) : Object.keys(LXD_VARIANTS));
+                   : (product.id === 'utd' ? Object.keys(metadata?.utdVariants || {}) : Object.keys(metadata?.lxdVariants || {}));
 
                 const isUTDSM = product.id === 'utd' && input.variant === 'SM';
                 const isLXDSeats = product.id === 'lxd' && (input.variant.includes('Seats') || input.variant === 'Hospital Pharmacy Model');
@@ -1003,10 +933,10 @@ const App: React.FC = () => {
                                      value={input.existingVariant || input.variant}
                                      onChange={(e) => handleInputChange(product.id, 'existingVariant', e.target.value)}
                                    >
-                                      {product.id === 'utd' && Object.keys(UTD_VARIANTS).map(v => (
+                                      {product.id === 'utd' && Object.keys(metadata?.utdVariants || {}).map(v => (
                                          <option key={v} value={v}>{v}</option>
                                       ))}
-                                      {product.id === 'lxd' && Object.keys(LXD_VARIANTS).map(v => {
+                                      {product.id === 'lxd' && Object.keys(metadata?.lxdVariants || {}).map(v => {
                                          if(v.includes('EE-Combo')) return null; 
                                          return <option key={v} value={v}>{v}</option>;
                                       })}
@@ -1035,10 +965,10 @@ const App: React.FC = () => {
                                  disabled={isRenewal && existingVariant === 'UTDEE' && product.id === 'utd'}
                                  onChange={(e) => handleInputChange(product.id, 'variant', e.target.value)}
                                >
-                                 {allowedTargetVariants.map(v => {
+                                 {(allowedTargetVariants as string[]).map(v => {
                                    let price = 0;
-                                   if (product.id === 'utd') price = UTD_VARIANTS[v];
-                                   if (product.id === 'lxd') price = LXD_VARIANTS[v];
+                                   if (product.id === 'utd') price = (metadata?.utdVariants as any)?.[v] || 0;
+                                   if (product.id === 'lxd') price = (metadata?.lxdVariants as any)?.[v] || 0;
                                    
                                    // Specific filtering for Combo logic in New Logo context (unchanged)
                                    if (!isRenewal && product.id === 'lxd' && v.includes('EE-Combo') && isRestrictedUTD) {
@@ -1092,7 +1022,7 @@ const App: React.FC = () => {
                              <div className={`flex items-center border border-gray-300 dark:border-gray-600 rounded shadow-sm overflow-hidden bg-white dark:bg-gray-700 h-7 ${shouldDisableLXDDiscount ? 'opacity-50 cursor-not-allowed' : ''}`}>
                                <button 
                                  type="button" 
-                                 onClick={() => { if(!shouldDisableLXDDiscount) handleInputChange(product.id, 'baseDiscount', Math.max(0, (input.baseDiscount || 0) - 1)) }} 
+                                 onClick={() => { if(!shouldDisableLXDDiscount) handleInputChange(product.id, 'baseDiscount', Math.max(0, (parseFloat(input.baseDiscount as any) || 0) - 1)) }} 
                                  className="w-7 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
                                  disabled={shouldDisableLXDDiscount}
                                >-</button>
@@ -1100,16 +1030,16 @@ const App: React.FC = () => {
                                  type="number"
                                  min="0"
                                  max="100"
-                                 step="1"
+                                 step="0.01"
                                  disabled={shouldDisableLXDDiscount}
                                  className="w-full h-full text-center text-xs p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
                                  value={input.baseDiscount}
-                                 onChange={(e) => handleInputChange(product.id, 'baseDiscount', parseInt(e.target.value) || 0)}
+                                 onChange={(e) => handleInputChange(product.id, 'baseDiscount', e.target.value)}
                                  style={{ appearance: 'textfield', MozAppearance: 'textfield' }}
                                />
                                <button 
                                  type="button" 
-                                 onClick={() => { if(!shouldDisableLXDDiscount) handleInputChange(product.id, 'baseDiscount', Math.min(100, (input.baseDiscount || 0) + 1)) }} 
+                                 onClick={() => { if(!shouldDisableLXDDiscount) handleInputChange(product.id, 'baseDiscount', Math.min(100, (parseFloat(input.baseDiscount as any) || 0) + 1)) }} 
                                  className="w-7 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
                                  disabled={shouldDisableLXDDiscount}
                                >+</button>
@@ -1328,7 +1258,7 @@ const App: React.FC = () => {
                                     selectedProductIds.forEach(pid => {
                                         const y1 = y1Breakdown.find((p: any) => p.id === pid)?.net || 0;
                                         if (y1 < 10000) {
-                                            const name = AVAILABLE_PRODUCTS.find(p => p.id === pid)?.shortName || pid.toUpperCase();
+                                            const name = (metadata?.availableProducts || []).find(p => p.id === pid)?.shortName || pid.toUpperCase();
                                             alerts.push(`${name} MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.`);
                                         }
                                     });
@@ -1409,7 +1339,7 @@ const App: React.FC = () => {
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
                 <h3 className="text-lg font-bold text-gray-800 dark:text-white">Extension Quote Results</h3>
                 <div className="text-xs font-sans tabular-nums text-gray-500 dark:text-gray-400">
-                  1 USD = {EXCHANGE_RATE_SAR} SAR
+                  1 USD = {sarRate} SAR
                 </div>
               </div>
               
@@ -1502,9 +1432,9 @@ const App: React.FC = () => {
                           <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.endUserPrice, 'USD')}</div>
                           {isIndirect && (
                             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                              <div>SAR: {formatCurrency(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')}</div>
-                              <div>VAT (15%): {formatCurrency(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')}</div>
-                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')}</div>
+                              <div>SAR: {formatCurrency(extensionResults.endUserPrice * sarRate, 'SAR')}</div>
+                              <div>VAT (15%): {formatCurrency(extensionResults.endUserPrice * sarRate * 0.15, 'SAR')}</div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.endUserPrice * sarRate * 1.15, 'SAR')}</div>
                             </div>
                           )}
                         </div>
@@ -1513,9 +1443,9 @@ const App: React.FC = () => {
                           <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.commission, 'USD')}</div>
                           {isIndirect && (
                             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                              <div>SAR: {formatCurrency(extensionResults.commission * EXCHANGE_RATE_SAR, 'SAR')}</div>
-                              <div>VAT (15%): {formatCurrency(extensionResults.commission * EXCHANGE_RATE_SAR * 0.15, 'SAR')}</div>
-                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.commission * EXCHANGE_RATE_SAR * 1.15, 'SAR')}</div>
+                              <div>SAR: {formatCurrency(extensionResults.commission * sarRate, 'SAR')}</div>
+                              <div>VAT (15%): {formatCurrency(extensionResults.commission * sarRate * 0.15, 'SAR')}</div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.commission * sarRate * 1.15, 'SAR')}</div>
                             </div>
                           )}
                         </div>
@@ -1524,9 +1454,9 @@ const App: React.FC = () => {
                           <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(extensionResults.netPrice, 'USD')}</div>
                           {isIndirect && (
                             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                              <div>SAR: {formatCurrency(extensionResults.netPrice * EXCHANGE_RATE_SAR, 'SAR')}</div>
-                              <div>VAT (15%): {formatCurrency(extensionResults.netPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')}</div>
-                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.netPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')}</div>
+                              <div>SAR: {formatCurrency(extensionResults.netPrice * sarRate, 'SAR')}</div>
+                              <div>VAT (15%): {formatCurrency(extensionResults.netPrice * sarRate * 0.15, 'SAR')}</div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.netPrice * sarRate * 1.15, 'SAR')}</div>
                             </div>
                           )}
                         </div>
@@ -1556,9 +1486,9 @@ const App: React.FC = () => {
                           <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.endUserPrice, 'USD')}</div>
                           {isIndirect && (
                             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                              <div>SAR: {formatCurrency(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')}</div>
-                              <div>VAT (15%): {formatCurrency(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')}</div>
-                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')}</div>
+                              <div>SAR: {formatCurrency(extensionResults.endUserPrice * sarRate, 'SAR')}</div>
+                              <div>VAT (15%): {formatCurrency(extensionResults.endUserPrice * sarRate * 0.15, 'SAR')}</div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.endUserPrice * sarRate * 1.15, 'SAR')}</div>
                             </div>
                           )}
                         </div>
@@ -1567,9 +1497,9 @@ const App: React.FC = () => {
                           <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.commission, 'USD')}</div>
                           {isIndirect && (
                             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                              <div>SAR: {formatCurrency(extensionResults.commission * EXCHANGE_RATE_SAR, 'SAR')}</div>
-                              <div>VAT (15%): {formatCurrency(extensionResults.commission * EXCHANGE_RATE_SAR * 0.15, 'SAR')}</div>
-                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.commission * EXCHANGE_RATE_SAR * 1.15, 'SAR')}</div>
+                              <div>SAR: {formatCurrency(extensionResults.commission * sarRate, 'SAR')}</div>
+                              <div>VAT (15%): {formatCurrency(extensionResults.commission * sarRate * 0.15, 'SAR')}</div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.commission * sarRate * 1.15, 'SAR')}</div>
                             </div>
                           )}
                         </div>
@@ -1578,9 +1508,9 @@ const App: React.FC = () => {
                           <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(extensionResults.netPrice, 'USD')}</div>
                           {isIndirect && (
                             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                              <div>SAR: {formatCurrency(extensionResults.netPrice * EXCHANGE_RATE_SAR, 'SAR')}</div>
-                              <div>VAT (15%): {formatCurrency(extensionResults.netPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')}</div>
-                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.netPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')}</div>
+                              <div>SAR: {formatCurrency(extensionResults.netPrice * sarRate, 'SAR')}</div>
+                              <div>VAT (15%): {formatCurrency(extensionResults.netPrice * sarRate * 0.15, 'SAR')}</div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.netPrice * sarRate * 1.15, 'SAR')}</div>
                             </div>
                           )}
                         </div>
@@ -1606,7 +1536,7 @@ const App: React.FC = () => {
                 <h3 className="text-lg font-bold text-gray-800 dark:text-white">Commercial Schedule</h3>
                 {isIndirect && (
                   <div className="text-xs font-sans tabular-nums text-gray-500 dark:text-gray-400">
-                     1 USD = {EXCHANGE_RATE_SAR} SAR
+                     1 USD = {metadata?.exchangeRateSAR || '...'} SAR
                   </div>
                 )}
              </div>
@@ -1619,7 +1549,7 @@ const App: React.FC = () => {
                         
                         {/* Dynamic Product Columns - Gross USD */}
                         {selectedProductIds.map(pid => {
-                           const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                           const p = (metadata?.availableProducts || []).find((x: any) => x.id === pid);
                            const colorClass = pid === 'utd' ? 'text-green-600 dark:text-green-300 bg-green-50 dark:bg-green-900/20' : 'text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20';
                            return (
                              <th key={pid} className={`px-4 py-3 text-center text-xs font-bold uppercase whitespace-nowrap ${colorClass}`}>
@@ -1635,7 +1565,7 @@ const App: React.FC = () => {
 
                         {/* Dynamic Product Columns - Gross SAR (Indirect only) */}
                         {isIndirect && selectedProductIds.map(pid => {
-                            const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                            const p = (metadata?.availableProducts || []).find(x => x.id === pid);
                             const colorClass = pid === 'utd' ? 'text-green-600 dark:text-green-300 bg-green-50/50 dark:bg-green-900/10' : 'text-blue-600 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-900/10';
                             return (
                               <th key={`${pid}-sar`} className={`px-4 py-3 text-center text-xs font-bold uppercase whitespace-nowrap ${colorClass}`}>
@@ -1833,7 +1763,7 @@ const App: React.FC = () => {
                 <h4 className="text-sm font-bold text-gray-800 dark:text-white mb-3 font-sans">Net Revenue Breakdown</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {selectedProductIds.map(pid => {
-                     const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                     const p = (metadata?.availableProducts || []).find((x: any) => x.id === pid);
                      const tcv = results?.productNetTotals?.[pid] || 0;
                      const acv = tcv / config.years;
                      return (
@@ -1857,7 +1787,7 @@ const App: React.FC = () => {
           </>
           )}
 
-          <ExportSection 
+            <ExportSection 
             key={resetKey}
             data={results} 
             config={config} 

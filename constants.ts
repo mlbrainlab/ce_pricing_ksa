@@ -1,9 +1,32 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.6.0';
+export const APP_VERSION = '6.6.2';
 
 export const CHANGELOG = [
+  {
+    version: '6.6.2',
+    date: new Date().toISOString().split('T')[0],
+    changes: [
+      'UI: Redesigned and streamlined Export Options section.',
+      'Feature: Restored and improved "Multiple Sites" list functionality allowing precise price breakdowns per site.',
+      'Feature: Restored "Technical Specifications" section in PDF exports.',
+      'UX: Improved Seller Information inputs alignment.',
+      'UX: Cleaned up unnecessary backend scripts.',
+    ]
+  },
+  {
+    version: '6.6.1',
+    date: '2026-05-05',
+    changes: [
+      'Pricing logic update: In a renewal scenario, if the customer is renewing the same variant and changing only the statistics (bed or head), the rate used for the additional stats (aka upsell value) is now the expiring rate * FPI / existing stat.',
+      'Security: Full-stack migration of export and pricing logic.',
+      'Security: Proprietary constants removed from frontend bundle.',
+      'Feature: Default "Show Stats" for proposals.',
+      'Feature: Automated rounding for CP deals.',
+      'UI: Polish and modern icons for Export section.'
+    ]
+  },
   {
     version: '6.6.0',
     date: '2026-04-21',
@@ -98,6 +121,50 @@ export const CHANGELOG = [
       'Feature: Auto Credential Capture.',
       'Patch/Fix: Fixed infinite "processing..." bug in PDF export.',
       'Patch/Fix: Added "Reset Form" button.'
+    ]
+  },
+  {
+    version: '6.4.0',
+    date: '2026-02-15',
+    changes: [
+      'Feature: Introduced "Extension" as a brand new Deal Type alongside New Logo and Renewal.',
+      'Feature: Added Option A (Pro-rated) and Option B (Flat Rate) calculation logic.'
+    ]
+  },
+  {
+    version: '6.3.0',
+    date: '2026-01-10',
+    changes: [
+      'Feature: Added "Designated Sites" logic (Breakdown per site, showing sites only).',
+      'Feature: Added Start Date selection and logic.',
+      'Feature: Added WHT (Withholding Tax) toggles and Rounding options.'
+    ]
+  },
+  {
+    version: '6.2.0',
+    date: '2025-11-20',
+    changes: [
+      'Feature: Implemented the Login screen with monthly passcodes and initials validation.',
+      'Feature: Added PostHog analytics to track user logins and quote generation.',
+      'Feature: Added Dark/Light mode toggling and responsive layout refinements.'
+    ]
+  },
+  {
+    version: '6.1.0',
+    date: '2025-10-05',
+    changes: [
+      'Feature: Added the ability to generate and download professional PDF proposals.',
+      'Feature: Added the ability to export raw data to Excel (.xlsx) files.',
+      'Feature: Implemented dynamic tables and technical specification links in the exports.'
+    ]
+  },
+  {
+    version: '6.0.0',
+    date: '2025-08-15',
+    changes: [
+      'Feature: The initial translation of the Excel pricing calculator into a React web application.',
+      'Feature: Core pricing engine (MYFPI, MYPP, Renewals, New Logo).',
+      'Feature: Product variants (UTD, LXD, Add-ons).'
     ]
   }
 ];

@@ -110,7 +110,7 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
         : (definition?.defaultBasePrice || 0);
     }
 
-    const effectiveDiscount = inputs.baseDiscount;
+    const effectiveDiscount = parseFloat(inputs.baseDiscount as any) || 0;
     let baseNet = baseGross * (1 - (effectiveDiscount / 100));
 
     // Apply WHT Gross Up if enabled
@@ -145,25 +145,41 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
          const expiringRate = inputs.existingCount && inputs.existingCount > 0 ? (expiring / inputs.existingCount) : expiring;
          
          const calculatePriceForTarget = (currentTarget: string) => {
-             if (inputs.changeInStats && inputs.count > (inputs.existingCount || 0)) {
-                 // If stats changed and are higher, use the list price (baseNet)
-                 const gross = UTD_VARIANTS[currentTarget] * inputs.count;
-                 const net = gross * (1 - ((inputs.baseDiscount || 0) / 100));
-                 return applyWHT ? net / WHT_FACTOR : net;
-             } else if (existing === currentTarget) {
-                 // Same Variant (or stats decreased)
-                 if (existing === 'UTDEE') return effectiveStats * expiringRate * 1.08;
-                 return effectiveStats * expiringRate * (1 + (upliftVal / 100));
-             } else {
-                 // Variant Upgrade (or stats decreased)
-                 if (existing === 'ANYWHERE' && currentTarget === 'UTDADV') {
-                     return effectiveStats * expiringRate * (1 + (upliftVal / 100) + 0.08);
-                 } else if (existing === 'ANYWHERE' && currentTarget === 'UTDEE') {
-                     return effectiveStats * expiringRate * 1.11;
-                 } else if (existing === 'UTDADV' && currentTarget === 'UTDEE') {
-                     return effectiveStats * expiringRate * 1.11;
+             const isStatsIncrease = inputs.changeInStats && inputs.count > (inputs.existingCount || 0);
+
+             if (existing === currentTarget) {
+                 if (isStatsIncrease) {
+                     // Renewing the same variant and changing only the statistics
+                     const existingCount = inputs.existingCount || 1;
+                     const additionalStats = inputs.count - existingCount;
+                     
+                     const upliftedBaseRate = currentTarget === 'UTDEE' ? (expiringRate * 1.08) : (expiringRate * (1 + (upliftVal / 100)));
+                     const baseNet = existingCount * upliftedBaseRate;
+                     const upsellValue = additionalStats * upliftedBaseRate;
+                     
+                     return baseNet + upsellValue;
                  } else {
+                     // Same Variant (or stats decreased)
+                     if (existing === 'UTDEE') return effectiveStats * expiringRate * 1.08;
                      return effectiveStats * expiringRate * (1 + (upliftVal / 100));
+                 }
+             } else {
+                 if (isStatsIncrease) {
+                     // If stats changed and are higher, AND VARIANT CHANGED, use the list price
+                     const gross = UTD_VARIANTS[currentTarget] * inputs.count;
+                     const net = gross * (1 - ((parseFloat(inputs.baseDiscount as any) || 0) / 100));
+                     return applyWHT ? net / WHT_FACTOR : net;
+                 } else {
+                     // Variant Upgrade (or stats decreased)
+                     if (existing === 'ANYWHERE' && currentTarget === 'UTDADV') {
+                         return effectiveStats * expiringRate * (1 + (upliftVal / 100) + 0.08);
+                     } else if (existing === 'ANYWHERE' && currentTarget === 'UTDEE') {
+                         return effectiveStats * expiringRate * 1.11;
+                     } else if (existing === 'UTDADV' && currentTarget === 'UTDEE') {
+                         return effectiveStats * expiringRate * 1.11;
+                     } else {
+                         return effectiveStats * expiringRate * (1 + (upliftVal / 100));
+                     }
                  }
              }
          };
@@ -186,8 +202,12 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
              productNotes.push(`UTD: Renewal > $30k. Recommend upgrading to UTD EE.`);
          }
 
-         if (inputs.changeInStats && inputs.count > (inputs.existingCount || 0)) {
-             productNotes.push(`UTD: Stats Increased - Using list price ($${pathBasedPrice.toFixed(0)})`);
+         const isStatsIncrease = inputs.changeInStats && inputs.count > (inputs.existingCount || 0);
+
+         if (isStatsIncrease && existing === finalTarget) {
+             productNotes.push(`UTD: Stats Increased (Same Variant) - Additional stats at FPI-adjusted expiring rate`);
+         } else if (isStatsIncrease && existing !== finalTarget) {
+             productNotes.push(`UTD: Stats Increased & Variant Upgrade - Using list price ($${pathBasedPrice.toFixed(0)})`);
          } else if (existing !== finalTarget) {
              if (existing === 'ANYWHERE' && finalTarget === 'UTDADV') {
                  productNotes.push(`UTD: Upsell Anywhere -> Adv (+8% applied)`);
@@ -239,12 +259,6 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
              }
          } else {
              // Bed Based Logic (Fixed Dollar Amounts)
-             // Check for specific transitions or just presence
-             // Scenarios imply additive logic:
-             // Base -> Flink: +12
-             // Base -> Flink+IPE: +28
-             // Flink -> Flink+IPE: +16
-             
              const existingHasFlink = existing.includes('FLINK');
              const existingHasIPE = existing.includes('IPE');
              const targetHasFlink = target.includes('FLINK');
@@ -262,35 +276,21 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
          }
 
          // 3. Calculate Components
-         // A. Renewal Base (Existing Sites * Expiring Rate * Uplift)
-         // Note: The scenarios show Renewal Amount = Expiring Amount * 1.05
          const renewalAmount = expiring * (1 + (upliftVal / 100));
-         
-         // B. Upsell on Existing (Existing Sites * Add-on Rate)
          const existingCount = inputs.existingCount || 0;
          let upsellOnExisting = existingCount * addOnRate;
          if (applyWHT) upsellOnExisting = upsellOnExisting / WHT_FACTOR;
 
-         // C. New Sites Cost (New Sites * (Expiring Rate + Add-on Rate))
-         // Note: New Sites do NOT pay Uplift in Year 1
          const newSitesCount = Math.max(0, inputs.count - existingCount);
          let newSitesCost = 0;
-         
          if (newSitesCount > 0) {
-             // Rate for New Sites = Expiring Rate + Add-on Rate
-             // (No Uplift applied to Expiring Rate portion)
-             const newSiteRate = expiringRate + addOnRate;
+             const newSiteRate = (expiringRate * (1 + (upliftVal / 100))) + addOnRate;
              newSitesCost = newSitesCount * newSiteRate;
              if (applyWHT) newSitesCost = newSitesCost / WHT_FACTOR;
-             
-             productNotes.push(`LXD: New Sites (${newSitesCount}) @ ${newSiteRate.toFixed(2)} (No Uplift)`);
+             productNotes.push(`LXD: New Sites (${newSitesCount}) @ ${newSiteRate.toFixed(2)} (FPI Applied)`);
          }
 
-         // 4. Total Year 1
          actualY1Price = renewalAmount + upsellOnExisting + newSitesCost;
-         
-         // Renewal Base for ACV Calculation
-         // Strictly the "Renewal Amount" part (Expiring * Uplift)
          renewalBase = renewalAmount;
 
          if (upsellOnExisting > 0) {
@@ -306,59 +306,35 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
   });
 
   // --- Step 2: Apply Floor Logic to Year 1 Nets ---
-  
   const hasUTD = selectedProducts.includes('utd');
   const hasLXD = selectedProducts.includes('lxd');
-
   let floorTriggered = false;
   
-  // Helper to calculate Add-on Net Value for LXD
   const getLXDAddonNet = (inputs: any, count: number, applyWHT: boolean) => {
       const variant = inputs.variant || '';
       let addOnRate = 0;
-      
       const isSeats = variant.includes('Seats');
 
       if (isSeats) {
-          // Percentage based add-ons on $300 base
           const baseSeatPrice = 300;
-          if (variant.includes('FLINK') && variant.includes('IPE')) {
-              addOnRate = baseSeatPrice * 0.30; // 90
-          } else if (variant.includes('FLINK')) {
-              addOnRate = baseSeatPrice * 0.10; // 30
-          } else if (variant.includes('IPE')) {
-              addOnRate = baseSeatPrice * 0.20; // 60
-          }
+          if (variant.includes('FLINK') && variant.includes('IPE')) addOnRate = baseSeatPrice * 0.30;
+          else if (variant.includes('FLINK')) addOnRate = baseSeatPrice * 0.10;
+          else if (variant.includes('IPE')) addOnRate = baseSeatPrice * 0.20;
       } else {
-          // Standard Bed-based add-ons
-          // Note: LXD_VARIANTS keys: "BASE PKG", "BASE PKG+FLINK", "BASE PKG+FLINK+IPE", "EE-Combo..."
-          // We need to detect if FLINK or IPE is present.
           const hasFlink = variant.includes('FLINK');
           const hasIPE = variant.includes('IPE');
-
-          if (hasFlink && hasIPE) {
-              addOnRate = LXD_ADDONS.FLINK_IPE;
-          } else if (hasFlink) {
-              addOnRate = LXD_ADDONS.FLINK;
-          } else if (hasIPE) {
-              addOnRate = LXD_ADDONS.IPE;
-          }
+          if (hasFlink && hasIPE) addOnRate = LXD_ADDONS.FLINK_IPE;
+          else if (hasFlink) addOnRate = LXD_ADDONS.FLINK;
+          else if (hasIPE) addOnRate = LXD_ADDONS.IPE;
       }
 
       let addonGross = addOnRate * count;
-      let addonNet = addonGross * (1 - (inputs.baseDiscount / 100));
-      
-      if (applyWHT) {
-          addonNet = addonNet / WHT_FACTOR;
-      }
+      let addonNet = addonGross * (1 - ((parseFloat(inputs.baseDiscount as any) || 0) / 100));
+      if (applyWHT) addonNet = addonNet / WHT_FACTOR;
       return addonNet;
   };
 
   if (hasUTD && hasLXD) {
-    // Combo Logic for LXD
-    // LXD Floor is COMBO_FLOOR_LXD_RAW (adjusted for WHT)
-    // Logic: Floor applies to Base. Add-ons are on top.
-    
     const lxdInputs = productInputs['lxd'];
     const lxdCurrentNet = year1ProductNets['lxd'];
     const lxdAddonNet = getLXDAddonNet(lxdInputs, lxdInputs.count, applyWHT);
@@ -369,7 +345,7 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
         const extraUsers = Math.max(0, lxdInputs.count - 6);
         let hpFloor = 6500 + (extraUsers * 1000);
         if (applyWHT) hpFloor = hpFloor / WHT_FACTOR;
-        currentLxdFloor = hpFloor; // Always use calculated floor for Hospital Pharmacy Model
+        currentLxdFloor = hpFloor;
     }
 
     if (lxdBaseNet < currentLxdFloor) {
@@ -378,40 +354,28 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
       floorTriggered = true;
     }
 
-    // UTD Floor Logic (Standard Floor)
-    // Logic: If UTDADV, Floor = StandardFloor * 1.08
     const utdInputs = productInputs['utd'];
     let utdFloor = activeStandardFloor;
-    if (utdInputs.variant === 'UTDADV') {
-        utdFloor = utdFloor * 1.08;
-    }
-
+    if (utdInputs.variant === 'UTDADV') utdFloor = utdFloor * 1.08;
     if (year1ProductNets['utd'] < utdFloor) {
         year1ProductNets['utd'] = utdFloor;
         productNotes.push(`UTD adjusted to Floor (${utdInputs.variant === 'UTDADV' ? 'Standard + 8%' : 'Standard'})`);
         floorTriggered = true;
     }
-
   } else if (hasUTD) {
-    // Single UTD
     const utdInputs = productInputs['utd'];
     let utdFloor = activeStandardFloor;
-    if (utdInputs.variant === 'UTDADV') {
-        utdFloor = utdFloor * 1.08;
-    }
-
+    if (utdInputs.variant === 'UTDADV') utdFloor = utdFloor * 1.08;
     if (year1ProductNets['utd'] < utdFloor) {
       year1ProductNets['utd'] = utdFloor;
       productNotes.push(`UTD adjusted to Minimum Floor (${utdInputs.variant === 'UTDADV' ? 'Standard + 8%' : 'Standard'})`);
       floorTriggered = true;
     }
   } else if (hasLXD) {
-    // Single LXD
     const lxdInputs = productInputs['lxd'];
     const lxdCurrentNet = year1ProductNets['lxd'];
     const lxdAddonNet = getLXDAddonNet(lxdInputs, lxdInputs.count, applyWHT);
     const lxdBaseNet = lxdCurrentNet - lxdAddonNet;
-
     let currentLxdFloor = activeStandardFloor;
     if (lxdInputs.variant === 'Hospital Pharmacy Model') {
         const extraUsers = Math.max(0, lxdInputs.count - 6);
@@ -419,7 +383,6 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
         if (applyWHT) hpFloor = hpFloor / WHT_FACTOR;
         currentLxdFloor = hpFloor;
     }
-
     if (lxdBaseNet < currentLxdFloor) {
       year1ProductNets['lxd'] = currentLxdFloor + lxdAddonNet;
       productNotes.push(`LXD adjusted to Minimum Floor (Base: ${currentLxdFloor.toFixed(0)} + Addons)`);
@@ -428,15 +391,12 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
   }
 
   // --- Step 3: Multi-Year Projection (Per Product) ---
-  
   const productSchedules: Record<string, number[]> = {};
-
   const safeYears = Math.max(0, Math.floor(Number(years) || 0));
 
   selectedProducts.forEach(prodId => {
     const y1Value = year1ProductNets[prodId];
     const schedule = new Array(safeYears).fill(0);
-    
     const specificRates = productRates[prodId] || rates;
     let specificMethod = productMethods?.[prodId] || method;
 
@@ -446,48 +406,38 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
     }
 
     if (specificMethod === PricingMethod.MYFPI) {
-      // Forward
       schedule[0] = y1Value;
       for (let i = 1; i < years; i++) {
         const rate = specificRates[i] || 0; 
         schedule[i] = schedule[i - 1] * (1 + (rate / 100));
       }
     } else {
-      // MYPP Reverse
       schedule[years - 1] = y1Value;
       for (let i = years - 2; i >= 0; i--) {
-        const discountRate = specificRates[i + 1] || 0; // Discount to reverse
+        const discountRate = specificRates[i + 1] || 0;
         schedule[i] = schedule[i + 1] / (1 + (discountRate / 100));
       }
     }
-    
     productSchedules[prodId] = schedule;
   });
 
-  // --- Step 3.5: Apply Flat Pricing (Flatten the curve) ---
   if (flatPricing && years > 1) {
     selectedProducts.forEach(prodId => {
       const schedule = productSchedules[prodId];
-      // Calculate sum of projected years
       const totalPeriodCost = schedule.reduce((acc, val) => acc + val, 0);
-      // Average it
       const averageAnnual = safeYears > 0 ? totalPeriodCost / safeYears : 0;
-      // Overwrite schedule with flat values
       productSchedules[prodId] = new Array(safeYears).fill(averageAnnual);
     });
   }
 
-  // --- Step 3.6: Apply Rounding ---
   if (rounding) {
     selectedProducts.forEach(prodId => {
       const schedule = productSchedules[prodId];
       for (let i = 0; i < years; i++) {
         const val = schedule[i];
         if (channel === ChannelType.DIRECT) {
-          // Direct: Round up to nearest 100 USD
           schedule[i] = Math.ceil(val / 100) * 100;
         } else {
-          // Indirect: Round up to nearest 1000 SAR
           const rawSAR = val * EXCHANGE_RATE_SAR;
           const roundedSAR = Math.ceil(rawSAR / 1000) * 1000;
           schedule[i] = roundedSAR / EXCHANGE_RATE_SAR;
@@ -498,104 +448,100 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
   }
 
   // --- Step 4: Aggregate and Format ---
-  
-  let totalTCV = 0;
-
-  let totalGrossUSD = 0;
-  let totalGrossSAR = 0;
-  let totalVatSAR = 0;
-  let totalGrandTotalSAR = 0;
-
-  let totalNetUSD = 0;
-  let totalNetSAR = 0;
-
+  let totalTCV = 0, totalGrossUSD = 0, totalGrossSAR = 0, totalVatSAR = 0, totalGrandTotalSAR = 0, totalNetUSD = 0, totalNetSAR = 0;
   const productNetTotals: Record<string, number> = {};
   selectedProducts.forEach(p => productNetTotals[p] = 0);
 
   for (let i = 0; i < years; i++) {
     const breakdown: ProductYearlyData[] = [];
     let yearSum = 0;
-    
     const netFactor = getNetFactor(dealType, channel, i);
 
     selectedProducts.forEach(prodId => {
       const val = productSchedules[prodId][i];
       yearSum += val;
-      
       const netVal = val * netFactor;
-      breakdown.push({
-        id: prodId,
-        gross: val,
-        grossSAR: convertToSAR(val),
-        net: netVal
-      });
-
+      breakdown.push({ id: prodId, gross: val, grossSAR: convertToSAR(val), net: netVal });
       productNetTotals[prodId] += netVal;
     });
 
-    // Totals for this year
     const yearGrossSAR = convertToSAR(yearSum);
     const yearVatSAR = yearGrossSAR * 0.15;
     const yearGrandTotalSAR = yearGrossSAR + yearVatSAR;
-
     const recognizedUSD = yearSum * netFactor;
     const recognizedSAR = recognizedUSD * EXCHANGE_RATE_SAR;
 
     yearlyResults.push({
-      year: i + 1,
-      breakdown,
-      grossUSD: yearSum,
-      grossSAR: yearGrossSAR,
-      vatSAR: yearVatSAR,
-      grandTotalSAR: yearGrandTotalSAR,
-      netUSD: recognizedUSD,
-      netSAR: recognizedSAR,
+      year: i + 1, breakdown, grossUSD: yearSum, grossSAR: yearGrossSAR,
+      vatSAR: yearVatSAR, grandTotalSAR: yearGrandTotalSAR,
+      netUSD: recognizedUSD, netSAR: recognizedSAR,
       floorAdjusted: i === 0 && floorTriggered,
       notes: i === 0 ? productNotes : [],
+      currencyToDisplay: channel === ChannelType.DIRECT ? 'USD' : 'SAR',
     });
 
-    totalTCV += yearSum;
-    totalGrossUSD += yearSum;
-    totalGrossSAR += yearGrossSAR;
-    totalVatSAR += yearVatSAR;
-    totalGrandTotalSAR += yearGrandTotalSAR;
-    totalNetUSD += recognizedUSD;
-    totalNetSAR += recognizedSAR;
+    totalTCV += yearSum; totalGrossUSD += yearSum; totalGrossSAR += yearGrossSAR;
+    totalVatSAR += yearVatSAR; totalGrandTotalSAR += yearGrandTotalSAR;
+    totalNetUSD += recognizedUSD; totalNetSAR += recognizedSAR;
   }
 
-  // --- Step 5: Splits (ACV) ---
   const acvUSD = totalTCV / years;
   const netACV = totalNetUSD / years;
-  
   let upsellACV = 0;
-  
-  if (dealType === DealType.RENEWAL) {
-    // Upsell = Total ACV - Renewal Base ACV
-    // Note: If no variant change, totalRenewalBaseForACV = totalGrossUSD, so upsell = 0.
-    upsellACV = Math.max(0, acvUSD - totalRenewalBaseForACV);
-  }
+  if (dealType === DealType.RENEWAL) upsellACV = Math.max(0, acvUSD - totalRenewalBaseForACV);
 
-  // Calculate Net Splits
-  // For Renewal deals, net factor is constant across years for indirect channels
-  const renewalNetFactor = getNetFactor(dealType, channel, 0);
-  const netRenewalBaseACV = totalRenewalBaseForACV * renewalNetFactor;
-  const netUpsellACV = upsellACV * renewalNetFactor;
-
-  return {
-    yearlyResults,
-    totalGrossUSD,
-    totalGrossSAR,
-    totalVatSAR,
-    totalGrandTotalSAR,
-    totalNetUSD,
-    totalNetSAR,
-    productNetTotals,
-    acvUSD,
-    netACV,
+  const results: CalculationOutput = {
+    yearlyResults, totalGrossUSD, totalGrossSAR, totalVatSAR, totalGrandTotalSAR,
+    totalNetUSD, totalNetSAR, productNetTotals, acvUSD, netACV,
     renewalBaseACV: totalRenewalBaseForACV,
-    netRenewalBaseACV,
+    netRenewalBaseACV: totalRenewalBaseForACV * getNetFactor(dealType, channel, 0),
     upsellACV,
-    netUpsellACV,
+    netUpsellACV: upsellACV * getNetFactor(dealType, channel, 0),
     currencyToDisplay: channel === ChannelType.DIRECT ? 'USD' : 'SAR',
   };
+
+  // Extension Quote Logic
+  if (dealType === DealType.EXTENSION) {
+    const tcv = config.expiringTerm === 'multi' ? (config.expiringTCV || 0) : (config.currentSpend || 0);
+    const monthlyCost = (config.currentSpend || 0) / 12;
+    let netFactor = 1.0;
+    if (channel === ChannelType.FULFILMENT) netFactor = 0.95;
+    if (channel === ChannelType.PARTNER_SOURCED) netFactor = 0.90;
+
+    if (config.extensionOption === 'A') {
+      const customerExtension = tcv * ((config.extensionPercentage || 0) / 100);
+      const monthsAvailable = monthlyCost > 0 ? customerExtension / monthlyCost : 0;
+      let integerMonths = Math.floor(monthsAvailable);
+      let nMonthsCost = integerMonths * monthlyCost;
+      let fpiPercentage = config.extensionFPI ?? (nMonthsCost > 0 ? ((customerExtension / nMonthsCost) - 1) * 100 : 0);
+      let endUserPrice = config.useFullExtension ? customerExtension : nMonthsCost * (1 + (fpiPercentage / 100));
+
+      results.extensionResults = {
+        type: 'A', variant: config.extensionVariant, customerTCV: tcv,
+        extensionPercentage: config.extensionPercentage, customerExtension,
+        currentSpend: config.currentSpend, monthlyCost, monthsAvailable, integerMonths, nMonthsCost,
+        fpiPercentage, endUserPrice, commission: endUserPrice * (1 - netFactor), netPrice: endUserPrice * netFactor,
+        useFullExtension: config.useFullExtension
+      };
+      if (config.useFullExtension) {
+          const expiringDays = config.expiringTerm === 'multi' ? 1095 : 365;
+          const dailyCost = tcv / expiringDays;
+          const exactDays = dailyCost > 0 ? customerExtension / dailyCost : 0;
+          results.extensionResults.days = Math.floor(exactDays);
+          results.extensionResults.extraDays = results.extensionResults.days % 30;
+      }
+    } else {
+      const maxSARExVAT = 100000 / 1.15;
+      const monthlyCostSAR = monthlyCost * EXCHANGE_RATE_SAR;
+      const monthsCovered = monthlyCostSAR > 0 ? Math.floor(maxSARExVAT / monthlyCostSAR) : 0;
+      const endUserPrice = monthsCovered * monthlyCost;
+      results.extensionResults = {
+        type: 'B', variant: config.extensionVariant, currentSpend: config.currentSpend,
+        monthlyCost, monthlyCostSAR, monthsCovered, maxSARExVAT,
+        endUserPrice, commission: endUserPrice * (1 - netFactor), netPrice: endUserPrice * netFactor
+      };
+    }
+  }
+
+  return results;
 };

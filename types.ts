@@ -30,7 +30,7 @@ export interface ProductInput {
   existingCount?: number; // Existing Stats (Renewal only)
   variant: string; // Target Variant
   existingVariant?: string; // Existing Variant (Renewal only)
-  baseDiscount: number; // %
+  baseDiscount: number | string; // %
   expiringAmount?: number; // USD, for Renewal only
   dph?: number; // Dollars Per Head (for UTD Renewal)
   forceHeadcountOverride?: boolean; // If true, prioritize HC calculation if higher
@@ -55,6 +55,7 @@ export interface PricingResult {
   netSAR: number;
   floorAdjusted: boolean;
   notes: string[];
+  currencyToDisplay: 'USD' | 'SAR';
 }
 
 export interface DealConfiguration {
@@ -73,6 +74,15 @@ export interface DealConfiguration {
   rounding: boolean;
   useStartDate?: boolean;
   startMonthYear?: string;
+  // Extension Fields
+  extensionOption?: 'A' | 'B';
+  expiringTerm?: 'multi' | 'single';
+  expiringTCV?: number;
+  currentSpend?: number;
+  extensionPercentage?: number;
+  extensionFPI?: number | null;
+  extensionVariant?: string;
+  useFullExtension?: boolean;
 }
 
 export interface CalculationOutput {
@@ -96,4 +106,6 @@ export interface CalculationOutput {
   netUpsellACV: number; // New: Net value of Upsell
   
   currencyToDisplay: 'USD' | 'SAR';
+  extensionResults?: any;
+  renewalNotes?: string[];
 }
