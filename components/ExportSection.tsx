@@ -9,6 +9,7 @@ import ExcelJS from 'exceljs';
 
 import { SAMIR_WHITE_LOGO_BASE64 } from '../samirLogo';
 import { WK_LOGO_BASE64 } from '../wkLogo';
+import { EAI_LOGO_BASE64 } from '../eaiLogo';
 
 interface ExportSectionProps {
   data: CalculationOutput;
@@ -297,9 +298,18 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         let title = "UpToDate\u00AE";
         if (variant === 'ANYWHERE') title = "UpToDate\u00AE Anywhere";
         if (variant === 'UTDADV') title = "UpToDate\u00AE Advanced";
-        if (variant === 'UTDEE') title = "UpToDate\u00AE Enterprise";
+        if (variant === 'UTDEE' || variant === 'UTDEE-EAI') title = "UpToDate\u00AE Enterprise";
         if (variant === 'SM') title = "UpToDate\u00AE Subscriber Manager";
         doc.setFontSize(22); doc.setFont(fontName, 'bold'); doc.text(title, 105, currentY, { align: 'center' }); currentY += 8;
+        if (variant === 'UTDEE-EAI') {
+            doc.setFontSize(14); doc.setFont(fontName, 'normal');
+            doc.text("with Expert AI", 105, currentY, { align: 'center' });
+            // The logo has dimensions of 240x480 which is 0.5 ratio wide:tall. We can render it small next to the text.
+            // Let's add the image at a central position.
+            const textWidth = doc.getTextWidth("with Expert AI");
+            doc.addImage(EAI_LOGO_BASE64, 'PNG', 105 + (textWidth / 2) + 2, currentY - 4.5, 5, 5, 'EAI_LOGO', 'FAST');
+            currentY += 8;
+        }
         doc.setFontSize(12); doc.setFont(fontName, 'normal'); doc.text("Clinical Decision Support Solution", 105, currentY, { align: 'center' }); currentY += 20;
     }
     
@@ -623,6 +633,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         if (canShowFLinkIntegration && showFLinkIntegration) terms.push({ text: "With this subscription, your formulary will be integrated into UpToDate directly at no additional cost." });
         if (config.selectedProducts.includes('lxd') && config.productInputs['lxd']?.variant === 'Hospital Pharmacy Model') terms.push({ text: "This subscription is limited to the above number of seats." });
         if (isUtdSm) terms.push({ text: "This subscription is limited to the number of seats mentioned above." });
+        if (config.selectedProducts.includes('utd') && config.productInputs['utd']?.variant === 'UTDEE-EAI') {
+            terms.push({ text: "This subscription includes UpToDate Expert AI site-wide access." });
+            terms.push({ text: "Expert AI site-wide access will be enabled upon technical evaluation after service activation." });
+        }
     }
 
     terms.forEach(term => {

@@ -1,9 +1,16 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.6.2';
+export const APP_VERSION = '6.6.3';
 
 export const CHANGELOG = [
+  {
+    version: '6.6.3',
+    date: new Date().toISOString().split('T')[0],
+    changes: [
+      'Feature: Added UTDEE-EAI Pricing.'
+    ]
+  },
   {
     version: '6.6.2',
     date: new Date().toISOString().split('T')[0],
@@ -199,6 +206,7 @@ export const UTD_VARIANTS: Record<string, number> = {
   "ANYWHERE": 259,
   "UTDADV": 259 * 1.08,
   "UTDEE": 265,
+  "UTDEE-EAI": 278.25,
   "SM": 0, // Special bucket pricing
 };
 

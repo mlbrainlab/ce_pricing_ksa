@@ -543,12 +543,13 @@ const App: React.FC = () => {
   // Helper to determine allowed Target Variants based on Existing
   const getAllowedTargetVariants = (productId: string, existingVariant: string) => {
       if (productId === 'utd') {
-          if (existingVariant === 'UTDEE') return ['UTDEE']; // Locked
+          if (existingVariant === 'UTDEE-EAI') return ['UTDEE-EAI'];
+          if (existingVariant === 'UTDEE') return ['UTDEE', 'UTDEE-EAI'];
 
-          // Anywhere -> Anywhere, Adv, EE
-          if (existingVariant === 'ANYWHERE') return ['ANYWHERE', 'UTDADV', 'UTDEE'];
-          // Adv -> Adv, EE
-          if (existingVariant === 'UTDADV') return ['UTDADV', 'UTDEE'];
+          // Anywhere -> Anywhere, Adv, EE, EE-EAI
+          if (existingVariant === 'ANYWHERE') return ['ANYWHERE', 'UTDADV', 'UTDEE', 'UTDEE-EAI'];
+          // Adv -> Adv, EE, EE-EAI
+          if (existingVariant === 'UTDADV') return ['UTDADV', 'UTDEE', 'UTDEE-EAI'];
       }
       if (productId === 'lxd') {
           if (existingVariant === 'BASE PKG') return ['BASE PKG', 'BASE PKG+FLINK', 'BASE PKG+FLINK+IPE'];
@@ -962,7 +963,7 @@ const App: React.FC = () => {
                                <select
                                  className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                  value={input.variant}
-                                 disabled={isRenewal && existingVariant === 'UTDEE' && product.id === 'utd'}
+                                 disabled={isRenewal && allowedTargetVariants.length <= 1}
                                  onChange={(e) => handleInputChange(product.id, 'variant', e.target.value)}
                                >
                                  {(allowedTargetVariants as string[]).map(v => {

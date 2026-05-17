@@ -153,14 +153,14 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
                      const existingCount = inputs.existingCount || 1;
                      const additionalStats = inputs.count - existingCount;
                      
-                     const upliftedBaseRate = currentTarget === 'UTDEE' ? (expiringRate * 1.08) : (expiringRate * (1 + (upliftVal / 100)));
+                     const upliftedBaseRate = (currentTarget === 'UTDEE' || currentTarget === 'UTDEE-EAI') ? (expiringRate * 1.08) : (expiringRate * (1 + (upliftVal / 100)));
                      const baseNet = existingCount * upliftedBaseRate;
                      const upsellValue = additionalStats * upliftedBaseRate;
                      
                      return baseNet + upsellValue;
                  } else {
                      // Same Variant (or stats decreased)
-                     if (existing === 'UTDEE') return effectiveStats * expiringRate * 1.08;
+                     if (existing === 'UTDEE' || existing === 'UTDEE-EAI') return effectiveStats * expiringRate * 1.08;
                      return effectiveStats * expiringRate * (1 + (upliftVal / 100));
                  }
              } else {
@@ -177,6 +177,10 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
                          return effectiveStats * expiringRate * 1.11;
                      } else if (existing === 'UTDADV' && currentTarget === 'UTDEE') {
                          return effectiveStats * expiringRate * 1.11;
+                     } else if ((existing === 'ANYWHERE' || existing === 'UTDADV') && currentTarget === 'UTDEE-EAI') {
+                         return effectiveStats * expiringRate * 1.14;
+                     } else if (existing === 'UTDEE' && currentTarget === 'UTDEE-EAI') {
+                         return effectiveStats * expiringRate * 1.11;
                      } else {
                          return effectiveStats * expiringRate * (1 + (upliftVal / 100));
                      }
@@ -188,17 +192,17 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
 
          // Check EE Eligibility
          let isEligibleForEE = false;
-         if (existing === 'UTDEE') {
+         if (existing === 'UTDEE' || existing === 'UTDEE-EAI') {
              isEligibleForEE = true;
          } else if (pathBasedPrice > 30000) {
              isEligibleForEE = true;
          }
          
-         if (target === 'UTDEE' && !isEligibleForEE) {
+         if ((target === 'UTDEE' || target === 'UTDEE-EAI') && !isEligibleForEE) {
              productNotes.push(`UTD: Ineligible for EE (Renewal < $30k). Reverting to ${existing}.`);
              finalTarget = existing;
              pathBasedPrice = calculatePriceForTarget(finalTarget);
-         } else if (finalTarget !== 'UTDEE' && isEligibleForEE) {
+         } else if (finalTarget !== 'UTDEE' && finalTarget !== 'UTDEE-EAI' && isEligibleForEE) {
              productNotes.push(`UTD: Renewal > $30k. Recommend upgrading to UTD EE.`);
          }
 
@@ -213,6 +217,8 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
                  productNotes.push(`UTD: Upsell Anywhere -> Adv (+8% applied)`);
              } else if (finalTarget === 'UTDEE') {
                  productNotes.push(`UTD: Upsell to EE (11% applied)`);
+             } else if (finalTarget === 'UTDEE-EAI') {
+                 productNotes.push(`UTD: Upsell to EE-EAI (${existing === 'UTDEE' ? '11%' : '14%'} applied)`);
              }
          }
 
