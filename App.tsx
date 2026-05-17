@@ -59,17 +59,13 @@ const App: React.FC = () => {
       })
       .catch(err => console.error('Auth verification failed:', err))
       .finally(() => setIsAuthChecked(true));
-  }, []);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      // Fetch metadata once authenticated
-      fetch('/api/metadata')
-        .then(m => m.json())
-        .then(setMetadata)
-        .catch(err => console.error('Metadata fetch failed:', err));
-    }
-  }, [isAuthenticated]);
+    // Fetch metadata immediately on mount (not sensitive)
+    fetch('/api/metadata')
+      .then(m => m.json())
+      .then(setMetadata)
+      .catch(err => console.error('Metadata fetch failed:', err));
+  }, []);
 
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -469,11 +465,11 @@ const App: React.FC = () => {
         }
       };
 
-      // Specific Logic: If UTD Variant becomes UTDEE, enforce min count 90
-      if (id === 'utd' && field === 'variant' && value === 'UTDEE') {
+      // Specific Logic: If UTD Variant becomes UTDEE or UTDEE-EAI, enforce min count 90
+      if (id === 'utd' && field === 'variant' && (value === 'UTDEE' || value === 'UTDEE-EAI')) {
          if (newState['utd'].count < 90) {
             newState['utd'].count = 90;
-            setNotification("Headcount adjusted to 90 (Minimum for UTD EE)");
+            setNotification("Headcount adjusted to 90 (Minimum for UTD Enterprise)");
             setTimeout(() => setNotification(null), 3000);
          }
       }
@@ -815,8 +811,13 @@ const App: React.FC = () => {
               {/* Section 2: Products & Inputs */}
               <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-5 border border-gray-100 dark:border-gray-700 transition-colors">
                 <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mb-4">2. Product Mix</h2>
-            <div className="space-y-4">
-              {(metadata?.availableProducts || []).map(product => {
+                <div className="space-y-4">
+                  {!metadata ? (
+                    <div className="flex flex-col items-center justify-center p-8 space-y-3">
+                      <div className="w-8 h-8 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+                      <p className="text-xs text-gray-500 font-medium italic">Loading product data...</p>
+                    </div>
+                  ) : (metadata.availableProducts || []).map(product => {
                 const isSelected = selectedProductIds.includes(product.id);
                 const input = productInputs[product.id] || { count: 0, variant: '', baseDiscount: 0 };
                 
@@ -826,7 +827,7 @@ const App: React.FC = () => {
                 const isRestrictedUTD = isUTDSelected && (currentUTDVariant === 'ANYWHERE' || currentUTDVariant === 'UTDADV');
                 
                 // Logic for disabling Base Discount on LXD if UTD EE + LXD EE-Combo is selected
-                const isUTDEE = isUTDSelected && currentUTDVariant === 'UTDEE';
+                const isUTDEE = isUTDSelected && (currentUTDVariant === 'UTDEE' || currentUTDVariant === 'UTDEE-EAI');
                 const isLXDComboVariant = product.id === 'lxd' && input.variant.includes('EE-Combo');
                 const shouldDisableLXDDiscount = isUTDEE && isLXDComboVariant;
 
@@ -1107,7 +1108,7 @@ const App: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleProductMethodChange('utd', PricingMethod.MYPP)}
-                              disabled={dealType === DealType.RENEWAL && !(productInputs.utd?.variant === 'UTDEE' && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0))}
+                              disabled={dealType === DealType.RENEWAL && !( (productInputs.utd?.variant === 'UTDEE' || productInputs.utd?.variant === 'UTDEE-EAI') && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0))}
                               className={`flex-1 rounded text-[11px] font-semibold tracking-wide transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${productMethods.utd === PricingMethod.MYPP ? 'bg-white dark:bg-gray-600 text-green-600 dark:text-green-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
                             >
                               MYPP
@@ -1146,7 +1147,7 @@ const App: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleMethodChange(PricingMethod.MYPP)}
-                          disabled={dealType === DealType.RENEWAL && selectedProductIds.includes('utd') && !(productInputs.utd?.variant === 'UTDEE' && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0))}
+                          disabled={dealType === DealType.RENEWAL && selectedProductIds.includes('utd') && !( (productInputs.utd?.variant === 'UTDEE' || productInputs.utd?.variant === 'UTDEE-EAI') && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0))}
                           className={`flex-1 rounded text-xs font-semibold tracking-wide transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${method === PricingMethod.MYPP ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
                         >
                           MYPP
@@ -1162,14 +1163,28 @@ const App: React.FC = () => {
                     <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
                       Renewal Uplift % (Year 1)
                     </div>
-                    {showSplitRates ? (
-                      <>
-                        {productMethods.utd !== PricingMethod.MYPP && renderRateInput("UTD Uplift", renewalUpliftUTD, setRenewalUpliftUTD, "Uplift %", "border-blue-200 dark:border-blue-800")}
-                        {productMethods.lxd !== PricingMethod.MYPP && renderRateInput("LXD Uplift", renewalUpliftLXD, setRenewalUpliftLXD, "Uplift %", "border-green-200 dark:border-green-800")}
-                      </>
-                    ) : (
-                      method !== PricingMethod.MYPP && renderRateInput("Uplift", renewalUpliftGlobal, setRenewalUpliftGlobal, "Uplift %")
-                    )}
+                     {showSplitRates ? (
+                       <>
+                         {productMethods.utd !== PricingMethod.MYPP && renderRateInput("UTD Uplift", renewalUpliftUTD, setRenewalUpliftUTD, "Uplift %", "border-blue-200 dark:border-blue-800")}
+                         {productMethods.lxd !== PricingMethod.MYPP && renderRateInput("LXD Uplift", renewalUpliftLXD, setRenewalUpliftLXD, "Uplift %", "border-green-200 dark:border-green-800")}
+                         {((productMethods.utd !== PricingMethod.MYPP && renewalUpliftUTD < 8) || (productMethods.lxd !== PricingMethod.MYPP && renewalUpliftLXD < 8)) && (
+                           <div className="mt-1 text-[10px] font-bold text-red-600 dark:text-red-400 animate-pulse">
+                             Requires Finance approval
+                           </div>
+                         )}
+                       </>
+                     ) : (
+                       method !== PricingMethod.MYPP && (
+                         <>
+                           {renderRateInput("Uplift", renewalUpliftGlobal, setRenewalUpliftGlobal, "Uplift %")}
+                           {renewalUpliftGlobal < 8 && (
+                             <div className="mt-1 text-[10px] font-bold text-red-600 dark:text-red-400 animate-pulse">
+                               Requires Finance approval
+                             </div>
+                           )}
+                         </>
+                       )
+                     )}
                  </div>
                )}
 

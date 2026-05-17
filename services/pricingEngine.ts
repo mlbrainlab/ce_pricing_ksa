@@ -153,14 +153,13 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
                      const existingCount = inputs.existingCount || 1;
                      const additionalStats = inputs.count - existingCount;
                      
-                     const upliftedBaseRate = (currentTarget === 'UTDEE' || currentTarget === 'UTDEE-EAI') ? (expiringRate * 1.08) : (expiringRate * (1 + (upliftVal / 100)));
+                     const upliftedBaseRate = expiringRate * (1 + (upliftVal / 100));
                      const baseNet = existingCount * upliftedBaseRate;
                      const upsellValue = additionalStats * upliftedBaseRate;
                      
                      return baseNet + upsellValue;
                  } else {
                      // Same Variant (or stats decreased)
-                     if (existing === 'UTDEE' || existing === 'UTDEE-EAI') return effectiveStats * expiringRate * 1.08;
                      return effectiveStats * expiringRate * (1 + (upliftVal / 100));
                  }
              } else {
@@ -216,9 +215,9 @@ export const calculatePricing = (config: DealConfiguration): CalculationOutput =
              if (existing === 'ANYWHERE' && finalTarget === 'UTDADV') {
                  productNotes.push(`UTD: Upsell Anywhere -> Adv (+8% applied)`);
              } else if (finalTarget === 'UTDEE') {
-                 productNotes.push(`UTD: Upsell to EE (11% applied)`);
+                 productNotes.push(`UTD: Upsell to EE (${upliftVal < 8 ? 'Exception: ' : ''}11% uplift recommendation applies)`);
              } else if (finalTarget === 'UTDEE-EAI') {
-                 productNotes.push(`UTD: Upsell to EE-EAI (${existing === 'UTDEE' ? '11%' : '14%'} applied)`);
+                 productNotes.push(`UTD: Upsell to EE-EAI (${upliftVal < 8 ? 'Exception: ' : ''}${existing === 'UTDEE' ? '11%' : '14%'} uplift recommendation applies)`);
              }
          }
 

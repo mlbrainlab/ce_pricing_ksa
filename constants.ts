@@ -8,7 +8,8 @@ export const CHANGELOG = [
     version: '6.6.3',
     date: new Date().toISOString().split('T')[0],
     changes: [
-      'Feature: Added UTDEE-EAI Pricing.'
+      'Feature: Added UTDEE-EAI Pricing.',
+      'Pricing: Enable FPI less than standard with warning.'
     ]
   },
   {

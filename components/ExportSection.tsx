@@ -44,6 +44,7 @@ export const PRODUCT_FULL_NAMES: Record<string, string> = {
   "ANYWHERE": "UpToDate® Anywhere",
   "UTDADV": "UpToDate® Advanced™",
   "UTDEE": "UpToDate® Enterprise™",
+  "UTDEE-EAI": "UpToDate® Enterprise with Expert AI",
   "SM": "UpToDate® Subscriber Manager",
   "BASE PKG": "Lexidrug® Base Package",
   "BASE PKG+FLINK": "Lexidrug® Base Package + Formulary Link",
@@ -301,16 +302,19 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         if (variant === 'UTDEE' || variant === 'UTDEE-EAI') title = "UpToDate\u00AE Enterprise";
         if (variant === 'SM') title = "UpToDate\u00AE Subscriber Manager";
         doc.setFontSize(22); doc.setFont(fontName, 'bold'); doc.text(title, 105, currentY, { align: 'center' }); currentY += 8;
+        
+        doc.setFontSize(14); doc.setFont(fontName, 'normal');
+        let subHeading = "Clinical Decision Support Solution";
         if (variant === 'UTDEE-EAI') {
-            doc.setFontSize(14); doc.setFont(fontName, 'normal');
-            doc.text("with Expert AI", 105, currentY, { align: 'center' });
-            // The logo has dimensions of 240x480 which is 0.5 ratio wide:tall. We can render it small next to the text.
-            // Let's add the image at a central position.
-            const textWidth = doc.getTextWidth("with Expert AI");
+            doc.text(`${subHeading} with Expert AI`, 105, currentY, { align: 'center' });
+            const textWidth = doc.getTextWidth(`${subHeading} with Expert AI`);
             doc.addImage(EAI_LOGO_BASE64, 'PNG', 105 + (textWidth / 2) + 2, currentY - 4.5, 5, 5, 'EAI_LOGO', 'FAST');
-            currentY += 8;
+            currentY += 20;
+        } else {
+            doc.setFontSize(12);
+            doc.text(subHeading, 105, currentY, { align: 'center' });
+            currentY += 20;
         }
-        doc.setFontSize(12); doc.setFont(fontName, 'normal'); doc.text("Clinical Decision Support Solution", 105, currentY, { align: 'center' }); currentY += 20;
     }
     
     if (hasLXD) {
