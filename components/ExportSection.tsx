@@ -61,6 +61,10 @@ interface SiteBreakdownItem {
   counts: Record<string, number>; // productId -> count
 }
 
+const formatMoney = (amount: number, currency: string) => { 
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount); 
+};
+
 export const ExportSection: React.FC<ExportSectionProps> = ({ 
   data, config, useStartDate, setUseStartDate, startMonthYear, setStartMonthYear,
   isExtensionQuote, extensionResults, renewalNotes = []
@@ -73,6 +77,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const [isExcelLoading, setIsExcelLoading] = useState(false);
   
   const [includeRenewalIncreaseInfo, setIncludeRenewalIncreaseInfo] = useState(false);
+  const [includeCalcDetails, setIncludeCalcDetails] = useState(true);
   React.useEffect(() => {
     const authName = localStorage.getItem('wk_auth_name');
     if (authName) {
@@ -90,6 +95,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const [pdfError, setPdfError] = useState<string | null>(null);
 
   const isUtdSm = config.selectedProducts.includes('utd') && config.productInputs['utd']?.variant === 'SM';
+  const isIndirect = config.channel !== ChannelType.DIRECT;
   const [showStats, setShowStats] = useState(true);
   const [showMonthlyCost, setShowMonthlyCost] = useState(false);
   const [showTotals, setShowTotals] = useState(true);
@@ -278,8 +284,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               doc.text(`©${new Date().getFullYear()} UpToDate, Inc. and its affiliates and/or licensors. All rights reserved.`, 14, pageHeight - 10);
           }
       };
-
-      const formatMoney = (amount: number, currency: string) => { return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount); };
 
       renderHeader(true);
       doc.setFontSize(26); doc.setFont(fontName, 'bold'); doc.setTextColor(255, 255, 255);
@@ -852,24 +856,109 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           const startRowIndex = ws.rowCount + 1;
           data.yearlyResults.forEach((r, idx) => {
               const rowData: any[] = [`Year ${r.year}`];
-              config.selectedProducts.forEach(pid => { const bd = r.breakdown.find(x => x.id === pid); rowData.push(bd ? (isIndirect ? bd.net : bd.gross) : 0); });
-              if (isIndirect) rowData.push(r.netUSD, r.grossSAR, r.vatSAR, r.grandTotalSAR); else rowData.push(r.grossUSD);
+              config.selectedProducts.forEach(pid => { 
+                const bd = r.breakdown.find(x => x.id === pid); 
+                rowData.push(bd ? (isIndirect ? bd.net : bd.gross) : 0); 
+              });
+              
+              if (isIndirect) {
+                  // Net USD, Gross SAR, VAT, Grand Total
+                  rowData.push(r.netUSD, r.grossSAR, r.vatSAR, r.grandTotalSAR);
+              } else {
+                  rowData.push(r.grossUSD);
+              }
+
               const newRow = ws.addRow(rowData);
+              
+              // Add formulas for years 2+ if it's MYFPI method and rates are simple
+              if (idx > 0 && config.method === 'MYFPI' && !config.flatPricing) {
+                  config.selectedProducts.forEach((pid, pIdx) => {
+                      const rate = (config.productRates[pid] || config.rates)[idx] || 0;
+                      if (rate > 0) {
+                          const colLetter = getColLetter(2 + pIdx);
+                          const prevCell = `${colLetter}${newRow.number - 1}`;
+                          newRow.getCell(2 + pIdx).value = { formula: `${prevCell}*(1+${rate/100})` };
+                      }
+                  });
+              }
+
               newRow.eachCell((cell, colNum) => { if (colNum > 1) cell.numFmt = '#,##0.00'; });
           });
 
           if (showTotals) {
               const totalRowData: any[] = ['TOTAL'];
-              config.selectedProducts.forEach(pid => {
-                  const prodTotal = data.yearlyResults.reduce((sum, r) => { const bd = r.breakdown.find(x => x.id === pid); return sum + (bd ? (isIndirect ? bd.net : bd.gross) : 0); }, 0);
-                  totalRowData.push(prodTotal);
+              const startDataRow = startRowIndex;
+              const endDataRow = ws.rowCount;
+              
+              config.selectedProducts.forEach((pid, pIdx) => {
+                  const colLetter = getColLetter(2 + pIdx);
+                  totalRowData.push({ formula: `SUM(${colLetter}${startDataRow}:${colLetter}${endDataRow})` });
               });
-              if (isIndirect) totalRowData.push(data.totalNetUSD, data.totalGrossSAR, data.totalVatSAR, data.totalGrandTotalSAR); 
-              else totalRowData.push(data.totalGrossUSD);
+
+              if (isIndirect) {
+                  const netUsdCol = getColLetter(2 + config.selectedProducts.length);
+                  const grossSarCol = getColLetter(3 + config.selectedProducts.length);
+                  const vatCol = getColLetter(4 + config.selectedProducts.length);
+                  const grandTotalCol = getColLetter(5 + config.selectedProducts.length);
+                  
+                  totalRowData.push(
+                    { formula: `SUM(${netUsdCol}${startDataRow}:${netUsdCol}${endDataRow})` },
+                    { formula: `SUM(${grossSarCol}${startDataRow}:${grossSarCol}${endDataRow})` },
+                    { formula: `SUM(${vatCol}${startDataRow}:${vatCol}${endDataRow})` },
+                    { formula: `SUM(${grandTotalCol}${startDataRow}:${grandTotalCol}${endDataRow})` }
+                  );
+              } else {
+                  const totalUsdCol = getColLetter(2 + config.selectedProducts.length);
+                  totalRowData.push({ formula: `SUM(${totalUsdCol}${startDataRow}:${totalUsdCol}${endDataRow})` });
+              }
               
               const totalRow = ws.addRow(totalRowData);
               totalRow.font = { bold: true };
               totalRow.eachCell((cell, colNum) => { if (colNum > 1) cell.numFmt = '#,##0.00'; });
+          }
+          
+          if (includeCalcDetails) {
+              const calcWs = wb.addWorksheet('Calculation Details');
+              calcWs.addRow(['Detailed Calculation Breakdown']).font = { bold: true, size: 14 };
+              calcWs.addRow([]);
+              
+              calcWs.addRow(['Product', 'Metric', 'Formula / Logic', 'Value']);
+              const hRow = calcWs.getRow(3);
+              hRow.font = { bold: true };
+              hRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+              config.selectedProducts.forEach(pid => {
+                  const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                  const inp = config.productInputs[pid];
+                  if (!p || !inp) return;
+
+                  calcWs.addRow([p.name, 'Base Count', 'User Input', inp.count || inp.existingCount]);
+                  calcWs.addRow(['', 'Pricing Method', 'Logic Select', config.productMethods[pid] || config.method]);
+                  
+                  const y1Net = data.yearlyResults[0]?.breakdown.find(b => b.id === pid)?.net || 0;
+                  calcWs.addRow(['', 'Year 1 Net (USD)', 'Final After Discounts/Floors', y1Net]).getCell(4).numFmt = '#,##0.00';
+                  
+                  if (config.dealType === 'RENEWAL') {
+                      calcWs.addRow(['', 'Expiring Amount', 'Previous Contract', inp.expiringAmount || 0]).getCell(4).numFmt = '#,##0.00';
+                      calcWs.addRow(['', 'Uplift Rate', 'Annual Increase %', (config.renewalUpliftRates[pid] || 0) + '%']);
+                  }
+                  
+                  if (pid === 'utd') {
+                      calcWs.addRow(['', 'Variant', 'Selected Tier', inp.variant]);
+                  } else if (pid === 'lxd') {
+                      calcWs.addRow(['', 'Variant', 'Selected Tier', inp.variant]);
+                  }
+
+                  calcWs.addRow([]);
+              });
+
+              calcWs.addRow(['Global Settings']).font = { bold: true };
+              calcWs.addRow(['WHT Applied', config.applyWHT ? 'Yes (5%)' : 'No']);
+              calcWs.addRow(['Exchange Rate', `1 USD = ${EXCHANGE_RATE_SAR} SAR`]);
+              calcWs.addRow(['Channel', config.channel]);
+              calcWs.addRow(['Start Date', config.useStartDate ? config.startMonthYear : 'Not Set']);
+              
+              calcWs.columns.forEach(column => { column.width = 30; });
           }
           contentRowStart = ws.rowCount + 2;
       }
@@ -954,7 +1043,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
           <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-700">
             <h3 className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Export Contents</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <input type="checkbox" checked={includeCalcDetails} onChange={(e) => setIncludeCalcDetails(e.target.checked)} className="rounded text-green-600 focus:ring-green-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                  <span>Include Calc Details</span>
+                </label>
               {!isExtensionQuote && (
                 <>
                   <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
@@ -1053,6 +1146,34 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           {(config.dealType !== DealType.NEW_LOGO && !useStartDate) && (
             <div className="mt-2 text-xs text-red-500 font-medium">
               Please select "Include Start Date" to enable exporting for Renewals and Extensions.
+            </div>
+          )}
+          {includeCalcDetails && (
+            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-700">
+               <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-3">Calculation Audit Trail</h4>
+               <div className="space-y-3">
+                  {config.selectedProducts.map(pid => {
+                     const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                     const y1 = data.yearlyResults[0]?.breakdown.find(b => b.id === pid);
+                     if (!p || !y1) return null;
+                     return (
+                        <div key={pid} className="text-xs flex flex-col gap-1 border-b border-gray-100 dark:border-gray-700 pb-2 last:border-0 last:pb-0">
+                           <div className="flex justify-between">
+                              <span className="font-semibold text-gray-900 dark:text-white">{p.name}</span>
+                              <span className="text-blue-600 dark:text-blue-400 font-mono">
+                                 {formatMoney(isIndirect ? y1.grossSAR : y1.gross, isIndirect ? 'SAR' : 'USD')}
+                              </span>
+                           </div>
+                           <div className="text-gray-500 dark:text-gray-400 italic">
+                              {config.dealType === 'RENEWAL' ? 
+                                `Expiring: ${formatMoney(config.productInputs[pid]?.expiringAmount || 0, 'USD')} @ ${config.renewalUpliftRates[pid] || 0}% uplift` :
+                                `Base: ${config.productInputs[pid]?.count || 0} units @ ${config.productInputs[pid]?.variant}`
+                              }
+                           </div>
+                        </div>
+                     );
+                  })}
+               </div>
             </div>
           )}
           {pdfError && <div className="text-red-500 text-sm mt-2">{pdfError}</div>}

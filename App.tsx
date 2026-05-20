@@ -1167,7 +1167,7 @@ const App: React.FC = () => {
                        <>
                          {productMethods.utd !== PricingMethod.MYPP && renderRateInput("UTD Uplift", renewalUpliftUTD, setRenewalUpliftUTD, "Uplift %", "border-blue-200 dark:border-blue-800")}
                          {productMethods.lxd !== PricingMethod.MYPP && renderRateInput("LXD Uplift", renewalUpliftLXD, setRenewalUpliftLXD, "Uplift %", "border-green-200 dark:border-green-800")}
-                         {((productMethods.utd !== PricingMethod.MYPP && renewalUpliftUTD < 8) || (productMethods.lxd !== PricingMethod.MYPP && renewalUpliftLXD < 8)) && (
+                         {((selectedProductIds.includes('utd') && productMethods.utd !== PricingMethod.MYPP && renewalUpliftUTD < 8) || (selectedProductIds.includes('lxd') && productMethods.lxd !== PricingMethod.MYPP && renewalUpliftLXD < 5)) && (
                            <div className="mt-1 text-[10px] font-bold text-red-600 dark:text-red-400 animate-pulse">
                              Requires Finance approval
                            </div>
@@ -1177,7 +1177,7 @@ const App: React.FC = () => {
                        method !== PricingMethod.MYPP && (
                          <>
                            {renderRateInput("Uplift", renewalUpliftGlobal, setRenewalUpliftGlobal, "Uplift %")}
-                           {renewalUpliftGlobal < 8 && (
+                           {renewalUpliftGlobal < (selectedProductIds.includes('utd') ? 8 : 5) && (
                              <div className="mt-1 text-[10px] font-bold text-red-600 dark:text-red-400 animate-pulse">
                                Requires Finance approval
                              </div>
@@ -1232,13 +1232,13 @@ const App: React.FC = () => {
                                 }
                                 
                                 if (productMethods.lxd === PricingMethod.MYPP) {
-                                    if (lxdRateVal < 8 || lxdRateVal > 25) showExceptionAlert = true;
+                                    if (lxdRateVal < 5 || lxdRateVal > 25) showExceptionAlert = true;
                                 } else if (productMethods.lxd === PricingMethod.MYFPI) {
                                     if (lxdRateVal < 5) showExceptionAlert = true;
                                 }
                             } else {
                                 if (method === PricingMethod.MYPP) {
-                                    if (globalRateVal < 8 || globalRateVal > 25) showExceptionAlert = true;
+                                    if (globalRateVal < (selectedProductIds.includes('utd') ? 8 : 5) || globalRateVal > 25) showExceptionAlert = true;
                                 } else if (method === PricingMethod.MYFPI) {
                                     if (selectedProductIds.includes('utd') && globalRateVal < 8) showExceptionAlert = true;
                                     if (selectedProductIds.includes('lxd') && !selectedProductIds.includes('utd') && globalRateVal < 5) showExceptionAlert = true;
