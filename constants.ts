@@ -1,12 +1,22 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.6.3';
+export const APP_VERSION = '6.6.4';
 
 export const CHANGELOG = [
   {
-    version: '6.6.3',
+    version: '6.6.4',
     date: new Date().toISOString().split('T')[0],
+    changes: [
+      'Extension Option B Expansion: Added customizable Uplift FPI% input applying specified rate to current spend for exact fractional and integer month calculation within 100K SAR limits.',
+      'UI Refinement: Redesigned the Uplift FPI% fields with interactive "+" and "-" step buttons (incrementing/decrementing whole values) while supporting manual decimal inputs (up to one decimal place).',
+      'Rules Update: Simplified the Extension Finance approval threshold to apply selectively on any Uplift FPI% below 5% across both Option A and Option B.',
+      'UI Cleanup: Renamed "Difference to Extension (FPI %)" labels to "Uplift FPI%" for consistency with renewal uplift fields.'
+    ]
+  },
+  {
+    version: '6.6.3',
+    date: '2026-05-20',
     changes: [
       'Feature: Added UTDEE-EAI Pricing.',
       'Pricing: Enable FPI less than standard with warning.'

@@ -1,19 +1,18 @@
-
 export enum DealType {
-  NEW_LOGO = 'New Logo',
-  RENEWAL = 'Renewal',
-  EXTENSION = 'Extension',
+  NEW_LOGO = "New Logo",
+  RENEWAL = "Renewal",
+  EXTENSION = "Extension",
 }
 
 export enum ChannelType {
-  DIRECT = 'Direct',
-  FULFILMENT = 'Fulfilment',
-  PARTNER_SOURCED = 'Partner Sourced',
+  DIRECT = "Direct",
+  FULFILMENT = "Fulfilment",
+  PARTNER_SOURCED = "Partner Sourced",
 }
 
 export enum PricingMethod {
-  MYPP = 'MYPP (Price Protection)',
-  MYFPI = 'MYFPI (Inflation)',
+  MYPP = "MYPP (Price Protection)",
+  MYFPI = "MYFPI (Inflation)",
 }
 
 export interface ProductDefinition {
@@ -49,13 +48,13 @@ export interface PricingResult {
   breakdown: ProductYearlyData[]; // Per product values
   grossUSD: number;
   grossSAR: number;
-  vatSAR: number;       // New: 15% VAT
+  vatSAR: number; // New: 15% VAT
   grandTotalSAR: number; // New: Gross + VAT
   netUSD: number;
   netSAR: number;
   floorAdjusted: boolean;
   notes: string[];
-  currencyToDisplay: 'USD' | 'SAR';
+  currencyToDisplay: "USD" | "SAR";
 }
 
 export interface DealConfiguration {
@@ -75,8 +74,8 @@ export interface DealConfiguration {
   useStartDate?: boolean;
   startMonthYear?: string;
   // Extension Fields
-  extensionOption?: 'A' | 'B';
-  expiringTerm?: 'multi' | 'single';
+  extensionOption?: "A" | "B";
+  expiringTerm?: "multi" | "single";
   expiringTCV?: number;
   currentSpend?: number;
   extensionPercentage?: number;
@@ -93,19 +92,19 @@ export interface CalculationOutput {
   totalGrandTotalSAR: number;
   totalNetUSD: number;
   totalNetSAR: number;
-  
+
   // Per Product Total Net (for summary)
   productNetTotals: Record<string, number>;
 
   // ACV & Splits
   acvUSD: number;
-  netACV: number; 
+  netACV: number;
   renewalBaseACV: number;
   netRenewalBaseACV: number; // New: Net value of Renewal Base
   upsellACV: number;
   netUpsellACV: number; // New: Net value of Upsell
-  
-  currencyToDisplay: 'USD' | 'SAR';
+
+  currencyToDisplay: "USD" | "SAR";
   extensionResults?: any;
   renewalNotes?: string[];
 }

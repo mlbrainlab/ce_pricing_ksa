@@ -424,8 +424,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           ['Product', PRODUCT_FULL_NAMES[extensionResults.variant] || extensionResults.variant],
           ['Dates', getExtensionDates()],
           ['Current Spend of Last Year (SAR)', formatMoney(extensionResults.currentSpend * EXCHANGE_RATE_SAR, 'SAR')],
+          ['Extension FPI Percentage', `${(extensionResults.fpiPercentage || 0).toFixed(2)}%`],
+          ['Effective Monthly Cost (SAR)', formatMoney(extensionResults.monthlyCostSAR, 'SAR')],
           ['Daily Cost (SAR)', formatMoney((extensionResults.monthlyCost / 30) * EXCHANGE_RATE_SAR, 'SAR')],
-          ['Extension Duration', `${Math.round(extensionResults.monthsCovered * 30)} days (${extensionResults.monthsCovered} months)`],
+          ['Extension Duration', `${Math.round(extensionResults.monthsCovered * 30)} days (${extensionResults.monthsCovered} months) (Exact: ${extensionResults.monthsAvailable?.toFixed(2)} months)`],
           ['End-User Price (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')],
           ['VAT (15%) (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')],
           ['Total (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')]
@@ -837,12 +839,14 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
              ws.addRow(['Product', PRODUCT_FULL_NAMES[extensionResults.variant] || extensionResults.variant]);
              ws.addRow(['Current Spend of Last Year (SAR)', extensionResults.currentSpend * EXCHANGE_RATE_SAR]).numFmt = '#,##0.00';
              ws.addRow(['Daily Cost (SAR)', (extensionResults.monthlyCost / 30) * EXCHANGE_RATE_SAR]).numFmt = '#,##0.00';
-             ws.addRow(['Extension Duration', `${Math.round(extensionResults.monthsCovered * 30)} days`]);
+             ws.addRow(['Extension FPI Percentage', `${(extensionResults.fpiPercentage || 0).toFixed(2)}%`]);
+             ws.addRow(['Effective Monthly Cost (SAR)', extensionResults.monthlyCostSAR]).numFmt = '#,##0.00';
+             ws.addRow(['Extension Duration', `${Math.round(extensionResults.monthsCovered * 30)} days (${extensionResults.monthsCovered} months) (Exact: ${extensionResults.monthsAvailable?.toFixed(2)} months)`]);
              
              const euRow = ws.addRow(['End-User Price (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR]); euRow.font = { bold: true }; euRow.numFmt = '#,##0.00';
              const vatRow = ws.addRow(['VAT (15%) (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15]); vatRow.font = { bold: true }; vatRow.numFmt = '#,##0.00';
              const totRow = ws.addRow(['Total (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15]); totRow.font = { bold: true }; totRow.numFmt = '#,##0.00';
-             contentRowStart = 16;
+             contentRowStart = 18;
          }
       } else {
           let headers = ['Year', ...prodNames];

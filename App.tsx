@@ -1,36 +1,40 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import posthog from 'posthog-js';
-import Login from './components/Login';
-import { Layout } from './components/Layout';
-import { ExportSection } from './components/ExportSection';
-import { logout } from './components/auth';
-import { FormattedNumberInput } from './components/FormattedNumberInput';
-import { 
-  DealType, 
-  ChannelType, 
-  PricingMethod, 
-  ProductInput, 
+import React, { useState, useEffect, useMemo } from "react";
+import posthog from "posthog-js";
+import Login from "./components/Login";
+import { Layout } from "./components/Layout";
+import { ExportSection } from "./components/ExportSection";
+import { logout } from "./components/auth";
+import { FormattedNumberInput } from "./components/FormattedNumberInput";
+import { UpliftFpiInput } from "./components/UpliftFpiInput";
+import {
+  DealType,
+  ChannelType,
+  PricingMethod,
+  ProductInput,
   DealConfiguration,
-  ProductDefinition
-} from './types';
+  ProductDefinition,
+} from "./types";
 // Removed direct constants import to protect sensitive pricing data
 // Metadata is now fetched from the secure backend API
 
-const formatCurrency = (amount: number, currency: 'USD' | 'SAR') => {
-  if (currency === 'USD') {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+const formatCurrency = (amount: number, currency: "USD" | "SAR") => {
+  if (currency === "USD") {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount);
   }
-  return `SAR ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(amount)}`;
+  return `SAR ${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(amount)}`;
 };
 
 // Initialize PostHog outside the component so it runs immediately
-if (typeof window !== 'undefined' && !(window as any).__POSTHOG_INITIALIZED__) {
-  posthog.init('phc_CxbCQgNgpx8NLdaWIQcW92rCssMtanf6RZXGTeab0iC', {
-    api_host: window.location.origin + '/p', // Use absolute URL for the proxy endpoint
-    ui_host: 'https://eu.posthog.com', // Keep the UI host pointing to PostHog
+if (typeof window !== "undefined" && !(window as any).__POSTHOG_INITIALIZED__) {
+  posthog.init("phc_CxbCQgNgpx8NLdaWIQcW92rCssMtanf6RZXGTeab0iC", {
+    api_host: window.location.origin + "/p", // Use absolute URL for the proxy endpoint
+    ui_host: "https://eu.posthog.com", // Keep the UI host pointing to PostHog
     autocapture: false, // Disabled to prevent client rate limiting from rapid UI interactions
     capture_pageview: true, // Enable automatic pageview capture
-    capture_pageleave: true // Track when users leave
+    capture_pageleave: true, // Track when users leave
   });
   (window as any).__POSTHOG_INITIALIZED__ = true;
 }
@@ -51,25 +55,25 @@ const App: React.FC = () => {
 
   useEffect(() => {
     // Check if user is already authenticated via backend cookie
-    fetch('/api/verify', { credentials: 'include' })
-      .then(res => {
+    fetch("/api/verify", { credentials: "include" })
+      .then((res) => {
         if (res.ok) {
           setIsAuthenticated(true);
         }
       })
-      .catch(err => console.error('Auth verification failed:', err))
+      .catch((err) => console.error("Auth verification failed:", err))
       .finally(() => setIsAuthChecked(true));
 
     // Fetch metadata immediately on mount (not sensitive)
-    fetch('/api/metadata')
-      .then(m => m.json())
+    fetch("/api/metadata")
+      .then((m) => m.json())
       .then(setMetadata)
-      .catch(err => console.error('Metadata fetch failed:', err));
+      .catch((err) => console.error("Metadata fetch failed:", err));
   }, []);
 
   const handleLogin = () => {
     setIsAuthenticated(true);
-    posthog.capture('user_logged_in');
+    posthog.capture("user_logged_in");
   };
 
   const handleLogout = async () => {
@@ -86,21 +90,30 @@ const App: React.FC = () => {
 
     const resetTimer = () => {
       clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        handleLogout();
-      }, 10 * 60 * 1000); // 10 minutes
+      timeoutId = setTimeout(
+        () => {
+          handleLogout();
+        },
+        10 * 60 * 1000,
+      ); // 10 minutes
     };
 
     // Initialize timer
     resetTimer();
 
     // Event listeners for user activity
-    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
-    events.forEach(event => window.addEventListener(event, resetTimer));
+    const events = [
+      "mousemove",
+      "keydown",
+      "mousedown",
+      "touchstart",
+      "scroll",
+    ];
+    events.forEach((event) => window.addEventListener(event, resetTimer));
 
     return () => {
       clearTimeout(timeoutId);
-      events.forEach(event => window.removeEventListener(event, resetTimer));
+      events.forEach((event) => window.removeEventListener(event, resetTimer));
     };
   }, [isAuthenticated]);
 
@@ -110,29 +123,34 @@ const App: React.FC = () => {
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [years, setYears] = useState<number>(3);
   const [method, setMethod] = useState<PricingMethod>(PricingMethod.MYFPI);
-  const [productMethods, setProductMethods] = useState<Record<string, PricingMethod>>({ utd: PricingMethod.MYFPI, lxd: PricingMethod.MYFPI });
+  const [productMethods, setProductMethods] = useState<
+    Record<string, PricingMethod>
+  >({ utd: PricingMethod.MYFPI, lxd: PricingMethod.MYFPI });
   const [applyWHT, setApplyWHT] = useState<boolean>(true); // Default true for KSA
-  const [flatPricing, setFlatPricing] = useState<boolean>(false); 
+  const [flatPricing, setFlatPricing] = useState<boolean>(false);
   const [rounding, setRounding] = useState<boolean>(false); // New Rounding Option
   const [notification, setNotification] = useState<string | null>(null); // Notification State
   const [resetKey, setResetKey] = useState<number>(0); // Key to reset child components
-  const [isArchitectNotesOpen, setIsArchitectNotesOpen] = useState<boolean>(false); // Accordion state
-  
+  const [isArchitectNotesOpen, setIsArchitectNotesOpen] =
+    useState<boolean>(false); // Accordion state
+
   // Extension Quote State
   const isExtensionQuote = dealType === DealType.EXTENSION;
-  const [extensionOption, setExtensionOption] = useState<'A' | 'B'>('A');
-  const [expiringTerm, setExpiringTerm] = useState<'multi' | 'single'>('multi');
+  const [extensionOption, setExtensionOption] = useState<"A" | "B">("A");
+  const [expiringTerm, setExpiringTerm] = useState<"multi" | "single">("multi");
   const [expiringTCV, setExpiringTCV] = useState<number>(0);
   const [currentSpend, setCurrentSpend] = useState<number>(0);
   const [extensionPercentage, setExtensionPercentage] = useState<number>(10);
   const [extensionFPI, setExtensionFPI] = useState<number | null>(null);
-  const [extensionVariant, setExtensionVariant] = useState<string>('ANYWHERE');
+  const [extensionVariant, setExtensionVariant] = useState<string>("ANYWHERE");
   const [useFullExtension, setUseFullExtension] = useState<boolean>(false);
 
   // Start Date State
   const [useStartDate, setUseStartDate] = useState<boolean>(false);
-  const [startMonthYear, setStartMonthYear] = useState<string>(new Date().toISOString().slice(0, 7));
-  
+  const [startMonthYear, setStartMonthYear] = useState<string>(
+    new Date().toISOString().slice(0, 7),
+  );
+
   // Structure Rates (Multi-Year logic: FPI or Reverse Discount)
   const [applyAnnualRate, setApplyAnnualRate] = useState<boolean>(false); // Toggle for Renewal MYFPI
   const [globalRateVal, setGlobalRateVal] = useState<number>(5);
@@ -145,9 +163,31 @@ const App: React.FC = () => {
   const [renewalUpliftLXD, setRenewalUpliftLXD] = useState<number>(5);
 
   // Product Inputs State
-  const [productInputs, setProductInputs] = useState<Record<string, ProductInput>>({
-    'utd': { count: 100, existingCount: 100, variant: 'ANYWHERE', existingVariant: 'ANYWHERE', baseDiscount: 0, expiringAmount: 0, dph: 0, forceHeadcountOverride: false, changeInStats: false },
-    'lxd': { count: 50, existingCount: 50, variant: 'BASE PKG', existingVariant: 'BASE PKG', baseDiscount: 0, expiringAmount: 0, dph: 0, forceHeadcountOverride: false, changeInStats: false },
+  const [productInputs, setProductInputs] = useState<
+    Record<string, ProductInput>
+  >({
+    utd: {
+      count: 100,
+      existingCount: 100,
+      variant: "ANYWHERE",
+      existingVariant: "ANYWHERE",
+      baseDiscount: 0,
+      expiringAmount: 0,
+      dph: 0,
+      forceHeadcountOverride: false,
+      changeInStats: false,
+    },
+    lxd: {
+      count: 50,
+      existingCount: 50,
+      variant: "BASE PKG",
+      existingVariant: "BASE PKG",
+      baseDiscount: 0,
+      expiringAmount: 0,
+      dph: 0,
+      forceHeadcountOverride: false,
+      changeInStats: false,
+    },
   });
 
   const resetForm = () => {
@@ -160,17 +200,17 @@ const App: React.FC = () => {
     setApplyWHT(true);
     setFlatPricing(false);
     setRounding(false);
-    
-    setExtensionOption('A');
-    setExpiringTerm('multi');
+
+    setExtensionOption("A");
+    setExpiringTerm("multi");
     setExpiringTCV(0);
     setCurrentSpend(0);
     setExtensionPercentage(10);
     setExtensionFPI(null);
-    setExtensionVariant('ANYWHERE');
+    setExtensionVariant("ANYWHERE");
     setUseFullExtension(false);
-    setResetKey(prev => prev + 1);
-    
+    setResetKey((prev) => prev + 1);
+
     setStartMonthYear(new Date().toISOString().slice(0, 7));
     setApplyAnnualRate(false);
     setGlobalRateVal(5);
@@ -179,15 +219,36 @@ const App: React.FC = () => {
     setRenewalUpliftGlobal(5);
     setRenewalUpliftUTD(8);
     setRenewalUpliftLXD(5);
-    
+
     setProductInputs({
-      'utd': { count: 100, existingCount: 100, variant: 'ANYWHERE', existingVariant: 'ANYWHERE', baseDiscount: 0, expiringAmount: 0, dph: 0, forceHeadcountOverride: false, changeInStats: false },
-      'lxd': { count: 50, existingCount: 50, variant: 'BASE PKG', existingVariant: 'BASE PKG', baseDiscount: 0, expiringAmount: 0, dph: 0, forceHeadcountOverride: false, changeInStats: false },
+      utd: {
+        count: 100,
+        existingCount: 100,
+        variant: "ANYWHERE",
+        existingVariant: "ANYWHERE",
+        baseDiscount: 0,
+        expiringAmount: 0,
+        dph: 0,
+        forceHeadcountOverride: false,
+        changeInStats: false,
+      },
+      lxd: {
+        count: 50,
+        existingCount: 50,
+        variant: "BASE PKG",
+        existingVariant: "BASE PKG",
+        baseDiscount: 0,
+        expiringAmount: 0,
+        dph: 0,
+        forceHeadcountOverride: false,
+        changeInStats: false,
+      },
     });
   };
 
   // Check if we need split rates (if both UTD and LXD are selected)
-  const showSplitRates = selectedProductIds.includes('utd') && selectedProductIds.includes('lxd');
+  const showSplitRates =
+    selectedProductIds.includes("utd") && selectedProductIds.includes("lxd");
   const isIndirect = channel !== ChannelType.DIRECT;
 
   // EFFECT: Auto-Uncheck WHT when Renewal is selected, force FULFILMENT for Extension
@@ -205,7 +266,10 @@ const App: React.FC = () => {
 
   // EFFECT: Auto-enable rounding when Fulfillment or Partner Sourced
   useEffect(() => {
-    if (channel === ChannelType.FULFILMENT || channel === ChannelType.PARTNER_SOURCED) {
+    if (
+      channel === ChannelType.FULFILMENT ||
+      channel === ChannelType.PARTNER_SOURCED
+    ) {
       setRounding(true);
     }
   }, [channel]);
@@ -214,14 +278,14 @@ const App: React.FC = () => {
   useEffect(() => {
     // Only apply defaults if one product is selected to avoid overwriting user preference aggressively
     if (selectedProductIds.length === 1) {
-      if (selectedProductIds.includes('utd')) {
+      if (selectedProductIds.includes("utd")) {
         // Structure Rates
         setGlobalRateVal(8);
         setUtdRateVal(8);
         // Uplift Rates
         setRenewalUpliftGlobal(8);
         setRenewalUpliftUTD(8);
-      } else if (selectedProductIds.includes('lxd')) {
+      } else if (selectedProductIds.includes("lxd")) {
         // Structure Rates
         setGlobalRateVal(5);
         setLxdRateVal(5);
@@ -242,22 +306,25 @@ const App: React.FC = () => {
     } else if (newMethod === PricingMethod.MYFPI) {
       setUtdRateVal(8);
       setLxdRateVal(5);
-      if (selectedProductIds.includes('utd')) {
+      if (selectedProductIds.includes("utd")) {
         setGlobalRateVal(8);
-      } else if (selectedProductIds.includes('lxd')) {
+      } else if (selectedProductIds.includes("lxd")) {
         setGlobalRateVal(5);
       }
     }
   };
 
-  const handleProductMethodChange = (productId: string, newMethod: PricingMethod) => {
-    setProductMethods(prev => ({ ...prev, [productId]: newMethod }));
+  const handleProductMethodChange = (
+    productId: string,
+    newMethod: PricingMethod,
+  ) => {
+    setProductMethods((prev) => ({ ...prev, [productId]: newMethod }));
     if (newMethod === PricingMethod.MYPP) {
-      if (productId === 'utd') setUtdRateVal(8);
-      if (productId === 'lxd') setLxdRateVal(8);
+      if (productId === "utd") setUtdRateVal(8);
+      if (productId === "lxd") setLxdRateVal(8);
     } else if (newMethod === PricingMethod.MYFPI) {
-      if (productId === 'utd') setUtdRateVal(8);
-      if (productId === 'lxd') setLxdRateVal(5);
+      if (productId === "utd") setUtdRateVal(8);
+      if (productId === "lxd") setLxdRateVal(5);
     }
   };
 
@@ -278,9 +345,9 @@ const App: React.FC = () => {
       return val;
     };
 
-    const effGlobal = getEffRate('global', globalRateVal); // 'global' is just a fallback, we'll use the method
-    const effUtd = getEffRate('utd', utdRateVal);
-    const effLxd = getEffRate('lxd', lxdRateVal);
+    const effGlobal = getEffRate("global", globalRateVal); // 'global' is just a fallback, we'll use the method
+    const effUtd = getEffRate("utd", utdRateVal);
+    const effLxd = getEffRate("lxd", lxdRateVal);
 
     // Generate arrays based on effective single input values (Structure Rates)
     const rates = generateRateArray(effGlobal, years);
@@ -289,11 +356,11 @@ const App: React.FC = () => {
 
     const productRates: Record<string, number[]> = {};
     if (showSplitRates) {
-      productRates['utd'] = utdRates;
-      productRates['lxd'] = lxdRates;
+      productRates["utd"] = utdRates;
+      productRates["lxd"] = lxdRates;
     } else {
-      if (selectedProductIds.includes('utd')) productRates['utd'] = rates;
-      if (selectedProductIds.includes('lxd')) productRates['lxd'] = rates;
+      if (selectedProductIds.includes("utd")) productRates["utd"] = rates;
+      if (selectedProductIds.includes("lxd")) productRates["lxd"] = rates;
     }
 
     // Renewal Uplifts
@@ -304,11 +371,13 @@ const App: React.FC = () => {
 
     const renewalUpliftRates: Record<string, number> = {};
     if (showSplitRates) {
-        renewalUpliftRates['utd'] = currentUtdUplift;
-        renewalUpliftRates['lxd'] = currentLxdUplift;
+      renewalUpliftRates["utd"] = currentUtdUplift;
+      renewalUpliftRates["lxd"] = currentLxdUplift;
     } else {
-        if (selectedProductIds.includes('utd')) renewalUpliftRates['utd'] = currentGlobalUplift;
-        if (selectedProductIds.includes('lxd')) renewalUpliftRates['lxd'] = currentGlobalUplift;
+      if (selectedProductIds.includes("utd"))
+        renewalUpliftRates["utd"] = currentGlobalUplift;
+      if (selectedProductIds.includes("lxd"))
+        renewalUpliftRates["lxd"] = currentGlobalUplift;
     }
 
     return {
@@ -319,16 +388,53 @@ const App: React.FC = () => {
       years,
       method,
       productMethods,
-      rates, 
+      rates,
       productRates,
       renewalUpliftRates,
       applyWHT,
       flatPricing,
       rounding,
       useStartDate,
-      startMonthYear
+      startMonthYear,
+      extensionOption,
+      expiringTerm,
+      expiringTCV,
+      currentSpend,
+      extensionPercentage,
+      extensionFPI,
+      extensionVariant,
+      useFullExtension,
     };
-  }, [dealType, channel, selectedProductIds, productInputs, years, method, productMethods, globalRateVal, utdRateVal, lxdRateVal, renewalUpliftGlobal, renewalUpliftUTD, renewalUpliftLXD, showSplitRates, applyWHT, flatPricing, rounding, applyAnnualRate, useStartDate, startMonthYear]);
+  }, [
+    dealType,
+    channel,
+    selectedProductIds,
+    productInputs,
+    years,
+    method,
+    productMethods,
+    globalRateVal,
+    utdRateVal,
+    lxdRateVal,
+    renewalUpliftGlobal,
+    renewalUpliftUTD,
+    renewalUpliftLXD,
+    showSplitRates,
+    applyWHT,
+    flatPricing,
+    rounding,
+    applyAnnualRate,
+    useStartDate,
+    startMonthYear,
+    extensionOption,
+    expiringTerm,
+    expiringTCV,
+    currentSpend,
+    extensionPercentage,
+    extensionFPI,
+    extensionVariant,
+    useFullExtension,
+  ]);
 
   // Results
   const [results, setResults] = useState<any>(null);
@@ -338,11 +444,11 @@ const App: React.FC = () => {
 
     const fetchPricing = async () => {
       try {
-        const res = await fetch('/api/calculate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(config)
+        const res = await fetch("/api/calculate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(config),
         });
         if (res.ok) {
           const data = await res.json();
@@ -350,10 +456,10 @@ const App: React.FC = () => {
         } else if (res.status === 401) {
           handleLogout();
         } else {
-          console.error('Calculation failed with status:', res.status);
+          console.error("Calculation failed with status:", res.status);
         }
       } catch (error) {
-        console.error('Calculation failed:', error);
+        console.error("Calculation failed:", error);
       }
     };
 
@@ -364,64 +470,89 @@ const App: React.FC = () => {
   // Extension Quote Logic
   const extensionResults = results?.extensionResults;
 
+  const currentFpiVal = useMemo(() => {
+    if (extensionOption === "A") {
+      return extensionFPI !== null
+        ? extensionFPI
+        : extensionResults?.fpiPercentage ?? 0;
+    } else {
+      return extensionFPI !== null ? extensionFPI : 0;
+    }
+  }, [extensionOption, extensionFPI, extensionResults]);
+
+  const extensionRequiresFinanceApproval = useMemo(() => {
+    if (!isExtensionQuote) return false;
+    return currentFpiVal < 5;
+  }, [isExtensionQuote, currentFpiVal]);
+
   // Validation Logic for UTDEE
   const utdEeWarning = useMemo(() => {
-    if (selectedProductIds.includes('utd')) {
-       const inputs = productInputs['utd'];
-       if (inputs.variant === 'UTDEE') {
-         // Check Year 1 Gross USD for UTD
-         // We can find it in yearlyResults[0].breakdown
-         const utdY1 = results?.yearlyResults?.[0]?.breakdown.find((p: any) => p.id === 'utd');
-         if (utdY1 && utdY1.gross < 30000) {
-           return "Warning: UTDEE deals under $30k/year require additional approval.";
-         }
-       }
+    if (selectedProductIds.includes("utd")) {
+      const inputs = productInputs["utd"];
+      if (inputs.variant === "UTDEE") {
+        // Check Year 1 Gross USD for UTD
+        // We can find it in yearlyResults[0].breakdown
+        const utdY1 = results?.yearlyResults?.[0]?.breakdown.find(
+          (p: any) => p.id === "utd",
+        );
+        if (utdY1 && utdY1.gross < 30000) {
+          return "Warning: UTDEE deals under $30k/year require additional approval.";
+        }
+      }
     }
     return null;
   }, [results, selectedProductIds, productInputs]);
-
 
   // Calculate Monthly Costs for Architect Notes
   const monthlyCosts = useMemo(() => {
     const analysisParts: string[] = [];
     const isIndirect = config.channel !== ChannelType.DIRECT;
-    const displayCurrency = isIndirect ? 'SAR' : 'USD';
-    const getValue = (valUSD: number, valSAR: number) => isIndirect ? valSAR : valUSD;
+    const displayCurrency = isIndirect ? "SAR" : "USD";
+    const getValue = (valUSD: number, valSAR: number) =>
+      isIndirect ? valSAR : valUSD;
 
-    if (config.selectedProducts.includes('utd')) {
-        const count = config.productInputs['utd'].count || 1; 
-        if (config.productInputs['utd'].count > 0) {
-            const totalGrossUSD = results?.yearlyResults?.reduce((sum: number, r: any) => {
-                const bd = r.breakdown.find((x: any) => x.id === 'utd');
-                return sum + (bd ? bd.gross : 0);
-            }, 0) || 0;
-            const totalGrossSAR = results?.yearlyResults?.reduce((sum: number, r: any) => {
-                const bd = r.breakdown.find((x: any) => x.id === 'utd');
-                return sum + (bd ? bd.grossSAR : 0);
-            }, 0) || 0;
+    if (config.selectedProducts.includes("utd")) {
+      const count = config.productInputs["utd"].count || 1;
+      if (config.productInputs["utd"].count > 0) {
+        const totalGrossUSD =
+          results?.yearlyResults?.reduce((sum: number, r: any) => {
+            const bd = r.breakdown.find((x: any) => x.id === "utd");
+            return sum + (bd ? bd.gross : 0);
+          }, 0) || 0;
+        const totalGrossSAR =
+          results?.yearlyResults?.reduce((sum: number, r: any) => {
+            const bd = r.breakdown.find((x: any) => x.id === "utd");
+            return sum + (bd ? bd.grossSAR : 0);
+          }, 0) || 0;
 
-            const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
-            const monthlyPerUnit = acv / count / 12;
-            analysisParts.push(`UTD: ${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /mo/physician`);
-        }
+        const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
+        const monthlyPerUnit = acv / count / 12;
+        analysisParts.push(
+          `UTD: ${displayCurrency} ${monthlyPerUnit.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /mo/physician`,
+        );
+      }
     }
 
-    if (config.selectedProducts.includes('lxd')) {
-        const count = config.productInputs['lxd'].count || 1;
-        if (config.productInputs['lxd'].count > 0) {
-            const totalGrossUSD = results?.yearlyResults?.reduce((sum: number, r: any) => {
-                const bd = r.breakdown.find((x: any) => x.id === 'lxd');
-                return sum + (bd ? bd.gross : 0);
-            }, 0) || 0;
-            const totalGrossSAR = results?.yearlyResults?.reduce((sum: number, r: any) => {
-                const bd = r.breakdown.find((x: any) => x.id === 'lxd');
-                return sum + (bd ? bd.grossSAR : 0);
-            }, 0) || 0;
+    if (config.selectedProducts.includes("lxd")) {
+      const count = config.productInputs["lxd"].count || 1;
+      if (config.productInputs["lxd"].count > 0) {
+        const totalGrossUSD =
+          results?.yearlyResults?.reduce((sum: number, r: any) => {
+            const bd = r.breakdown.find((x: any) => x.id === "lxd");
+            return sum + (bd ? bd.gross : 0);
+          }, 0) || 0;
+        const totalGrossSAR =
+          results?.yearlyResults?.reduce((sum: number, r: any) => {
+            const bd = r.breakdown.find((x: any) => x.id === "lxd");
+            return sum + (bd ? bd.grossSAR : 0);
+          }, 0) || 0;
 
-            const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
-            const monthlyPerUnit = acv / count / 12;
-            analysisParts.push(`LXD: ${displayCurrency} ${monthlyPerUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /mo/bed`);
-        }
+        const acv = getValue(totalGrossUSD, totalGrossSAR) / config.years;
+        const monthlyPerUnit = acv / count / 12;
+        analysisParts.push(
+          `LXD: ${displayCurrency} ${monthlyPerUnit.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /mo/bed`,
+        );
+      }
     }
     return analysisParts;
   }, [config, results]);
@@ -430,17 +561,28 @@ const App: React.FC = () => {
     if (config.dealType !== DealType.RENEWAL || !results) return [];
 
     const notes: string[] = [];
-    const totalExpiringUSD = Object.values(config.productInputs).reduce((sum, p) => sum + (p.expiringAmount || 0), 0);
-    
+    const totalExpiringUSD = Object.values(config.productInputs).reduce(
+      (sum, p) => sum + (p.expiringAmount || 0),
+      0,
+    );
+
     if (totalExpiringUSD > 0) {
       const customerACV = results.acvUSD;
       const pct1 = ((customerACV - totalExpiringUSD) / totalExpiringUSD) * 100;
-      const pct1Text = pct1 > 0 ? `${pct1.toFixed(1)}% more` : `${Math.abs(pct1).toFixed(1)}% less`;
-      notes.push(`This renewal proposal is ${pct1Text} compared to current spend.`);
-      
+      const pct1Text =
+        pct1 > 0
+          ? `${pct1.toFixed(1)}% more`
+          : `${Math.abs(pct1).toFixed(1)}% less`;
+      notes.push(
+        `This renewal proposal is ${pct1Text} compared to current spend.`,
+      );
+
       const y1GrossUSD = results.yearlyResults[0]?.grossUSD || 0;
       const pct2 = ((y1GrossUSD - totalExpiringUSD) / totalExpiringUSD) * 100;
-      const pct2Text = pct2 >= 0 ? `increase is ${pct2.toFixed(1)}%` : `decrease is ${Math.abs(pct2).toFixed(1)}%`;
+      const pct2Text =
+        pct2 >= 0
+          ? `increase is ${pct2.toFixed(1)}%`
+          : `decrease is ${Math.abs(pct2).toFixed(1)}%`;
       notes.push(`The first-year ${pct2Text} compared to current spend.`);
     }
 
@@ -449,62 +591,72 @@ const App: React.FC = () => {
 
   // Handlers
   const toggleProduct = (id: string) => {
-    setSelectedProductIds(prev => 
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+    setSelectedProductIds((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
     );
   };
 
-  const handleInputChange = (id: string, field: keyof ProductInput, value: string | number | boolean) => {
-    setProductInputs(prev => {
+  const handleInputChange = (
+    id: string,
+    field: keyof ProductInput,
+    value: string | number | boolean,
+  ) => {
+    setProductInputs((prev) => {
       const prevInput = prev[id];
       const newState = {
         ...prev,
         [id]: {
           ...prevInput,
-          [field]: value
-        }
+          [field]: value,
+        },
       };
 
       // Specific Logic: If UTD Variant becomes UTDEE or UTDEE-EAI, enforce min count 90
-      if (id === 'utd' && field === 'variant' && (value === 'UTDEE' || value === 'UTDEE-EAI')) {
-         if (newState['utd'].count < 90) {
-            newState['utd'].count = 90;
-            setNotification("Headcount adjusted to 90 (Minimum for UTD Enterprise)");
-            setTimeout(() => setNotification(null), 3000);
-         }
+      if (
+        id === "utd" &&
+        field === "variant" &&
+        (value === "UTDEE" || value === "UTDEE-EAI")
+      ) {
+        if (newState["utd"].count < 90) {
+          newState["utd"].count = 90;
+          setNotification(
+            "Headcount adjusted to 90 (Minimum for UTD Enterprise)",
+          );
+          setTimeout(() => setNotification(null), 3000);
+        }
       }
 
       // UTD SM Variant Check
-      if (id === 'utd' && field === 'variant' && value === 'SM') {
-          if (newState['utd'].count > 499) {
-             setNotification("UTD SM is not applicable for > 499 seats.");
-             setTimeout(() => setNotification(null), 3000);
-          }
+      if (id === "utd" && field === "variant" && value === "SM") {
+        if (newState["utd"].count > 499) {
+          setNotification("UTD SM is not applicable for > 499 seats.");
+          setTimeout(() => setNotification(null), 3000);
+        }
       }
-      
-      // Auto-check/uncheck Apply WHT if stats change is toggled
-      if (field === 'changeInStats') {
-         setApplyWHT(value === true);
-      }
-      
-      // Reset logic when Existing Variant changes
-      if (dealType === DealType.RENEWAL && field === 'existingVariant') {
-         // If existing changes, reset target variant to match existing initially
-         // to avoid invalid combinations.
-         // EXCEPTION: If Existing is UTDEE, Target must be UTDEE
-         if (value === 'UTDEE') {
-            newState[id].variant = 'UTDEE';
-            if (id === 'utd') {
-                setUtdRateVal(8); 
-                setRenewalUpliftUTD(8);
-            }
-         } else {
-            newState[id].variant = value as string;
-         }
 
-         // Also reset upgrade checkboxes
-         newState[id].changeInStats = false;
-         newState[id].forceHeadcountOverride = false;
+      // Auto-check/uncheck Apply WHT if stats change is toggled
+      if (field === "changeInStats") {
+        setApplyWHT(value === true);
+      }
+
+      // Reset logic when Existing Variant changes
+      if (dealType === DealType.RENEWAL && field === "existingVariant") {
+        // If existing changes, reset target variant to match existing initially
+        // to avoid invalid combinations.
+        // EXCEPTION: If Existing is UTDEE, Target must be UTDEE
+        if (value === "UTDEE") {
+          newState[id].variant = "UTDEE";
+          if (id === "utd") {
+            setUtdRateVal(8);
+            setRenewalUpliftUTD(8);
+          }
+        } else {
+          newState[id].variant = value as string;
+        }
+
+        // Also reset upgrade checkboxes
+        newState[id].changeInStats = false;
+        newState[id].forceHeadcountOverride = false;
       }
 
       return newState;
@@ -512,95 +664,121 @@ const App: React.FC = () => {
   };
 
   const handleInputBlur = (id: string, field: keyof ProductInput) => {
-    setProductInputs(prev => {
+    setProductInputs((prev) => {
       const prevInput = prev[id];
-      const newState = { 
+      const newState = {
         ...prev,
-        [id]: { ...prevInput }
+        [id]: { ...prevInput },
       };
 
-      if (id === 'utd' && field === 'count') {
-         const currentCount = prevInput.count;
-         if (prevInput.variant === 'UTDEE' && currentCount < 90) {
-            newState['utd'].variant = 'UTDADV';
-            setNotification("Variant switched to UTD Advanced (UTD EE requires 90+ HC)");
-            setTimeout(() => setNotification(null), 3000);
-         }
-         if (prevInput.variant === 'SM' && currentCount > 499) {
-             newState['utd'].variant = 'UTDADV'; // Fallback to ADV
-             setNotification("Variant switched to UTD Advanced (UTD SM is not applicable for > 499 seats)");
-             setTimeout(() => setNotification(null), 3000);
-         }
+      if (id === "utd" && field === "count") {
+        const currentCount = prevInput.count;
+        if (prevInput.variant === "UTDEE" && currentCount < 90) {
+          newState["utd"].variant = "UTDADV";
+          setNotification(
+            "Variant switched to UTD Advanced (UTD EE requires 90+ HC)",
+          );
+          setTimeout(() => setNotification(null), 3000);
+        }
+        if (prevInput.variant === "SM" && currentCount > 499) {
+          newState["utd"].variant = "UTDADV"; // Fallback to ADV
+          setNotification(
+            "Variant switched to UTD Advanced (UTD SM is not applicable for > 499 seats)",
+          );
+          setTimeout(() => setNotification(null), 3000);
+        }
       }
       return newState;
     });
   };
 
   // Helper to determine allowed Target Variants based on Existing
-  const getAllowedTargetVariants = (productId: string, existingVariant: string) => {
-      if (productId === 'utd') {
-          if (existingVariant === 'UTDEE-EAI') return ['UTDEE-EAI'];
-          if (existingVariant === 'UTDEE') return ['UTDEE', 'UTDEE-EAI'];
+  const getAllowedTargetVariants = (
+    productId: string,
+    existingVariant: string,
+  ) => {
+    if (productId === "utd") {
+      if (existingVariant === "UTDEE-EAI") return ["UTDEE-EAI"];
+      if (existingVariant === "UTDEE") return ["UTDEE", "UTDEE-EAI"];
 
-          // Anywhere -> Anywhere, Adv, EE, EE-EAI
-          if (existingVariant === 'ANYWHERE') return ['ANYWHERE', 'UTDADV', 'UTDEE', 'UTDEE-EAI'];
-          // Adv -> Adv, EE, EE-EAI
-          if (existingVariant === 'UTDADV') return ['UTDADV', 'UTDEE', 'UTDEE-EAI'];
-      }
-      if (productId === 'lxd') {
-          if (existingVariant === 'BASE PKG') return ['BASE PKG', 'BASE PKG+FLINK', 'BASE PKG+FLINK+IPE'];
-          if (existingVariant === 'BASE PKG+FLINK') return ['BASE PKG+FLINK', 'BASE PKG+FLINK+IPE'];
-          if (existingVariant === 'BASE PKG+FLINK+IPE') return ['BASE PKG+FLINK+IPE'];
-          
-          if (existingVariant === 'EE-Combo') return ['EE-Combo', 'EE-Combo+FLINK', 'EE-Combo+FLINK+IPE'];
-          if (existingVariant === 'EE-Combo+FLINK') return ['EE-Combo+FLINK', 'EE-Combo+FLINK+IPE'];
-          if (existingVariant === 'EE-Combo+FLINK+IPE') return ['EE-Combo+FLINK+IPE'];
+      // Anywhere -> Anywhere, Adv, EE, EE-EAI
+      if (existingVariant === "ANYWHERE")
+        return ["ANYWHERE", "UTDADV", "UTDEE", "UTDEE-EAI"];
+      // Adv -> Adv, EE, EE-EAI
+      if (existingVariant === "UTDADV") return ["UTDADV", "UTDEE", "UTDEE-EAI"];
+    }
+    if (productId === "lxd") {
+      if (existingVariant === "BASE PKG")
+        return ["BASE PKG", "BASE PKG+FLINK", "BASE PKG+FLINK+IPE"];
+      if (existingVariant === "BASE PKG+FLINK")
+        return ["BASE PKG+FLINK", "BASE PKG+FLINK+IPE"];
+      if (existingVariant === "BASE PKG+FLINK+IPE")
+        return ["BASE PKG+FLINK+IPE"];
 
-          if (existingVariant === 'Seats') return ['Seats', 'Seats+FLINK', 'Seats+IPE', 'Seats+FLINK+IPE'];
-          if (existingVariant === 'Seats+FLINK') return ['Seats+FLINK', 'Seats+FLINK+IPE'];
-          if (existingVariant === 'Seats+IPE') return ['Seats+IPE', 'Seats+FLINK+IPE'];
-          if (existingVariant === 'Seats+FLINK+IPE') return ['Seats+FLINK+IPE'];
+      if (existingVariant === "EE-Combo")
+        return ["EE-Combo", "EE-Combo+FLINK", "EE-Combo+FLINK+IPE"];
+      if (existingVariant === "EE-Combo+FLINK")
+        return ["EE-Combo+FLINK", "EE-Combo+FLINK+IPE"];
+      if (existingVariant === "EE-Combo+FLINK+IPE")
+        return ["EE-Combo+FLINK+IPE"];
 
-          if (existingVariant === 'Hospital Pharmacy Model') return ['Hospital Pharmacy Model'];
-          
-          return Object.keys(metadata?.lxdVariants || {}); // Fallback
-      }
-      return [existingVariant]; // Default
+      if (existingVariant === "Seats")
+        return ["Seats", "Seats+FLINK", "Seats+IPE", "Seats+FLINK+IPE"];
+      if (existingVariant === "Seats+FLINK")
+        return ["Seats+FLINK", "Seats+FLINK+IPE"];
+      if (existingVariant === "Seats+IPE")
+        return ["Seats+IPE", "Seats+FLINK+IPE"];
+      if (existingVariant === "Seats+FLINK+IPE") return ["Seats+FLINK+IPE"];
+
+      if (existingVariant === "Hospital Pharmacy Model")
+        return ["Hospital Pharmacy Model"];
+
+      return Object.keys(metadata?.lxdVariants || {}); // Fallback
+    }
+    return [existingVariant]; // Default
   };
 
   // Input Field Helper
   const renderRateInput = (
-    label: string, 
-    value: number, 
+    label: string,
+    value: number,
     onChange: (val: number) => void,
     suffixText: string = "Annual increase %",
-    colorClass: string = "border-gray-300"
+    colorClass: string = "border-gray-300",
   ) => (
     <div className="mb-4">
-      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{label}</label>
+      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+        {label}
+      </label>
       <div className="flex items-center">
-        <div className={`flex items-center border ${colorClass} dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 w-32 h-9`}>
-          <button 
-            type="button" 
-            onClick={() => onChange(value - 1)} 
+        <div
+          className={`flex items-center border ${colorClass} dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 w-32 h-9`}
+        >
+          <button
+            type="button"
+            onClick={() => onChange(value - 1)}
             className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
-          >-</button>
+          >
+            -
+          </button>
           <input
             type="number"
             step="1"
             value={value}
             onChange={(e) => onChange(parseInt(e.target.value) || 0)}
             className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
-            style={{ appearance: 'textfield', MozAppearance: 'textfield' }}
+            style={{ appearance: "textfield", MozAppearance: "textfield" }}
           />
-          <button 
-            type="button" 
-            onClick={() => onChange(value + 1)} 
+          <button
+            type="button"
+            onClick={() => onChange(value + 1)}
             className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
-          >+</button>
+          >
+            +
+          </button>
         </div>
         <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
-           {suffixText}
+          {suffixText}
         </span>
       </div>
     </div>
@@ -608,19 +786,34 @@ const App: React.FC = () => {
 
   // Label Logic for Annual Rate
   const getAnnualRateLabel = () => {
-     if (showSplitRates && productMethods.utd !== productMethods.lxd) return "Annual Rates %";
-     if (method === PricingMethod.MYPP) return "MYPP reverse discount %";
-     if (dealType === DealType.RENEWAL) return "Annual Increase % (Year 2+)";
-     return "Annual Increase %";
+    if (showSplitRates && productMethods.utd !== productMethods.lxd)
+      return "Annual Rates %";
+    if (method === PricingMethod.MYPP) return "MYPP reverse discount %";
+    if (dealType === DealType.RENEWAL) return "Annual Increase % (Year 2+)";
+    return "Annual Increase %";
   };
 
   // Determine if rate inputs should be shown
-  const isUtdRateVisible = dealType !== DealType.RENEWAL || (showSplitRates ? productMethods.utd === PricingMethod.MYPP : method === PricingMethod.MYPP) || applyAnnualRate;
-  const isLxdRateVisible = dealType !== DealType.RENEWAL || (showSplitRates ? productMethods.lxd === PricingMethod.MYPP : method === PricingMethod.MYPP) || applyAnnualRate;
+  const isUtdRateVisible =
+    dealType !== DealType.RENEWAL ||
+    (showSplitRates
+      ? productMethods.utd === PricingMethod.MYPP
+      : method === PricingMethod.MYPP) ||
+    applyAnnualRate;
+  const isLxdRateVisible =
+    dealType !== DealType.RENEWAL ||
+    (showSplitRates
+      ? productMethods.lxd === PricingMethod.MYPP
+      : method === PricingMethod.MYPP) ||
+    applyAnnualRate;
   const shouldShowAnnualRateInputs = isUtdRateVisible || isLxdRateVisible;
 
   if (!isAuthChecked) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-500">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-500">
+        Loading...
+      </div>
+    );
   }
 
   if (!isAuthenticated) {
@@ -636,14 +829,14 @@ const App: React.FC = () => {
         </div>
       )}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
-        
         {/* Left Column: Configuration */}
         <div className="xl:col-span-1 space-y-6">
-          
           {/* Section 1: Deal Basics */}
           <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-5 border border-gray-100 dark:border-gray-700 transition-colors">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">1. Deal Context</h2>
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">
+                1. Deal Context
+              </h2>
               <button
                 onClick={resetForm}
                 className="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium px-2 py-1 border border-red-200 dark:border-red-800 rounded bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
@@ -653,8 +846,10 @@ const App: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Type</label>
-                <select 
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Type
+                </label>
+                <select
                   className="mt-1 block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   value={dealType}
                   onChange={(e) => setDealType(e.target.value as DealType)}
@@ -665,22 +860,34 @@ const App: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Channel</label>
-                <select 
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Channel
+                </label>
+                <select
                   className="mt-1 block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   value={channel}
                   onChange={(e) => setChannel(e.target.value as ChannelType)}
                 >
-                  <option value={ChannelType.DIRECT} disabled={isExtensionQuote}>Direct (USD)</option>
-                  <option value={ChannelType.FULFILMENT}>Fulfilment (SAR)</option>
-                  <option value={ChannelType.PARTNER_SOURCED}>Partner Sourced (SAR)</option>
+                  <option
+                    value={ChannelType.DIRECT}
+                    disabled={isExtensionQuote}
+                  >
+                    Direct (USD)
+                  </option>
+                  <option value={ChannelType.FULFILMENT}>
+                    Fulfilment (SAR)
+                  </option>
+                  <option value={ChannelType.PARTNER_SOURCED}>
+                    Partner Sourced (SAR)
+                  </option>
                 </select>
               </div>
             </div>
             {isExtensionQuote && (
               <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded text-xs text-yellow-800 dark:text-yellow-200">
-                  <strong>Note:</strong> RL and Finance approvals are required for Extension Quotes.
+                  <strong>Note:</strong> RL and Finance approvals are required
+                  for Extension Quotes.
                 </div>
               </div>
             )}
@@ -689,43 +896,61 @@ const App: React.FC = () => {
           {/* Extension Quote Configuration */}
           {isExtensionQuote && (
             <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-5 border border-gray-100 dark:border-gray-700 transition-colors">
-              <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mb-4">Extension Configuration</h2>
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mb-4">
+                Extension Configuration
+              </h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Option</label>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    Option
+                  </label>
                   <select
                     className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     value={extensionOption}
-                    onChange={(e) => setExtensionOption(e.target.value as 'A' | 'B')}
+                    onChange={(e) =>
+                      setExtensionOption(e.target.value as "A" | "B")
+                    }
                   >
                     <option value="A">Option A (% of TCV)</option>
-                    <option value="B">Option B (Specific Months under 100k SAR)</option>
+                    <option value="B">
+                      Option B (Specific Months under 100k SAR)
+                    </option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Variant</label>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    Variant
+                  </label>
                   <select
                     className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     value={extensionVariant}
                     onChange={(e) => setExtensionVariant(e.target.value)}
                   >
-                    {Object.keys(metadata?.utdVariants || {}).map(v => (
-                      <option key={v} value={v}>{v}</option>
+                    {Object.keys(metadata?.utdVariants || {}).map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
                     ))}
-                    {Object.keys(metadata?.lxdVariants || {}).map(v => (
-                      <option key={v} value={v}>{v}</option>
+                    {Object.keys(metadata?.lxdVariants || {}).map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
                     ))}
                   </select>
                 </div>
 
-                {extensionOption === 'A' && (
+                {extensionOption === "A" && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Expiring Term</label>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Expiring Term
+                    </label>
                     <select
                       className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       value={expiringTerm}
-                      onChange={(e) => setExpiringTerm(e.target.value as 'multi' | 'single')}
+                      onChange={(e) =>
+                        setExpiringTerm(e.target.value as "multi" | "single")
+                      }
                     >
                       <option value="multi">Multi-Year</option>
                       <option value="single">Single Year</option>
@@ -733,9 +958,11 @@ const App: React.FC = () => {
                   </div>
                 )}
 
-                {extensionOption === 'A' && expiringTerm === 'multi' && (
+                {extensionOption === "A" && expiringTerm === "multi" && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Customer TCV (USD)</label>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Customer TCV (USD)
+                    </label>
                     <FormattedNumberInput
                       value={expiringTCV}
                       onChange={setExpiringTCV}
@@ -745,7 +972,9 @@ const App: React.FC = () => {
                 )}
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Current Spend (Exit Year) (USD)</label>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    Current Spend (Exit Year) (USD)
+                  </label>
                   <FormattedNumberInput
                     value={currentSpend}
                     onChange={setCurrentSpend}
@@ -753,9 +982,11 @@ const App: React.FC = () => {
                   />
                 </div>
 
-                {extensionOption === 'A' && (
+                {extensionOption === "A" && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Extension Percentage (%)</label>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Extension Percentage (%)
+                    </label>
                     <FormattedNumberInput
                       value={extensionPercentage}
                       onChange={setExtensionPercentage}
@@ -763,32 +994,51 @@ const App: React.FC = () => {
                     />
                   </div>
                 )}
-                
-                {extensionOption === 'A' && (
+
+                {extensionOption === "A" && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Difference to Extension (FPI %)</label>
-                    <div className="flex items-center space-x-2">
-                      <div className="relative flex-1">
-                        <FormattedNumberInput
-                          value={extensionFPI !== null ? extensionFPI : (extensionResults?.type === 'A' ? Number(extensionResults.fpiPercentage.toFixed(2)) : 0)}
-                          onChange={setExtensionFPI}
-                          className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 pr-6 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
-                          disabled={useFullExtension}
-                        />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 text-sm">%</span>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Uplift FPI%
+                    </label>
+                    <UpliftFpiInput
+                      value={
+                        extensionFPI !== null
+                          ? extensionFPI
+                          : extensionResults?.type === "A"
+                            ? Number(
+                                extensionResults.fpiPercentage.toFixed(2),
+                              )
+                            : 0
+                      }
+                      onChange={setExtensionFPI}
+                      disabled={useFullExtension}
+                    />
+                    {extensionRequiresFinanceApproval && (
+                      <div className="mt-1 text-[10px] font-bold text-red-600 dark:text-red-400 animate-pulse">
+                        Requires Finance approval
                       </div>
-                      <button
-                        onClick={() => setExtensionFPI(null)}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                        disabled={useFullExtension}
-                      >
-                        Auto
-                      </button>
-                    </div>
+                    )}
                   </div>
                 )}
 
-                {extensionOption === 'A' && (
+                {extensionOption === "B" && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Uplift FPI%
+                    </label>
+                    <UpliftFpiInput
+                      value={extensionFPI !== null ? extensionFPI : 0}
+                      onChange={setExtensionFPI}
+                    />
+                    {extensionRequiresFinanceApproval && (
+                      <div className="mt-1 text-[10px] font-bold text-red-600 dark:text-red-400 animate-pulse">
+                        Requires Finance approval
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {extensionOption === "A" && (
                   <div className="flex items-center mt-2">
                     <input
                       id="use-full-extension-checkbox"
@@ -797,7 +1047,10 @@ const App: React.FC = () => {
                       onChange={(e) => setUseFullExtension(e.target.checked)}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
                     />
-                    <label htmlFor="use-full-extension-checkbox" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label
+                      htmlFor="use-full-extension-checkbox"
+                      className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
                       Use full extension
                     </label>
                   </div>
@@ -810,613 +1063,1075 @@ const App: React.FC = () => {
             <>
               {/* Section 2: Products & Inputs */}
               <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-5 border border-gray-100 dark:border-gray-700 transition-colors">
-                <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mb-4">2. Product Mix</h2>
+                <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mb-4">
+                  2. Product Mix
+                </h2>
                 <div className="space-y-4">
                   {!metadata ? (
                     <div className="flex flex-col items-center justify-center p-8 space-y-3">
                       <div className="w-8 h-8 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-                      <p className="text-xs text-gray-500 font-medium italic">Loading product data...</p>
+                      <p className="text-xs text-gray-500 font-medium italic">
+                        Loading product data...
+                      </p>
                     </div>
-                  ) : (metadata.availableProducts || []).map(product => {
-                const isSelected = selectedProductIds.includes(product.id);
-                const input = productInputs[product.id] || { count: 0, variant: '', baseDiscount: 0 };
-                
-                // Logic for disabling LXD variants if UTD is ANYWHERE or UTDADV
-                const isUTDSelected = selectedProductIds.includes('utd');
-                const currentUTDVariant = productInputs['utd']?.variant;
-                const isRestrictedUTD = isUTDSelected && (currentUTDVariant === 'ANYWHERE' || currentUTDVariant === 'UTDADV');
-                
-                // Logic for disabling Base Discount on LXD if UTD EE + LXD EE-Combo is selected
-                const isUTDEE = isUTDSelected && (currentUTDVariant === 'UTDEE' || currentUTDVariant === 'UTDEE-EAI');
-                const isLXDComboVariant = product.id === 'lxd' && input.variant.includes('EE-Combo');
-                const shouldDisableLXDDiscount = isUTDEE && isLXDComboVariant;
+                  ) : (
+                    (metadata.availableProducts || []).map((product) => {
+                      const isSelected = selectedProductIds.includes(
+                        product.id,
+                      );
+                      const input = productInputs[product.id] || {
+                        count: 0,
+                        variant: "",
+                        baseDiscount: 0,
+                      };
 
-                // Rename discount label if split rates (Combo) are active for LXD
-                const discountLabel = (product.id === 'lxd' && isUTDSelected) ? 'Combo Discount %' : 'Base Discount %';
+                      // Logic for disabling LXD variants if UTD is ANYWHERE or UTDADV
+                      const isUTDSelected = selectedProductIds.includes("utd");
+                      const currentUTDVariant = productInputs["utd"]?.variant;
+                      const isRestrictedUTD =
+                        isUTDSelected &&
+                        (currentUTDVariant === "ANYWHERE" ||
+                          currentUTDVariant === "UTDADV");
 
-                // RENEWAL SPECIFIC LOGIC
-                const isRenewal = dealType === DealType.RENEWAL;
-                const dphValue = input.dph || 0;
-                const usageValue = dphValue > 0 && input.expiringAmount ? (input.expiringAmount / dphValue) : 0;
-                
-                // --- Upsell Logic Checks ---
-                const existingVariant = input.existingVariant || input.variant;
-                const targetVariant = input.variant;
+                      // Logic for disabling Base Discount on LXD if UTD EE + LXD EE-Combo is selected
+                      const isUTDEE =
+                        isUTDSelected &&
+                        (currentUTDVariant === "UTDEE" ||
+                          currentUTDVariant === "UTDEE-EAI");
+                      const isLXDComboVariant =
+                        product.id === "lxd" &&
+                        input.variant.includes("EE-Combo");
+                      const shouldDisableLXDDiscount =
+                        isUTDEE && isLXDComboVariant;
 
-                // UTD Stats Change Check (Enable for any UTD renewal)
-                const showStatsCheckbox = isRenewal && product.id === 'utd';
+                      // Rename discount label if split rates (Combo) are active for LXD
+                      const discountLabel =
+                        product.id === "lxd" && isUTDSelected
+                          ? "Combo Discount %"
+                          : "Base Discount %";
 
-                // LXD Addon Check
-                const isLXDAddonUpgrade = isRenewal && product.id === 'lxd' && existingVariant !== targetVariant;
-                
-                // Logic to Enable Count Input
-                // Default: Disabled (0) for Renewal
-                let isCountDisabled = isRenewal;
-                if (isRenewal) {
-                    if (showStatsCheckbox && input.changeInStats) {
-                        isCountDisabled = false;
-                    }
-                    if (isLXDAddonUpgrade) {
-                        isCountDisabled = false;
-                    }
-                    // Enable count input for LXD renewal to allow stats change
-                    if (product.id === 'lxd') {
-                        isCountDisabled = false;
-                    }
-                }
+                      // RENEWAL SPECIFIC LOGIC
+                      const isRenewal = dealType === DealType.RENEWAL;
+                      const dphValue = input.dph || 0;
+                      const usageValue =
+                        dphValue > 0 && input.expiringAmount
+                          ? input.expiringAmount / dphValue
+                          : 0;
 
-                // Variants Filtering
-                const allowedTargetVariants = isRenewal 
-                   ? getAllowedTargetVariants(product.id, existingVariant) 
-                   : (product.id === 'utd' ? Object.keys(metadata?.utdVariants || {}) : Object.keys(metadata?.lxdVariants || {}));
+                      // --- Upsell Logic Checks ---
+                      const existingVariant =
+                        input.existingVariant || input.variant;
+                      const targetVariant = input.variant;
 
-                const isUTDSM = product.id === 'utd' && input.variant === 'SM';
-                const isLXDSeats = product.id === 'lxd' && (input.variant.includes('Seats') || input.variant === 'Hospital Pharmacy Model');
+                      // UTD Stats Change Check (Enable for any UTD renewal)
+                      const showStatsCheckbox =
+                        isRenewal && product.id === "utd";
 
-                return (
-                  <div key={product.id} className={`border rounded-md transition-colors ${isSelected ? (product.id === 'utd' ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30' : 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30') : 'border-gray-200 dark:border-gray-700'}`}>
-                    {/* Header Row */}
-                    <div className="flex items-center p-3">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleProduct(product.id)}
-                        className={`h-4 w-4 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-500 ${product.id === 'utd' ? 'text-green-600 focus:ring-green-500' : 'text-blue-600 focus:ring-blue-500'}`}
-                      />
-                      <span className={`ml-3 text-sm font-medium ${isSelected ? (product.id === 'utd' ? 'text-green-900 dark:text-green-200' : 'text-blue-900 dark:text-blue-200') : 'text-gray-500 dark:text-gray-400'}`}>
-                        {product.name}
-                      </span>
-                    </div>
-                    
-                    {/* Expanded Input Row */}
-                    {isSelected && (
-                      <div className={`px-3 pb-3 pt-0 border-t mt-1 grid grid-cols-1 gap-3 ${product.id === 'utd' ? 'border-green-100 dark:border-green-800' : 'border-blue-100 dark:border-blue-800'}`}>
-                        <div className="grid grid-cols-2 gap-3 mt-2">
-                           
-                           {/* Renewal: Expiring Amount (Primary) */}
-                           {isRenewal && (
-                             <div className="col-span-2 p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 rounded">
-                               <label className="block text-xs text-orange-700 dark:text-orange-400 font-semibold mb-1">Expiring Amount (USD)</label>
-                               <FormattedNumberInput
-                                 value={input.expiringAmount || 0}
-                                 onChange={(val) => handleInputChange(product.id, 'expiringAmount', val)}
-                                 className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-orange-500 focus:border-orange-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
-                               />
-                               {/* Restored DPH Fields for UTD */}
-                               {product.id === 'utd' && (
-                                 <div className="grid grid-cols-2 gap-2 mt-2">
-                                    <div>
-                                        <label className="block text-[10px] text-gray-500 dark:text-gray-400 uppercase">DPH</label>
-                                        <FormattedNumberInput
-                                          value={input.dph || 0}
-                                          onChange={(val) => handleInputChange(product.id, 'dph', val)}
-                                          placeholder="0.00"
-                                          className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 border p-1 bg-white dark:bg-gray-700"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] text-gray-500 dark:text-gray-400 uppercase">Usage (Auto)</label>
-                                        <div className="text-xs p-1 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-500 font-sans tabular-nums">
-                                          {Math.round(usageValue).toLocaleString()}
+                      // LXD Addon Check
+                      const isLXDAddonUpgrade =
+                        isRenewal &&
+                        product.id === "lxd" &&
+                        existingVariant !== targetVariant;
+
+                      // Logic to Enable Count Input
+                      // Default: Disabled (0) for Renewal
+                      let isCountDisabled = isRenewal;
+                      if (isRenewal) {
+                        if (showStatsCheckbox && input.changeInStats) {
+                          isCountDisabled = false;
+                        }
+                        if (isLXDAddonUpgrade) {
+                          isCountDisabled = false;
+                        }
+                        // Enable count input for LXD renewal to allow stats change
+                        if (product.id === "lxd") {
+                          isCountDisabled = false;
+                        }
+                      }
+
+                      // Variants Filtering
+                      const allowedTargetVariants = isRenewal
+                        ? getAllowedTargetVariants(product.id, existingVariant)
+                        : product.id === "utd"
+                          ? Object.keys(metadata?.utdVariants || {})
+                          : Object.keys(metadata?.lxdVariants || {});
+
+                      const isUTDSM =
+                        product.id === "utd" && input.variant === "SM";
+                      const isLXDSeats =
+                        product.id === "lxd" &&
+                        (input.variant.includes("Seats") ||
+                          input.variant === "Hospital Pharmacy Model");
+
+                      return (
+                        <div
+                          key={product.id}
+                          className={`border rounded-md transition-colors ${isSelected ? (product.id === "utd" ? "border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30" : "border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30") : "border-gray-200 dark:border-gray-700"}`}
+                        >
+                          {/* Header Row */}
+                          <div className="flex items-center p-3">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleProduct(product.id)}
+                              className={`h-4 w-4 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-500 ${product.id === "utd" ? "text-green-600 focus:ring-green-500" : "text-blue-600 focus:ring-blue-500"}`}
+                            />
+                            <span
+                              className={`ml-3 text-sm font-medium ${isSelected ? (product.id === "utd" ? "text-green-900 dark:text-green-200" : "text-blue-900 dark:text-blue-200") : "text-gray-500 dark:text-gray-400"}`}
+                            >
+                              {product.name}
+                            </span>
+                          </div>
+
+                          {/* Expanded Input Row */}
+                          {isSelected && (
+                            <div
+                              className={`px-3 pb-3 pt-0 border-t mt-1 grid grid-cols-1 gap-3 ${product.id === "utd" ? "border-green-100 dark:border-green-800" : "border-blue-100 dark:border-blue-800"}`}
+                            >
+                              <div className="grid grid-cols-2 gap-3 mt-2">
+                                {/* Renewal: Expiring Amount (Primary) */}
+                                {isRenewal && (
+                                  <div className="col-span-2 p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 rounded">
+                                    <label className="block text-xs text-orange-700 dark:text-orange-400 font-semibold mb-1">
+                                      Expiring Amount (USD)
+                                    </label>
+                                    <FormattedNumberInput
+                                      value={input.expiringAmount || 0}
+                                      onChange={(val) =>
+                                        handleInputChange(
+                                          product.id,
+                                          "expiringAmount",
+                                          val,
+                                        )
+                                      }
+                                      className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-orange-500 focus:border-orange-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
+                                    />
+                                    {/* Restored DPH Fields for UTD */}
+                                    {product.id === "utd" && (
+                                      <div className="grid grid-cols-2 gap-2 mt-2">
+                                        <div>
+                                          <label className="block text-[10px] text-gray-500 dark:text-gray-400 uppercase">
+                                            DPH
+                                          </label>
+                                          <FormattedNumberInput
+                                            value={input.dph || 0}
+                                            onChange={(val) =>
+                                              handleInputChange(
+                                                product.id,
+                                                "dph",
+                                                val,
+                                              )
+                                            }
+                                            placeholder="0.00"
+                                            className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 border p-1 bg-white dark:bg-gray-700"
+                                          />
                                         </div>
+                                        <div>
+                                          <label className="block text-[10px] text-gray-500 dark:text-gray-400 uppercase">
+                                            Usage (Auto)
+                                          </label>
+                                          <div className="text-xs p-1 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-500 font-sans tabular-nums">
+                                            {Math.round(
+                                              usageValue,
+                                            ).toLocaleString()}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Renewal: Existing Variant Selection */}
+                                {isRenewal && product.hasVariants && (
+                                  <div className="col-span-2 grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                        Existing Variant
+                                      </label>
+                                      <select
+                                        className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-gray-500 border p-1 bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
+                                        value={
+                                          input.existingVariant || input.variant
+                                        }
+                                        onChange={(e) =>
+                                          handleInputChange(
+                                            product.id,
+                                            "existingVariant",
+                                            e.target.value,
+                                          )
+                                        }
+                                      >
+                                        {product.id === "utd" &&
+                                          Object.keys(
+                                            metadata?.utdVariants || {},
+                                          ).map((v) => (
+                                            <option key={v} value={v}>
+                                              {v}
+                                            </option>
+                                          ))}
+                                        {product.id === "lxd" &&
+                                          Object.keys(
+                                            metadata?.lxdVariants || {},
+                                          ).map((v) => {
+                                            if (v.includes("EE-Combo"))
+                                              return null;
+                                            return (
+                                              <option key={v} value={v}>
+                                                {v}
+                                              </option>
+                                            );
+                                          })}
+                                      </select>
                                     </div>
-                                 </div>
-                               )}
-                             </div>
-                           )}
+                                    <div>
+                                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                        Existing Stats
+                                      </label>
+                                      <FormattedNumberInput
+                                        value={input.existingCount || 0}
+                                        onChange={(val) =>
+                                          handleInputChange(
+                                            product.id,
+                                            "existingCount",
+                                            val,
+                                          )
+                                        }
+                                        className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-gray-500 border p-1 bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
 
-                           {/* Renewal: Existing Variant Selection */}
-                           {isRenewal && product.hasVariants && (
-                             <div className="col-span-2 grid grid-cols-2 gap-2">
-                               <div>
-                                   <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Existing Variant</label>
-                                   <select
-                                     className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-gray-500 border p-1 bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
-                                     value={input.existingVariant || input.variant}
-                                     onChange={(e) => handleInputChange(product.id, 'existingVariant', e.target.value)}
-                                   >
-                                      {product.id === 'utd' && Object.keys(metadata?.utdVariants || {}).map(v => (
-                                         <option key={v} value={v}>{v}</option>
-                                      ))}
-                                      {product.id === 'lxd' && Object.keys(metadata?.lxdVariants || {}).map(v => {
-                                         if(v.includes('EE-Combo')) return null; 
-                                         return <option key={v} value={v}>{v}</option>;
-                                      })}
-                                   </select>
-                               </div>
-                               <div>
-                                   <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Existing Stats</label>
-                                   <FormattedNumberInput
-                                     value={input.existingCount || 0}
-                                     onChange={(val) => handleInputChange(product.id, 'existingCount', val)}
-                                     className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-gray-500 border p-1 bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
-                                   />
-                               </div>
-                             </div>
-                           )}
+                                {/* Target Variant Selector */}
+                                {product.hasVariants ? (
+                                  <div className="col-span-2">
+                                    <label className="block text-xs text-blue-700 dark:text-blue-300 mb-1">
+                                      {isRenewal
+                                        ? "Target Upgrade Variant"
+                                        : "Variant"}
+                                    </label>
+                                    <select
+                                      className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                      value={input.variant}
+                                      disabled={
+                                        isRenewal &&
+                                        allowedTargetVariants.length <= 1
+                                      }
+                                      onChange={(e) =>
+                                        handleInputChange(
+                                          product.id,
+                                          "variant",
+                                          e.target.value,
+                                        )
+                                      }
+                                    >
+                                      {(allowedTargetVariants as string[]).map(
+                                        (v) => {
+                                          let price = 0;
+                                          if (product.id === "utd")
+                                            price =
+                                              (metadata?.utdVariants as any)?.[
+                                                v
+                                              ] || 0;
+                                          if (product.id === "lxd")
+                                            price =
+                                              (metadata?.lxdVariants as any)?.[
+                                                v
+                                              ] || 0;
 
-                           {/* Target Variant Selector */}
-                           {product.hasVariants ? (
-                             <div className="col-span-2">
-                               <label className="block text-xs text-blue-700 dark:text-blue-300 mb-1">
-                                  {isRenewal ? "Target Upgrade Variant" : "Variant"}
-                               </label>
-                               <select
-                                 className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                 value={input.variant}
-                                 disabled={isRenewal && allowedTargetVariants.length <= 1}
-                                 onChange={(e) => handleInputChange(product.id, 'variant', e.target.value)}
-                               >
-                                 {(allowedTargetVariants as string[]).map(v => {
-                                   let price = 0;
-                                   if (product.id === 'utd') price = (metadata?.utdVariants as any)?.[v] || 0;
-                                   if (product.id === 'lxd') price = (metadata?.lxdVariants as any)?.[v] || 0;
-                                   
-                                   // Specific filtering for Combo logic in New Logo context (unchanged)
-                                   if (!isRenewal && product.id === 'lxd' && v.includes('EE-Combo') && isRestrictedUTD) {
-                                      return <option key={v} value={v} disabled>{v} (Requires UTD EE)</option>;
-                                   }
+                                          // Specific filtering for Combo logic in New Logo context (unchanged)
+                                          if (
+                                            !isRenewal &&
+                                            product.id === "lxd" &&
+                                            v.includes("EE-Combo") &&
+                                            isRestrictedUTD
+                                          ) {
+                                            return (
+                                              <option
+                                                key={v}
+                                                value={v}
+                                                disabled
+                                              >
+                                                {v} (Requires UTD EE)
+                                              </option>
+                                            );
+                                          }
 
-                                   return <option key={v} value={v}>{v}{price > 0 ? ` ($${price})` : ''}</option>;
-                                 })}
-                               </select>
-                             </div>
-                           ) : (
-                             <div className="col-span-2 text-xs text-gray-400 italic mt-1">Standard pricing applied</div>
-                           )}
-                           
-                           {/* UTD EE Upgrade Checkbox */}
-                           {showStatsCheckbox && (
-                             <div className="col-span-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 p-2 rounded flex items-center">
-                                <input 
-                                  type="checkbox"
-                                  className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                                  checked={input.changeInStats || false}
-                                  onChange={(e) => handleInputChange(product.id, 'changeInStats', e.target.checked)}
-                                />
-                                <span className="ml-2 text-xs text-purple-700 dark:text-purple-300 font-medium">
-                                   Switching or changing stats?
-                                </span>
-                             </div>
-                           )}
+                                          return (
+                                            <option key={v} value={v}>
+                                              {v}
+                                              {price > 0 ? ` ($${price})` : ""}
+                                            </option>
+                                          );
+                                        },
+                                      )}
+                                    </select>
+                                  </div>
+                                ) : (
+                                  <div className="col-span-2 text-xs text-gray-400 italic mt-1">
+                                    Standard pricing applied
+                                  </div>
+                                )}
 
-                           {/* Count Input (HC/BC) */}
-                           {product.countLabel && (
-                             <div>
-                               <label className={`block text-xs mb-1 ${isCountDisabled ? 'text-gray-400' : 'text-blue-700 dark:text-blue-300'}`}>
-                                 {/* Rename label if stats change */}
-                                 {(isUTDSM || isLXDSeats) ? "Seats" : ((showStatsCheckbox && input.changeInStats) ? "New Stats" : product.countLabel)} 
-                                 {isCountDisabled && ' (Ignored)'}
-                               </label>
-                               <FormattedNumberInput
-                                 value={input.count}
-                                 onChange={(val) => handleInputChange(product.id, 'count', val)}
-                                 onBlur={() => handleInputBlur(product.id, 'count')}
-                                 disabled={isCountDisabled}
-                                 className={`block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums ${isCountDisabled ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''}`}
-                               />
-                             </div>
-                           )}
+                                {/* UTD EE Upgrade Checkbox */}
+                                {showStatsCheckbox && (
+                                  <div className="col-span-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 p-2 rounded flex items-center">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                                      checked={input.changeInStats || false}
+                                      onChange={(e) =>
+                                        handleInputChange(
+                                          product.id,
+                                          "changeInStats",
+                                          e.target.checked,
+                                        )
+                                      }
+                                    />
+                                    <span className="ml-2 text-xs text-purple-700 dark:text-purple-300 font-medium">
+                                      Switching or changing stats?
+                                    </span>
+                                  </div>
+                                )}
 
-                           {/* Discount Input */}
-                           <div className={product.countLabel ? '' : 'col-span-2'}>
-                             <label className="block text-xs text-blue-700 dark:text-blue-300 mb-1">{discountLabel}</label>
-                             <div className={`flex items-center border border-gray-300 dark:border-gray-600 rounded shadow-sm overflow-hidden bg-white dark:bg-gray-700 h-7 ${shouldDisableLXDDiscount ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                               <button 
-                                 type="button" 
-                                 onClick={() => { if(!shouldDisableLXDDiscount) handleInputChange(product.id, 'baseDiscount', Math.max(0, (parseFloat(input.baseDiscount as any) || 0) - 1)) }} 
-                                 className="w-7 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
-                                 disabled={shouldDisableLXDDiscount}
-                               >-</button>
-                               <input
-                                 type="number"
-                                 min="0"
-                                 max="100"
-                                 step="0.01"
-                                 disabled={shouldDisableLXDDiscount}
-                                 className="w-full h-full text-center text-xs p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
-                                 value={input.baseDiscount}
-                                 onChange={(e) => handleInputChange(product.id, 'baseDiscount', e.target.value)}
-                                 style={{ appearance: 'textfield', MozAppearance: 'textfield' }}
-                               />
-                               <button 
-                                 type="button" 
-                                 onClick={() => { if(!shouldDisableLXDDiscount) handleInputChange(product.id, 'baseDiscount', Math.min(100, (parseFloat(input.baseDiscount as any) || 0) + 1)) }} 
-                                 className="w-7 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
-                                 disabled={shouldDisableLXDDiscount}
-                               >+</button>
-                             </div>
-                           </div>
+                                {/* Count Input (HC/BC) */}
+                                {product.countLabel && (
+                                  <div>
+                                    <label
+                                      className={`block text-xs mb-1 ${isCountDisabled ? "text-gray-400" : "text-blue-700 dark:text-blue-300"}`}
+                                    >
+                                      {/* Rename label if stats change */}
+                                      {isUTDSM || isLXDSeats
+                                        ? "Seats"
+                                        : showStatsCheckbox &&
+                                            input.changeInStats
+                                          ? "New Stats"
+                                          : product.countLabel}
+                                      {isCountDisabled && " (Ignored)"}
+                                    </label>
+                                    <FormattedNumberInput
+                                      value={input.count}
+                                      onChange={(val) =>
+                                        handleInputChange(
+                                          product.id,
+                                          "count",
+                                          val,
+                                        )
+                                      }
+                                      onBlur={() =>
+                                        handleInputBlur(product.id, "count")
+                                      }
+                                      disabled={isCountDisabled}
+                                      className={`block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums ${isCountDisabled ? "opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800" : ""}`}
+                                    />
+                                  </div>
+                                )}
+
+                                {/* Discount Input */}
+                                <div
+                                  className={
+                                    product.countLabel ? "" : "col-span-2"
+                                  }
+                                >
+                                  <label className="block text-xs text-blue-700 dark:text-blue-300 mb-1">
+                                    {discountLabel}
+                                  </label>
+                                  <div
+                                    className={`flex items-center border border-gray-300 dark:border-gray-600 rounded shadow-sm overflow-hidden bg-white dark:bg-gray-700 h-7 ${shouldDisableLXDDiscount ? "opacity-50 cursor-not-allowed" : ""}`}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!shouldDisableLXDDiscount)
+                                          handleInputChange(
+                                            product.id,
+                                            "baseDiscount",
+                                            Math.max(
+                                              0,
+                                              (parseFloat(
+                                                input.baseDiscount as any,
+                                              ) || 0) - 1,
+                                            ),
+                                          );
+                                      }}
+                                      className="w-7 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+                                      disabled={shouldDisableLXDDiscount}
+                                    >
+                                      -
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      step="0.01"
+                                      disabled={shouldDisableLXDDiscount}
+                                      className="w-full h-full text-center text-xs p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
+                                      value={input.baseDiscount}
+                                      onChange={(e) =>
+                                        handleInputChange(
+                                          product.id,
+                                          "baseDiscount",
+                                          e.target.value,
+                                        )
+                                      }
+                                      style={{
+                                        appearance: "textfield",
+                                        MozAppearance: "textfield",
+                                      }}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!shouldDisableLXDDiscount)
+                                          handleInputChange(
+                                            product.id,
+                                            "baseDiscount",
+                                            Math.min(
+                                              100,
+                                              (parseFloat(
+                                                input.baseDiscount as any,
+                                              ) || 0) + 1,
+                                            ),
+                                          );
+                                      }}
+                                      className="w-7 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+                                      disabled={shouldDisableLXDDiscount}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
 
-          {/* Section 3: Multi-Year */}
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-5 border border-gray-100 dark:border-gray-700 transition-colors">
-            <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mb-4">3. Structure</h2>
-            <div className="space-y-4">
-               {/* WHT Checkbox */}
-               <div className="flex items-center justify-between">
-                 <div className="flex items-center">
-                    <input 
-                      id="wht-checkbox"
-                      type="checkbox" 
-                      checked={applyWHT} 
-                      onChange={(e) => setApplyWHT(e.target.checked)}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
-                    />
-                    <label htmlFor="wht-checkbox" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Apply WHT (Gross Up)
-                    </label>
-                 </div>
-               </div>
-
-               <div className="flex space-x-4">
-                  <div className="w-1/3">
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Duration</label>
-                    <div className="mt-1 flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 h-9">
-                      <button type="button" onClick={() => setYears(Math.max(1, years - 1))} className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none">-</button>
-                      <input 
-                        type="number" min="1" max="7" 
-                        value={years} 
-                        onChange={(e) => setYears(parseInt(e.target.value) || 1)}
-                        className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
-                        style={{ appearance: 'textfield', MozAppearance: 'textfield' }}
+              {/* Section 3: Multi-Year */}
+              <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-5 border border-gray-100 dark:border-gray-700 transition-colors">
+                <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mb-4">
+                  3. Structure
+                </h2>
+                <div className="space-y-4">
+                  {/* WHT Checkbox */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <input
+                        id="wht-checkbox"
+                        type="checkbox"
+                        checked={applyWHT}
+                        onChange={(e) => setApplyWHT(e.target.checked)}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
                       />
-                      <button type="button" onClick={() => setYears(Math.min(7, years + 1))} className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none">+</button>
+                      <label
+                        htmlFor="wht-checkbox"
+                        className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+                      >
+                        Apply WHT (Gross Up)
+                      </label>
                     </div>
-                 </div>
-                 <div className="w-2/3">
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Method</label>
-                    {showSplitRates ? (
-                      <div className="flex flex-col space-y-2 mt-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300 w-8">UTD:</span>
-                          <div className="flex-1 flex bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded p-1 h-8 ml-2">
-                            <button
-                              type="button"
-                              onClick={() => handleProductMethodChange('utd', PricingMethod.MYFPI)}
-                              className={`flex-1 rounded text-[11px] font-semibold tracking-wide transition-all duration-200 ${productMethods.utd === PricingMethod.MYFPI ? 'bg-white dark:bg-gray-600 text-green-600 dark:text-green-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
-                            >
-                              MYFPI
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleProductMethodChange('utd', PricingMethod.MYPP)}
-                              disabled={dealType === DealType.RENEWAL && !( (productInputs.utd?.variant === 'UTDEE' || productInputs.utd?.variant === 'UTDEE-EAI') && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0))}
-                              className={`flex-1 rounded text-[11px] font-semibold tracking-wide transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${productMethods.utd === PricingMethod.MYPP ? 'bg-white dark:bg-gray-600 text-green-600 dark:text-green-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
-                            >
-                              MYPP
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300 w-8">LXD:</span>
-                          <div className="flex-1 flex bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded p-1 h-8 ml-2">
-                            <button
-                              type="button"
-                              onClick={() => handleProductMethodChange('lxd', PricingMethod.MYFPI)}
-                              className={`flex-1 rounded text-[11px] font-semibold tracking-wide transition-all duration-200 ${productMethods.lxd === PricingMethod.MYFPI ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
-                            >
-                              MYFPI
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleProductMethodChange('lxd', PricingMethod.MYPP)}
-                              className={`flex-1 rounded text-[11px] font-semibold tracking-wide transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${productMethods.lxd === PricingMethod.MYPP ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
-                            >
-                              MYPP
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="mt-1 flex bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md p-1 h-9">
-                        <button
-                          type="button"
-                          onClick={() => handleMethodChange(PricingMethod.MYFPI)}
-                          className={`flex-1 rounded text-xs font-semibold tracking-wide transition-all duration-200 ${method === PricingMethod.MYFPI ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
-                        >
-                          MYFPI
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleMethodChange(PricingMethod.MYPP)}
-                          disabled={dealType === DealType.RENEWAL && selectedProductIds.includes('utd') && !( (productInputs.utd?.variant === 'UTDEE' || productInputs.utd?.variant === 'UTDEE-EAI') && productInputs.utd?.changeInStats && (productInputs.utd?.count || 0) > (productInputs.utd?.existingCount || 0))}
-                          className={`flex-1 rounded text-xs font-semibold tracking-wide transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${method === PricingMethod.MYPP ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
-                        >
-                          MYPP
-                        </button>
-                      </div>
-                    )}
-                 </div>
-               </div>
-               
-               {/* Renewal Uplift Rate (Specific for Renewal Base) - Show for ALL Renewals */}
-               {dealType === DealType.RENEWAL && (
-                 <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
-                    <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-                      Renewal Uplift % (Year 1)
-                    </div>
-                     {showSplitRates ? (
-                       <>
-                         {productMethods.utd !== PricingMethod.MYPP && renderRateInput("UTD Uplift", renewalUpliftUTD, setRenewalUpliftUTD, "Uplift %", "border-blue-200 dark:border-blue-800")}
-                         {productMethods.lxd !== PricingMethod.MYPP && renderRateInput("LXD Uplift", renewalUpliftLXD, setRenewalUpliftLXD, "Uplift %", "border-green-200 dark:border-green-800")}
-                         {((selectedProductIds.includes('utd') && productMethods.utd !== PricingMethod.MYPP && renewalUpliftUTD < 8) || (selectedProductIds.includes('lxd') && productMethods.lxd !== PricingMethod.MYPP && renewalUpliftLXD < 5)) && (
-                           <div className="mt-1 text-[10px] font-bold text-red-600 dark:text-red-400 animate-pulse">
-                             Requires Finance approval
-                           </div>
-                         )}
-                       </>
-                     ) : (
-                       method !== PricingMethod.MYPP && (
-                         <>
-                           {renderRateInput("Uplift", renewalUpliftGlobal, setRenewalUpliftGlobal, "Uplift %")}
-                           {renewalUpliftGlobal < (selectedProductIds.includes('utd') ? 8 : 5) && (
-                             <div className="mt-1 text-[10px] font-bold text-red-600 dark:text-red-400 animate-pulse">
-                               Requires Finance approval
-                             </div>
-                           )}
-                         </>
-                       )
-                     )}
-                 </div>
-               )}
+                  </div>
 
-               {/* Annual Rate Logic */}
-               <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
-                  {/* Conditional Checkbox for Renewal MYFPI */}
-                  {dealType === DealType.RENEWAL && (method === PricingMethod.MYFPI || (showSplitRates && (productMethods.utd === PricingMethod.MYFPI || productMethods.lxd === PricingMethod.MYFPI))) && (
-                     <div className="flex items-center mb-4">
+                  <div className="flex space-x-4">
+                    <div className="w-1/3">
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                        Duration
+                      </label>
+                      <div className="mt-1 flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 h-9">
+                        <button
+                          type="button"
+                          onClick={() => setYears(Math.max(1, years - 1))}
+                          className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+                        >
+                          -
+                        </button>
                         <input
-                           id="apply-annual-rate"
-                           type="checkbox"
-                           checked={applyAnnualRate}
-                           onChange={(e) => setApplyAnnualRate(e.target.checked)}
-                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                          type="number"
+                          min="1"
+                          max="7"
+                          value={years}
+                          onChange={(e) =>
+                            setYears(parseInt(e.target.value) || 1)
+                          }
+                          className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
+                          style={{
+                            appearance: "textfield",
+                            MozAppearance: "textfield",
+                          }}
                         />
-                        <label htmlFor="apply-annual-rate" className="ml-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-                           Apply Annual Increase for Year 2+?
-                        </label>
-                     </div>
+                        <button
+                          type="button"
+                          onClick={() => setYears(Math.min(7, years + 1))}
+                          className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    <div className="w-2/3">
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                        Method
+                      </label>
+                      {showSplitRates ? (
+                        <div className="flex flex-col space-y-2 mt-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-gray-700 dark:text-gray-300 w-8">
+                              UTD:
+                            </span>
+                            <div className="flex-1 flex bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded p-1 h-8 ml-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleProductMethodChange(
+                                    "utd",
+                                    PricingMethod.MYFPI,
+                                  )
+                                }
+                                className={`flex-1 rounded text-[11px] font-semibold tracking-wide transition-all duration-200 ${productMethods.utd === PricingMethod.MYFPI ? "bg-white dark:bg-gray-600 text-green-600 dark:text-green-300 shadow-sm" : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"}`}
+                              >
+                                MYFPI
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleProductMethodChange(
+                                    "utd",
+                                    PricingMethod.MYPP,
+                                  )
+                                }
+                                disabled={
+                                  dealType === DealType.RENEWAL &&
+                                  !(
+                                    (productInputs.utd?.variant === "UTDEE" ||
+                                      productInputs.utd?.variant ===
+                                        "UTDEE-EAI") &&
+                                    productInputs.utd?.changeInStats &&
+                                    (productInputs.utd?.count || 0) >
+                                      (productInputs.utd?.existingCount || 0)
+                                  )
+                                }
+                                className={`flex-1 rounded text-[11px] font-semibold tracking-wide transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${productMethods.utd === PricingMethod.MYPP ? "bg-white dark:bg-gray-600 text-green-600 dark:text-green-300 shadow-sm" : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"}`}
+                              >
+                                MYPP
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-gray-700 dark:text-gray-300 w-8">
+                              LXD:
+                            </span>
+                            <div className="flex-1 flex bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded p-1 h-8 ml-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleProductMethodChange(
+                                    "lxd",
+                                    PricingMethod.MYFPI,
+                                  )
+                                }
+                                className={`flex-1 rounded text-[11px] font-semibold tracking-wide transition-all duration-200 ${productMethods.lxd === PricingMethod.MYFPI ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-300 shadow-sm" : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"}`}
+                              >
+                                MYFPI
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleProductMethodChange(
+                                    "lxd",
+                                    PricingMethod.MYPP,
+                                  )
+                                }
+                                className={`flex-1 rounded text-[11px] font-semibold tracking-wide transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${productMethods.lxd === PricingMethod.MYPP ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-300 shadow-sm" : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"}`}
+                              >
+                                MYPP
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-1 flex bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md p-1 h-9">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleMethodChange(PricingMethod.MYFPI)
+                            }
+                            className={`flex-1 rounded text-xs font-semibold tracking-wide transition-all duration-200 ${method === PricingMethod.MYFPI ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-300 shadow-sm" : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"}`}
+                          >
+                            MYFPI
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleMethodChange(PricingMethod.MYPP)
+                            }
+                            disabled={
+                              dealType === DealType.RENEWAL &&
+                              selectedProductIds.includes("utd") &&
+                              !(
+                                (productInputs.utd?.variant === "UTDEE" ||
+                                  productInputs.utd?.variant === "UTDEE-EAI") &&
+                                productInputs.utd?.changeInStats &&
+                                (productInputs.utd?.count || 0) >
+                                  (productInputs.utd?.existingCount || 0)
+                              )
+                            }
+                            className={`flex-1 rounded text-xs font-semibold tracking-wide transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${method === PricingMethod.MYPP ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-300 shadow-sm" : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"}`}
+                          >
+                            MYPP
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Renewal Uplift Rate (Specific for Renewal Base) - Show for ALL Renewals */}
+                  {dealType === DealType.RENEWAL && (
+                    <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
+                      <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+                        Renewal Uplift % (Year 1)
+                      </div>
+                      {showSplitRates ? (
+                        <>
+                          {productMethods.utd !== PricingMethod.MYPP &&
+                            renderRateInput(
+                              "UTD Uplift",
+                              renewalUpliftUTD,
+                              setRenewalUpliftUTD,
+                              "Uplift %",
+                              "border-blue-200 dark:border-blue-800",
+                            )}
+                          {productMethods.lxd !== PricingMethod.MYPP &&
+                            renderRateInput(
+                              "LXD Uplift",
+                              renewalUpliftLXD,
+                              setRenewalUpliftLXD,
+                              "Uplift %",
+                              "border-green-200 dark:border-green-800",
+                            )}
+                          {((selectedProductIds.includes("utd") &&
+                            productMethods.utd !== PricingMethod.MYPP &&
+                            renewalUpliftUTD < 8) ||
+                            (selectedProductIds.includes("lxd") &&
+                              productMethods.lxd !== PricingMethod.MYPP &&
+                              renewalUpliftLXD < 5)) && (
+                            <div className="mt-1 text-[10px] font-bold text-red-600 dark:text-red-400 animate-pulse">
+                              Requires Finance approval
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        method !== PricingMethod.MYPP && (
+                          <>
+                            {renderRateInput(
+                              "Uplift",
+                              renewalUpliftGlobal,
+                              setRenewalUpliftGlobal,
+                              "Uplift %",
+                            )}
+                            {renewalUpliftGlobal <
+                              (selectedProductIds.includes("utd") ? 8 : 5) && (
+                              <div className="mt-1 text-[10px] font-bold text-red-600 dark:text-red-400 animate-pulse">
+                                Requires Finance approval
+                              </div>
+                            )}
+                          </>
+                        )
+                      )}
+                    </div>
                   )}
 
-                  {/* Render Inputs if condition met */}
-                  {shouldShowAnnualRateInputs && (
+                  {/* Annual Rate Logic */}
+                  <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
+                    {/* Conditional Checkbox for Renewal MYFPI */}
+                    {dealType === DealType.RENEWAL &&
+                      (method === PricingMethod.MYFPI ||
+                        (showSplitRates &&
+                          (productMethods.utd === PricingMethod.MYFPI ||
+                            productMethods.lxd === PricingMethod.MYFPI))) && (
+                        <div className="flex items-center mb-4">
+                          <input
+                            id="apply-annual-rate"
+                            type="checkbox"
+                            checked={applyAnnualRate}
+                            onChange={(e) =>
+                              setApplyAnnualRate(e.target.checked)
+                            }
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                          />
+                          <label
+                            htmlFor="apply-annual-rate"
+                            className="ml-2 text-xs font-medium text-gray-700 dark:text-gray-300"
+                          >
+                            Apply Annual Increase for Year 2+?
+                          </label>
+                        </div>
+                      )}
+
+                    {/* Render Inputs if condition met */}
+                    {shouldShowAnnualRateInputs && (
                       <>
                         <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-                            {getAnnualRateLabel()}
+                          {getAnnualRateLabel()}
                         </div>
                         {showSplitRates ? (
-                            <>
-                              {isUtdRateVisible && renderRateInput("UTD Rate", utdRateVal, setUtdRateVal, productMethods.utd === PricingMethod.MYPP ? "Reverse %" : "Annual %", "border-blue-200 dark:border-blue-800")}
-                              {isLxdRateVisible && renderRateInput("LXD Rate", lxdRateVal, setLxdRateVal, productMethods.lxd === PricingMethod.MYPP ? "Reverse %" : "Annual %", "border-green-200 dark:border-green-800")}
-                            </>
-                          ) : (
-                            isUtdRateVisible && renderRateInput("Rate", globalRateVal, setGlobalRateVal, method === PricingMethod.MYPP ? "Reverse %" : "Annual %")
+                          <>
+                            {isUtdRateVisible &&
+                              renderRateInput(
+                                "UTD Rate",
+                                utdRateVal,
+                                setUtdRateVal,
+                                productMethods.utd === PricingMethod.MYPP
+                                  ? "Reverse %"
+                                  : "Annual %",
+                                "border-blue-200 dark:border-blue-800",
+                              )}
+                            {isLxdRateVisible &&
+                              renderRateInput(
+                                "LXD Rate",
+                                lxdRateVal,
+                                setLxdRateVal,
+                                productMethods.lxd === PricingMethod.MYPP
+                                  ? "Reverse %"
+                                  : "Annual %",
+                                "border-green-200 dark:border-green-800",
+                              )}
+                          </>
+                        ) : (
+                          isUtdRateVisible &&
+                          renderRateInput(
+                            "Rate",
+                            globalRateVal,
+                            setGlobalRateVal,
+                            method === PricingMethod.MYPP
+                              ? "Reverse %"
+                              : "Annual %",
+                          )
                         )}
-                        
+
                         {/* Exception Form Alert */}
                         {(() => {
-                            let showExceptionAlert = false;
-                            if (showSplitRates) {
-                                if (productMethods.utd === PricingMethod.MYPP) {
-                                    if (utdRateVal < 8 || utdRateVal > 25) showExceptionAlert = true;
-                                } else if (productMethods.utd === PricingMethod.MYFPI) {
-                                    if (utdRateVal < 8) showExceptionAlert = true;
-                                }
-                                
-                                if (productMethods.lxd === PricingMethod.MYPP) {
-                                    if (lxdRateVal < 5 || lxdRateVal > 25) showExceptionAlert = true;
-                                } else if (productMethods.lxd === PricingMethod.MYFPI) {
-                                    if (lxdRateVal < 5) showExceptionAlert = true;
-                                }
-                            } else {
-                                if (method === PricingMethod.MYPP) {
-                                    if (globalRateVal < (selectedProductIds.includes('utd') ? 8 : 5) || globalRateVal > 25) showExceptionAlert = true;
-                                } else if (method === PricingMethod.MYFPI) {
-                                    if (selectedProductIds.includes('utd') && globalRateVal < 8) showExceptionAlert = true;
-                                    if (selectedProductIds.includes('lxd') && !selectedProductIds.includes('utd') && globalRateVal < 5) showExceptionAlert = true;
-                                }
+                          let showExceptionAlert = false;
+                          if (showSplitRates) {
+                            if (productMethods.utd === PricingMethod.MYPP) {
+                              if (utdRateVal < 8 || utdRateVal > 25)
+                                showExceptionAlert = true;
+                            } else if (
+                              productMethods.utd === PricingMethod.MYFPI
+                            ) {
+                              if (utdRateVal < 8) showExceptionAlert = true;
                             }
-                            
-                            if (showExceptionAlert) {
-                                return (
-                                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700 font-medium">
-                                        Exception Form is required for this discount
-                                    </div>
-                                );
+
+                            if (productMethods.lxd === PricingMethod.MYPP) {
+                              if (lxdRateVal < 5 || lxdRateVal > 25)
+                                showExceptionAlert = true;
+                            } else if (
+                              productMethods.lxd === PricingMethod.MYFPI
+                            ) {
+                              if (lxdRateVal < 5) showExceptionAlert = true;
                             }
-                            return null;
+                          } else {
+                            if (method === PricingMethod.MYPP) {
+                              if (
+                                globalRateVal <
+                                  (selectedProductIds.includes("utd")
+                                    ? 8
+                                    : 5) ||
+                                globalRateVal > 25
+                              )
+                                showExceptionAlert = true;
+                            } else if (method === PricingMethod.MYFPI) {
+                              if (
+                                selectedProductIds.includes("utd") &&
+                                globalRateVal < 8
+                              )
+                                showExceptionAlert = true;
+                              if (
+                                selectedProductIds.includes("lxd") &&
+                                !selectedProductIds.includes("utd") &&
+                                globalRateVal < 5
+                              )
+                                showExceptionAlert = true;
+                            }
+                          }
+
+                          if (showExceptionAlert) {
+                            return (
+                              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700 font-medium">
+                                Exception Form is required for this discount
+                              </div>
+                            );
+                          }
+                          return null;
                         })()}
 
                         {/* MYPP Threshold Alert */}
                         {(() => {
-                            const y1Breakdown = results?.yearlyResults?.[0]?.breakdown || [];
-                            const alerts = [];
-                            
-                            if (showSplitRates) {
-                                if (productMethods.utd === PricingMethod.MYPP) {
-                                    const utdY1 = y1Breakdown.find((p: any) => p.id === 'utd')?.net || 0;
-                                    if (utdY1 < 10000) alerts.push("UTD MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.");
-                                }
-                                if (productMethods.lxd === PricingMethod.MYPP) {
-                                    const lxdY1 = y1Breakdown.find((p: any) => p.id === 'lxd')?.net || 0;
-                                    if (lxdY1 < 10000) alerts.push("LXD MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.");
-                                }
-                            } else {
-                                if (method === PricingMethod.MYPP) {
-                                    selectedProductIds.forEach(pid => {
-                                        const y1 = y1Breakdown.find((p: any) => p.id === pid)?.net || 0;
-                                        if (y1 < 10000) {
-                                            const name = (metadata?.availableProducts || []).find(p => p.id === pid)?.shortName || pid.toUpperCase();
-                                            alerts.push(`${name} MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.`);
-                                        }
-                                    });
-                                }
-                            }
-                            
-                            if (alerts.length > 0) {
-                                return (
-                                    <div className="mt-2 space-y-1">
-                                        {alerts.map((alert, idx) => (
-                                            <div key={idx} className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 font-medium">
-                                                {alert}
-                                            </div>
-                                        ))}
-                                    </div>
+                          const y1Breakdown =
+                            results?.yearlyResults?.[0]?.breakdown || [];
+                          const alerts = [];
+
+                          if (showSplitRates) {
+                            if (productMethods.utd === PricingMethod.MYPP) {
+                              const utdY1 =
+                                y1Breakdown.find((p: any) => p.id === "utd")
+                                  ?.net || 0;
+                              if (utdY1 < 10000)
+                                alerts.push(
+                                  "UTD MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.",
                                 );
                             }
-                            return null;
+                            if (productMethods.lxd === PricingMethod.MYPP) {
+                              const lxdY1 =
+                                y1Breakdown.find((p: any) => p.id === "lxd")
+                                  ?.net || 0;
+                              if (lxdY1 < 10000)
+                                alerts.push(
+                                  "LXD MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.",
+                                );
+                            }
+                          } else {
+                            if (method === PricingMethod.MYPP) {
+                              selectedProductIds.forEach((pid) => {
+                                const y1 =
+                                  y1Breakdown.find((p: any) => p.id === pid)
+                                    ?.net || 0;
+                                if (y1 < 10000) {
+                                  const name =
+                                    (metadata?.availableProducts || []).find(
+                                      (p) => p.id === pid,
+                                    )?.shortName || pid.toUpperCase();
+                                  alerts.push(
+                                    `${name} MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.`,
+                                  );
+                                }
+                              });
+                            }
+                          }
+
+                          if (alerts.length > 0) {
+                            return (
+                              <div className="mt-2 space-y-1">
+                                {alerts.map((alert, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 font-medium"
+                                  >
+                                    {alert}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }
+                          return null;
                         })()}
                       </>
-                  )}
-               </div>
+                    )}
+                  </div>
 
-               {/* Flat Pricing Checkbox (Moved Here) */}
-               {years > 1 && (
-                 <div className="mt-4">
-                    <div className="flex items-center">
-                        <input 
+                  {/* Flat Pricing Checkbox (Moved Here) */}
+                  {years > 1 && (
+                    <div className="mt-4">
+                      <div className="flex items-center">
+                        <input
                           id="flat-pricing-checkbox"
-                          type="checkbox" 
-                          checked={flatPricing} 
+                          type="checkbox"
+                          checked={flatPricing}
                           onChange={(e) => setFlatPricing(e.target.checked)}
                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
                         />
-                        <label htmlFor="flat-pricing-checkbox" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label
+                          htmlFor="flat-pricing-checkbox"
+                          className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >
                           Flat Pricing
                         </label>
-                    </div>
-                    {flatPricing && (
+                      </div>
+                      {flatPricing && (
                         <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600 font-medium">
-                            This option requires RL and Finance approvals
+                          This option requires RL and Finance approvals
                         </div>
-                    )}
-                 </div>
-               )}
+                      )}
+                    </div>
+                  )}
 
-               {/* Rounding Checkbox */}
-               <div className="flex items-center mt-2">
-                  <input 
-                    id="rounding-checkbox"
-                    type="checkbox" 
-                    checked={rounding} 
-                    onChange={(e) => setRounding(e.target.checked)}
-                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
-                  />
-                  <label htmlFor="rounding-checkbox" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Round up prices?
-                  </label>
-               </div>
-            </div>
-            </div>
+                  {/* Rounding Checkbox */}
+                  <div className="flex items-center mt-2">
+                    <input
+                      id="rounding-checkbox"
+                      type="checkbox"
+                      checked={rounding}
+                      onChange={(e) => setRounding(e.target.checked)}
+                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                    />
+                    <label
+                      htmlFor="rounding-checkbox"
+                      className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      Round up prices?
+                    </label>
+                  </div>
+                </div>
+              </div>
             </>
           )}
         </div>
 
         {/* Right Column: Output */}
         <div className="xl:col-span-2 space-y-6 xl:sticky xl:top-24 h-fit">
-          
           {isExtensionQuote && !extensionResults && (
             <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-12 flex flex-col items-center justify-center border border-gray-200 dark:border-gray-700">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
-              <p className="text-gray-500 dark:text-gray-400">Calculating extension...</p>
+              <p className="text-gray-500 dark:text-gray-400">
+                Calculating extension...
+              </p>
             </div>
           )}
 
           {isExtensionQuote && extensionResults && (
             <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 transition-colors">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-white">Extension Quote Results</h3>
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white">
+                  Extension Quote Results
+                </h3>
                 <div className="text-xs font-sans tabular-nums text-gray-500 dark:text-gray-400">
                   1 USD = {sarRate} SAR
                 </div>
               </div>
-              
+
               <div className="p-6 space-y-6">
-                {extensionResults.type === 'A' && (
+                {extensionResults.type === "A" && (
                   <>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-100 dark:border-gray-600">
-                        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Extension Value</div>
-                        <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.customerExtension, 'USD')}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                          Extension Value
+                        </div>
+                        <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                          {formatCurrency(
+                            extensionResults.customerExtension,
+                            "USD",
+                          )}
+                        </div>
                       </div>
                       {extensionResults.useFullExtension ? (
                         <>
                           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800 col-span-3">
                             <div className="flex items-center justify-between mb-1">
-                              <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">Extension Duration</div>
+                              <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">
+                                Extension Duration
+                              </div>
                               <div className="flex space-x-2">
-                                <button 
+                                <button
                                   onClick={() => {
-                                    const targetMonths = Math.max(1, extensionResults.integerMonths - (extensionResults.extraDays === 0 ? 1 : 0));
-                                    const newPercentage = extensionResults.customerTCV > 0 ? (targetMonths * extensionResults.monthlyCost) / extensionResults.customerTCV * 100 : 0;
+                                    const targetMonths = Math.max(
+                                      1,
+                                      extensionResults.integerMonths -
+                                        (extensionResults.extraDays === 0
+                                          ? 1
+                                          : 0),
+                                    );
+                                    const newPercentage =
+                                      extensionResults.customerTCV > 0
+                                        ? ((targetMonths *
+                                            extensionResults.monthlyCost) /
+                                            extensionResults.customerTCV) *
+                                          100
+                                        : 0;
                                     setExtensionPercentage(newPercentage);
                                   }}
                                   className="p-1 bg-blue-100 dark:bg-blue-800 hover:bg-blue-200 dark:hover:bg-blue-700 rounded text-blue-700 dark:text-blue-200 transition-colors"
                                   title="Previous Month"
                                 >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      d="M15 19l-7-7 7-7"
+                                    ></path>
+                                  </svg>
                                 </button>
-                                <button 
+                                <button
                                   onClick={() => {
-                                    const targetMonths = extensionResults.integerMonths + 1;
-                                    const newPercentage = extensionResults.customerTCV > 0 ? (targetMonths * extensionResults.monthlyCost) / extensionResults.customerTCV * 100 : 0;
+                                    const targetMonths =
+                                      extensionResults.integerMonths + 1;
+                                    const newPercentage =
+                                      extensionResults.customerTCV > 0
+                                        ? ((targetMonths *
+                                            extensionResults.monthlyCost) /
+                                            extensionResults.customerTCV) *
+                                          100
+                                        : 0;
                                     setExtensionPercentage(newPercentage);
                                   }}
                                   className="p-1 bg-blue-100 dark:bg-blue-800 hover:bg-blue-200 dark:hover:bg-blue-700 rounded text-blue-700 dark:text-blue-200 transition-colors"
                                   title="Next Month"
                                 >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      d="M9 5l7 7-7 7"
+                                    ></path>
+                                  </svg>
                                 </button>
                               </div>
                             </div>
                             <div className="text-xl font-bold text-blue-700 dark:text-blue-300 font-sans">
-                              {extensionResults.days} days - equivalent to {extensionResults.integerMonths} months and {extensionResults.extraDays} days
+                              {extensionResults.days} days - equivalent to{" "}
+                              {extensionResults.integerMonths} months and{" "}
+                              {extensionResults.extraDays} days
                             </div>
                             <div className="text-sm text-blue-600 dark:text-blue-400 mt-2 space-y-2">
                               <div className="flex items-center justify-between">
-                                <span>{extensionResults.integerMonths} months = {extensionResults.percentageLess?.toFixed(2)}% of TCV</span>
-                                <button 
-                                  onClick={() => setExtensionPercentage(extensionResults.percentageLess || 0)}
+                                <span>
+                                  {extensionResults.integerMonths} months ={" "}
+                                  {extensionResults.percentageLess?.toFixed(2)}%
+                                  of TCV
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    setExtensionPercentage(
+                                      extensionResults.percentageLess || 0,
+                                    )
+                                  }
                                   className="text-xs bg-blue-100 dark:bg-blue-800 hover:bg-blue-200 dark:hover:bg-blue-700 text-blue-700 dark:text-blue-200 px-2 py-1 rounded transition-colors"
                                 >
-                                  Use {extensionResults.percentageLess?.toFixed(2)}%
+                                  Use{" "}
+                                  {extensionResults.percentageLess?.toFixed(2)}%
                                 </button>
                               </div>
                               <div className="flex items-center justify-between">
-                                <span>{extensionResults.integerMonths + 1} months = {extensionResults.percentageMore?.toFixed(2)}% of TCV</span>
-                                <button 
-                                  onClick={() => setExtensionPercentage(extensionResults.percentageMore || 0)}
+                                <span>
+                                  {extensionResults.integerMonths + 1} months ={" "}
+                                  {extensionResults.percentageMore?.toFixed(2)}%
+                                  of TCV
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    setExtensionPercentage(
+                                      extensionResults.percentageMore || 0,
+                                    )
+                                  }
                                   className="text-xs bg-blue-100 dark:bg-blue-800 hover:bg-blue-200 dark:hover:bg-blue-700 text-blue-700 dark:text-blue-200 px-2 py-1 rounded transition-colors"
                                 >
-                                  Use {extensionResults.percentageMore?.toFixed(2)}%
+                                  Use{" "}
+                                  {extensionResults.percentageMore?.toFixed(2)}%
                                 </button>
                               </div>
                             </div>
@@ -1425,54 +2140,143 @@ const App: React.FC = () => {
                       ) : (
                         <>
                           <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-100 dark:border-gray-600">
-                            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Available Months</div>
-                            <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{extensionResults.monthsAvailable.toFixed(2)}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                              Available Months
+                            </div>
+                            <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                              {extensionResults.monthsAvailable.toFixed(2)}
+                            </div>
                           </div>
                           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
-                            <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">Extension Months</div>
-                            <div className="text-xl font-bold text-blue-700 dark:text-blue-300 font-sans">{extensionResults.integerMonths}</div>
+                            <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">
+                              Extension Months
+                            </div>
+                            <div className="text-xl font-bold text-blue-700 dark:text-blue-300 font-sans">
+                              {extensionResults.integerMonths}
+                            </div>
                           </div>
                           <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800">
-                            <div className="text-xs text-purple-600 dark:text-purple-400 uppercase font-sans">FPI %</div>
-                            <div className="text-xl font-bold text-purple-700 dark:text-purple-300 font-sans">{extensionResults.fpiPercentage?.toFixed(2) || '0.00'}%</div>
+                            <div className="text-xs text-purple-600 dark:text-purple-400 uppercase font-sans">
+                              FPI %
+                            </div>
+                            <div className="text-xl font-bold text-purple-700 dark:text-purple-300 font-sans">
+                              {extensionResults.fpiPercentage?.toFixed(2) ||
+                                "0.00"}
+                              %
+                            </div>
                           </div>
                         </>
                       )}
                     </div>
 
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                      <h4 className="text-sm font-bold text-gray-800 dark:text-white mb-3 font-sans">Pricing Breakdown</h4>
+                      <h4 className="text-sm font-bold text-gray-800 dark:text-white mb-3 font-sans">
+                        Pricing Breakdown
+                      </h4>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-blue-500 dark:border-blue-400">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">End-User Price</div>
-                          <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.endUserPrice, 'USD')}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                            End-User Price
+                          </div>
+                          <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                            {formatCurrency(
+                              extensionResults.endUserPrice,
+                              "USD",
+                            )}
+                          </div>
                           {isIndirect && (
                             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                              <div>SAR: {formatCurrency(extensionResults.endUserPrice * sarRate, 'SAR')}</div>
-                              <div>VAT (15%): {formatCurrency(extensionResults.endUserPrice * sarRate * 0.15, 'SAR')}</div>
-                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.endUserPrice * sarRate * 1.15, 'SAR')}</div>
+                              <div>
+                                SAR:{" "}
+                                {formatCurrency(
+                                  extensionResults.endUserPrice * sarRate,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div>
+                                VAT (15%):{" "}
+                                {formatCurrency(
+                                  extensionResults.endUserPrice *
+                                    sarRate *
+                                    0.15,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">
+                                Total:{" "}
+                                {formatCurrency(
+                                  extensionResults.endUserPrice *
+                                    sarRate *
+                                    1.15,
+                                  "SAR",
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
                         <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-orange-500 dark:border-orange-400">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Reseller Fees</div>
-                          <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.commission, 'USD')}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                            Reseller Fees
+                          </div>
+                          <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                            {formatCurrency(extensionResults.commission, "USD")}
+                          </div>
                           {isIndirect && (
                             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                              <div>SAR: {formatCurrency(extensionResults.commission * sarRate, 'SAR')}</div>
-                              <div>VAT (15%): {formatCurrency(extensionResults.commission * sarRate * 0.15, 'SAR')}</div>
-                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.commission * sarRate * 1.15, 'SAR')}</div>
+                              <div>
+                                SAR:{" "}
+                                {formatCurrency(
+                                  extensionResults.commission * sarRate,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div>
+                                VAT (15%):{" "}
+                                {formatCurrency(
+                                  extensionResults.commission * sarRate * 0.15,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">
+                                Total:{" "}
+                                {formatCurrency(
+                                  extensionResults.commission * sarRate * 1.15,
+                                  "SAR",
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
                         <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-gray-500 dark:border-gray-400">
-                          <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">Net Price</div>
-                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(extensionResults.netPrice, 'USD')}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">
+                            Net Price
+                          </div>
+                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">
+                            {formatCurrency(extensionResults.netPrice, "USD")}
+                          </div>
                           {isIndirect && (
                             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                              <div>SAR: {formatCurrency(extensionResults.netPrice * sarRate, 'SAR')}</div>
-                              <div>VAT (15%): {formatCurrency(extensionResults.netPrice * sarRate * 0.15, 'SAR')}</div>
-                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.netPrice * sarRate * 1.15, 'SAR')}</div>
+                              <div>
+                                SAR:{" "}
+                                {formatCurrency(
+                                  extensionResults.netPrice * sarRate,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div>
+                                VAT (15%):{" "}
+                                {formatCurrency(
+                                  extensionResults.netPrice * sarRate * 0.15,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">
+                                Total:{" "}
+                                {formatCurrency(
+                                  extensionResults.netPrice * sarRate * 1.15,
+                                  "SAR",
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -1481,52 +2285,150 @@ const App: React.FC = () => {
                   </>
                 )}
 
-                {extensionResults.type === 'B' && (
+                {extensionResults.type === "B" && (
                   <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-100 dark:border-gray-600">
-                        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Monthly Cost (SAR)</div>
-                        <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.monthlyCostSAR, 'SAR')}</div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-100 dark:border-gray-600 animate-fade-in">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                          Monthly Cost (SAR)
+                        </div>
+                        <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                          {formatCurrency(
+                            extensionResults.monthlyCostSAR,
+                            "SAR",
+                          )}
+                        </div>
                       </div>
-                      <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
-                        <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">Eligible Months (&lt;100k SAR)</div>
-                        <div className="text-xl font-bold text-blue-700 dark:text-blue-300 font-sans">{extensionResults.monthsCovered}</div>
+                      <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800 animate-fade-in">
+                        <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">
+                          Eligible Months (&lt;100k SAR)
+                        </div>
+                        <div className="text-xl font-bold text-blue-700 dark:text-blue-300 font-sans">
+                          {extensionResults.monthsCovered}
+                        </div>
+                        <div className="text-[10px] text-blue-500/80 mt-1 dark:text-blue-400/80 font-mono">
+                          Exact fraction: {extensionResults.monthsAvailable?.toFixed(2)} months
+                        </div>
+                      </div>
+                      <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800 animate-fade-in">
+                        <div className="text-xs text-purple-600 dark:text-purple-400 uppercase font-sans">
+                          FPI % Applied
+                        </div>
+                        <div className="text-xl font-bold text-purple-700 dark:text-purple-300 font-sans">
+                          {(extensionResults.fpiPercentage || 0).toFixed(2)}%
+                        </div>
                       </div>
                     </div>
 
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                      <h4 className="text-sm font-bold text-gray-800 dark:text-white mb-3 font-sans">Pricing Breakdown (for {extensionResults.monthsCovered} months)</h4>
+                      <h4 className="text-sm font-bold text-gray-800 dark:text-white mb-3 font-sans">
+                        Pricing Breakdown (for {extensionResults.monthsCovered}{" "}
+                        months)
+                      </h4>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-blue-500 dark:border-blue-400">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">End-User Price</div>
-                          <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.endUserPrice, 'USD')}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                            End-User Price
+                          </div>
+                          <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                            {formatCurrency(
+                              extensionResults.endUserPrice,
+                              "USD",
+                            )}
+                          </div>
                           {isIndirect && (
                             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                              <div>SAR: {formatCurrency(extensionResults.endUserPrice * sarRate, 'SAR')}</div>
-                              <div>VAT (15%): {formatCurrency(extensionResults.endUserPrice * sarRate * 0.15, 'SAR')}</div>
-                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.endUserPrice * sarRate * 1.15, 'SAR')}</div>
+                              <div>
+                                SAR:{" "}
+                                {formatCurrency(
+                                  extensionResults.endUserPrice * sarRate,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div>
+                                VAT (15%):{" "}
+                                {formatCurrency(
+                                  extensionResults.endUserPrice *
+                                    sarRate *
+                                    0.15,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">
+                                Total:{" "}
+                                {formatCurrency(
+                                  extensionResults.endUserPrice *
+                                    sarRate *
+                                    1.15,
+                                  "SAR",
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
                         <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-orange-500 dark:border-orange-400">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Reseller Fees</div>
-                          <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(extensionResults.commission, 'USD')}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                            Reseller Fees
+                          </div>
+                          <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                            {formatCurrency(extensionResults.commission, "USD")}
+                          </div>
                           {isIndirect && (
                             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                              <div>SAR: {formatCurrency(extensionResults.commission * sarRate, 'SAR')}</div>
-                              <div>VAT (15%): {formatCurrency(extensionResults.commission * sarRate * 0.15, 'SAR')}</div>
-                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.commission * sarRate * 1.15, 'SAR')}</div>
+                              <div>
+                                SAR:{" "}
+                                {formatCurrency(
+                                  extensionResults.commission * sarRate,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div>
+                                VAT (15%):{" "}
+                                {formatCurrency(
+                                  extensionResults.commission * sarRate * 0.15,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">
+                                Total:{" "}
+                                {formatCurrency(
+                                  extensionResults.commission * sarRate * 1.15,
+                                  "SAR",
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
                         <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-gray-500 dark:border-gray-400">
-                          <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">Net Price</div>
-                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(extensionResults.netPrice, 'USD')}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">
+                            Net Price
+                          </div>
+                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">
+                            {formatCurrency(extensionResults.netPrice, "USD")}
+                          </div>
                           {isIndirect && (
                             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                              <div>SAR: {formatCurrency(extensionResults.netPrice * sarRate, 'SAR')}</div>
-                              <div>VAT (15%): {formatCurrency(extensionResults.netPrice * sarRate * 0.15, 'SAR')}</div>
-                              <div className="font-bold text-gray-700 dark:text-gray-300">Total: {formatCurrency(extensionResults.netPrice * sarRate * 1.15, 'SAR')}</div>
+                              <div>
+                                SAR:{" "}
+                                {formatCurrency(
+                                  extensionResults.netPrice * sarRate,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div>
+                                VAT (15%):{" "}
+                                {formatCurrency(
+                                  extensionResults.netPrice * sarRate * 0.15,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">
+                                Total:{" "}
+                                {formatCurrency(
+                                  extensionResults.netPrice * sarRate * 1.15,
+                                  "SAR",
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -1541,272 +2443,389 @@ const App: React.FC = () => {
           {!isExtensionQuote && !results && (
             <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-12 flex flex-col items-center justify-center border border-gray-200 dark:border-gray-700">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
-              <p className="text-gray-500 dark:text-gray-400">Calculating pricing...</p>
+              <p className="text-gray-500 dark:text-gray-400">
+                Calculating pricing...
+              </p>
             </div>
           )}
 
           {!isExtensionQuote && results && (
             <>
-          <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 transition-colors">
-             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-white">Commercial Schedule</h3>
-                {isIndirect && (
-                  <div className="text-xs font-sans tabular-nums text-gray-500 dark:text-gray-400">
-                     1 USD = {metadata?.exchangeRateSAR || '...'} SAR
-                  </div>
-                )}
-             </div>
-             
-             <div className="overflow-x-auto">
-               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-100 dark:bg-gray-700">
-                     <tr>
-                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">Year</th>
-                        
+              <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 transition-colors">
+                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-gray-800 dark:text-white">
+                    Commercial Schedule
+                  </h3>
+                  {isIndirect && (
+                    <div className="text-xs font-sans tabular-nums text-gray-500 dark:text-gray-400">
+                      1 USD = {metadata?.exchangeRateSAR || "..."} SAR
+                    </div>
+                  )}
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-100 dark:bg-gray-700">
+                      <tr>
+                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">
+                          Year
+                        </th>
+
                         {/* Dynamic Product Columns - Gross USD */}
-                        {selectedProductIds.map(pid => {
-                           const p = (metadata?.availableProducts || []).find((x: any) => x.id === pid);
-                           const colorClass = pid === 'utd' ? 'text-green-600 dark:text-green-300 bg-green-50 dark:bg-green-900/20' : 'text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20';
-                           return (
-                             <th key={pid} className={`px-4 py-3 text-center text-xs font-bold uppercase whitespace-nowrap ${colorClass}`}>
-                               {p?.shortName || p?.name} (USD)
-                             </th>
-                           );
+                        {selectedProductIds.map((pid) => {
+                          const p = (metadata?.availableProducts || []).find(
+                            (x: any) => x.id === pid,
+                          );
+                          const colorClass =
+                            pid === "utd"
+                              ? "text-green-600 dark:text-green-300 bg-green-50 dark:bg-green-900/20"
+                              : "text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20";
+                          return (
+                            <th
+                              key={pid}
+                              className={`px-4 py-3 text-center text-xs font-bold uppercase whitespace-nowrap ${colorClass}`}
+                            >
+                              {p?.shortName || p?.name} (USD)
+                            </th>
+                          );
                         })}
 
                         {/* Always show USD Total */}
                         <th className="px-4 py-3 text-center text-xs font-bold text-orange-800 dark:text-orange-200 uppercase bg-orange-100 dark:bg-orange-900/40 whitespace-nowrap">
-                           Total (USD)
+                          Total (USD)
                         </th>
 
                         {/* Dynamic Product Columns - Gross SAR (Indirect only) */}
-                        {isIndirect && selectedProductIds.map(pid => {
-                            const p = (metadata?.availableProducts || []).find(x => x.id === pid);
-                            const colorClass = pid === 'utd' ? 'text-green-600 dark:text-green-300 bg-green-50/50 dark:bg-green-900/10' : 'text-blue-600 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-900/10';
+                        {isIndirect &&
+                          selectedProductIds.map((pid) => {
+                            const p = (metadata?.availableProducts || []).find(
+                              (x) => x.id === pid,
+                            );
+                            const colorClass =
+                              pid === "utd"
+                                ? "text-green-600 dark:text-green-300 bg-green-50/50 dark:bg-green-900/10"
+                                : "text-blue-600 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-900/10";
                             return (
-                              <th key={`${pid}-sar`} className={`px-4 py-3 text-center text-xs font-bold uppercase whitespace-nowrap ${colorClass}`}>
+                              <th
+                                key={`${pid}-sar`}
+                                className={`px-4 py-3 text-center text-xs font-bold uppercase whitespace-nowrap ${colorClass}`}
+                              >
                                 {p?.shortName || p?.name} (SAR)
                               </th>
                             );
-                        })}
+                          })}
 
                         {/* Conditionally show SAR Total */}
                         {isIndirect && (
                           <th className="px-4 py-3 text-center text-xs font-bold text-orange-800 dark:text-orange-200 uppercase bg-orange-100 dark:bg-orange-900/40 whitespace-nowrap">
-                             Total (SAR)
+                            Total (SAR)
                           </th>
                         )}
 
                         {/* New VAT and Grand Total Columns for Indirect */}
                         {isIndirect && (
                           <>
-                             <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase bg-yellow-50 dark:bg-yellow-900/20 whitespace-nowrap">
-                               VAT (15%)
-                             </th>
-                             <th className="px-4 py-3 text-center text-xs font-bold text-gray-900 dark:text-gray-100 uppercase bg-yellow-200 dark:bg-yellow-900/60">
-                               Grand Total<br/>(SAR)
-                             </th>
+                            <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase bg-yellow-50 dark:bg-yellow-900/20 whitespace-nowrap">
+                              VAT (15%)
+                            </th>
+                            <th className="px-4 py-3 text-center text-xs font-bold text-gray-900 dark:text-gray-100 uppercase bg-yellow-200 dark:bg-yellow-900/60">
+                              Grand Total
+                              <br />
+                              (SAR)
+                            </th>
                           </>
                         )}
 
-                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">Recognized<br/>Total (USD)</th>
-                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
-                     {results?.yearlyResults?.map((r: any, i: number) => (
-                        <tr key={r.year} className={i % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700/50'}>
-                           <td className="px-4 py-4 text-center text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">Year {r.year}</td>
-                           
-                           {/* Product Columns Data Gross USD */}
-                           {selectedProductIds.map(pid => {
-                             const pData = r.breakdown.find((d: any) => d.id === pid);
-                             const colorClass = pid === 'utd' ? 'text-green-700 dark:text-green-300 bg-green-50/30 dark:bg-green-900/10' : 'text-blue-700 dark:text-blue-300 bg-blue-50/30 dark:bg-blue-900/10';
-                             return (
-                               <td key={pid} className={`px-4 py-4 text-center text-sm font-sans tabular-nums whitespace-nowrap ${colorClass}`}>
-                                 {pData ? formatCurrency(pData.gross, 'USD') : '-'}
-                               </td>
-                             );
-                           })}
+                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">
+                          Recognized
+                          <br />
+                          Total (USD)
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
+                      {results?.yearlyResults?.map((r: any, i: number) => (
+                        <tr
+                          key={r.year}
+                          className={
+                            i % 2 === 0
+                              ? "bg-white dark:bg-gray-800"
+                              : "bg-gray-50 dark:bg-gray-700/50"
+                          }
+                        >
+                          <td className="px-4 py-4 text-center text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
+                            Year {r.year}
+                          </td>
 
-                           {/* Total USD */}
-                           <td className="px-4 py-4 text-center text-sm font-bold text-orange-700 dark:text-orange-300 font-sans tabular-nums bg-orange-50 dark:bg-orange-900/20 whitespace-nowrap">
-                              {formatCurrency(r.grossUSD, 'USD')}
-                           </td>
+                          {/* Product Columns Data Gross USD */}
+                          {selectedProductIds.map((pid) => {
+                            const pData = r.breakdown.find(
+                              (d: any) => d.id === pid,
+                            );
+                            const colorClass =
+                              pid === "utd"
+                                ? "text-green-700 dark:text-green-300 bg-green-50/30 dark:bg-green-900/10"
+                                : "text-blue-700 dark:text-blue-300 bg-blue-50/30 dark:bg-blue-900/10";
+                            return (
+                              <td
+                                key={pid}
+                                className={`px-4 py-4 text-center text-sm font-sans tabular-nums whitespace-nowrap ${colorClass}`}
+                              >
+                                {pData
+                                  ? formatCurrency(pData.gross, "USD")
+                                  : "-"}
+                              </td>
+                            );
+                          })}
 
-                           {/* Product Columns Data Gross SAR (Indirect only) */}
-                           {isIndirect && selectedProductIds.map(pid => {
-                             const pData = r.breakdown.find((d: any) => d.id === pid);
-                             const colorClass = pid === 'utd' ? 'text-green-700 dark:text-green-300 bg-green-50/20 dark:bg-green-900/5' : 'text-blue-700 dark:text-blue-300 bg-blue-50/20 dark:bg-blue-900/5';
-                             return (
-                               <td key={`${pid}-sar`} className={`px-4 py-4 text-center text-sm font-sans tabular-nums whitespace-nowrap ${colorClass}`}>
-                                 {pData ? formatCurrency(pData.grossSAR, 'SAR') : '-'}
-                               </td>
-                             );
-                           })}
+                          {/* Total USD */}
+                          <td className="px-4 py-4 text-center text-sm font-bold text-orange-700 dark:text-orange-300 font-sans tabular-nums bg-orange-50 dark:bg-orange-900/20 whitespace-nowrap">
+                            {formatCurrency(r.grossUSD, "USD")}
+                          </td>
 
-                           {/* Total SAR (if Indirect) */}
-                           {isIndirect && (
-                             <td className="px-4 py-4 text-center text-sm font-bold text-orange-800 dark:text-orange-200 font-sans tabular-nums bg-orange-50 dark:bg-orange-900/20 whitespace-nowrap">
-                                {formatCurrency(r.grossSAR, 'SAR')}
-                             </td>
-                           )}
+                          {/* Product Columns Data Gross SAR (Indirect only) */}
+                          {isIndirect &&
+                            selectedProductIds.map((pid) => {
+                              const pData = r.breakdown.find(
+                                (d: any) => d.id === pid,
+                              );
+                              const colorClass =
+                                pid === "utd"
+                                  ? "text-green-700 dark:text-green-300 bg-green-50/20 dark:bg-green-900/5"
+                                  : "text-blue-700 dark:text-blue-300 bg-blue-50/20 dark:bg-blue-900/5";
+                              return (
+                                <td
+                                  key={`${pid}-sar`}
+                                  className={`px-4 py-4 text-center text-sm font-sans tabular-nums whitespace-nowrap ${colorClass}`}
+                                >
+                                  {pData
+                                    ? formatCurrency(pData.grossSAR, "SAR")
+                                    : "-"}
+                                </td>
+                              );
+                            })}
 
-                           {/* VAT and Grand Total */}
-                           {isIndirect && (
-                             <>
-                               <td className="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-400 font-sans tabular-nums bg-yellow-50/50 dark:bg-yellow-900/10 whitespace-nowrap">
-                                  {formatCurrency(r.vatSAR, 'SAR')}
-                               </td>
-                               <td className="px-4 py-4 text-center text-sm font-bold text-gray-900 dark:text-gray-100 font-sans tabular-nums bg-yellow-100 dark:bg-yellow-900/40 whitespace-nowrap">
-                                  {formatCurrency(r.grandTotalSAR, 'SAR')}
-                               </td>
-                             </>
-                           )}
+                          {/* Total SAR (if Indirect) */}
+                          {isIndirect && (
+                            <td className="px-4 py-4 text-center text-sm font-bold text-orange-800 dark:text-orange-200 font-sans tabular-nums bg-orange-50 dark:bg-orange-900/20 whitespace-nowrap">
+                              {formatCurrency(r.grossSAR, "SAR")}
+                            </td>
+                          )}
 
-                           <td className="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-400 font-sans tabular-nums whitespace-nowrap">
-                              {formatCurrency(r.netUSD, 'USD')}
-                           </td>
+                          {/* VAT and Grand Total */}
+                          {isIndirect && (
+                            <>
+                              <td className="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-400 font-sans tabular-nums bg-yellow-50/50 dark:bg-yellow-900/10 whitespace-nowrap">
+                                {formatCurrency(r.vatSAR, "SAR")}
+                              </td>
+                              <td className="px-4 py-4 text-center text-sm font-bold text-gray-900 dark:text-gray-100 font-sans tabular-nums bg-yellow-100 dark:bg-yellow-900/40 whitespace-nowrap">
+                                {formatCurrency(r.grandTotalSAR, "SAR")}
+                              </td>
+                            </>
+                          )}
+
+                          <td className="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-400 font-sans tabular-nums whitespace-nowrap">
+                            {formatCurrency(r.netUSD, "USD")}
+                          </td>
                         </tr>
-                     ))}
-                     <tr className="bg-gray-800 dark:bg-gray-900 text-white">
-                        <td className="px-4 py-4 text-center text-sm font-bold whitespace-nowrap">Total</td>
-                        
+                      ))}
+                      <tr className="bg-gray-800 dark:bg-gray-900 text-white">
+                        <td className="px-4 py-4 text-center text-sm font-bold whitespace-nowrap">
+                          Total
+                        </td>
+
                         {/* Empty cells for breakdown columns USD */}
-                        {selectedProductIds.map(pid => (
+                        {selectedProductIds.map((pid) => (
                           <td key={pid}></td>
                         ))}
 
                         {/* Total USD */}
                         <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums whitespace-nowrap">
-                           {formatCurrency(results?.totalGrossUSD || 0, 'USD')}
+                          {formatCurrency(results?.totalGrossUSD || 0, "USD")}
                         </td>
 
                         {/* Empty cells for breakdown columns SAR */}
-                        {isIndirect && selectedProductIds.map(pid => (
-                          <td key={`${pid}-sar`}></td>
-                        ))}
+                        {isIndirect &&
+                          selectedProductIds.map((pid) => (
+                            <td key={`${pid}-sar`}></td>
+                          ))}
 
-                         {/* Total SAR */}
+                        {/* Total SAR */}
                         {isIndirect && (
-                           <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums text-orange-300 whitespace-nowrap">
-                              {formatCurrency(results?.totalGrossSAR || 0, 'SAR')}
-                           </td>
+                          <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums text-orange-300 whitespace-nowrap">
+                            {formatCurrency(results?.totalGrossSAR || 0, "SAR")}
+                          </td>
                         )}
 
                         {/* VAT and Grand Total */}
                         {isIndirect && (
-                           <>
-                              <td className="px-4 py-4 text-center text-sm font-sans tabular-nums text-gray-300 whitespace-nowrap">
-                                 {formatCurrency(results?.totalVatSAR || 0, 'SAR')}
-                              </td>
-                              <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums text-yellow-300 whitespace-nowrap">
-                                 {formatCurrency(results?.totalGrandTotalSAR || 0, 'SAR')}
-                              </td>
-                           </>
+                          <>
+                            <td className="px-4 py-4 text-center text-sm font-sans tabular-nums text-gray-300 whitespace-nowrap">
+                              {formatCurrency(results?.totalVatSAR || 0, "SAR")}
+                            </td>
+                            <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums text-yellow-300 whitespace-nowrap">
+                              {formatCurrency(
+                                results?.totalGrandTotalSAR || 0,
+                                "SAR",
+                              )}
+                            </td>
+                          </>
                         )}
 
                         <td className="px-4 py-4 text-center text-sm font-bold font-sans tabular-nums text-gray-300 whitespace-nowrap">
-                           {formatCurrency(results?.totalNetUSD || 0, 'USD')}
+                          {formatCurrency(results?.totalNetUSD || 0, "USD")}
                         </td>
-                     </tr>
-                  </tbody>
-               </table>
-             </div>
-          </div>
-          
-          {/* Summary Metrics (ACV & Splits) */}
-          <div className="font-sans"> 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-               <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-blue-500 dark:border-blue-400 transition-colors">
-                  <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Customer TCV</div>
-                  <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(results?.totalGrossUSD || 0, 'USD')}</div>
-               </div>
-               <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-indigo-500 dark:border-indigo-400 transition-colors">
-                  <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Customer ACV</div>
-                  <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(results?.acvUSD || 0, 'USD')}</div>
-               </div>
-               
-               {/* Net Metrics (Only for Indirect Channels) */}
-               {isIndirect && (
-                 <>
-                   <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-gray-500 dark:border-gray-400 transition-colors">
-                      <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">Net TCV</div>
-                      <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(results?.totalNetUSD || 0, 'USD')}</div>
-                   </div>
-                   <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-gray-500 dark:border-gray-400 transition-colors">
-                      <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">Net ACV</div>
-                      <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(results?.netACV || 0, 'USD')}</div>
-                   </div>
-                 </>
-               )}
-
-               {dealType === DealType.RENEWAL && (
-                 <>
-                   {/* Renewal Base ACV (Gross) */}
-                   <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-green-500 dark:border-green-400 transition-colors">
-                      <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Renewal Base ACV</div>
-                      <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(results?.renewalBaseACV || 0, 'USD')}</div>
-                   </div>
-
-                   {/* Net Renewal Base ACV (New for Indirect) */}
-                   {isIndirect && (
-                      <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-green-500 dark:border-green-400 transition-colors">
-                          <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">Net Renewal Base</div>
-                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(results?.netRenewalBaseACV || 0, 'USD')}</div>
-                      </div>
-                   )}
-
-                   {/* Upsell ACV (Gross) */}
-                   <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-orange-500 dark:border-orange-400 transition-colors">
-                      <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">Upsell ACV</div>
-                      <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">{formatCurrency(results?.upsellACV || 0, 'USD')}</div>
-                   </div>
-
-                   {/* Net Upsell ACV (New for Indirect) */}
-                   {isIndirect && (
-                      <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-orange-500 dark:border-orange-400 transition-colors">
-                          <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">Net Upsell</div>
-                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">{formatCurrency(results?.netUpsellACV || 0, 'USD')}</div>
-                      </div>
-                   )}
-                 </>
-               )}
-            </div>
-
-            {/* NEW: Net Revenue Breakdown Section with ACV and TCV */}
-            {isIndirect && selectedProductIds.length > 0 && (
-              <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border border-gray-200 dark:border-gray-700 mb-4 transition-colors">
-                <h4 className="text-sm font-bold text-gray-800 dark:text-white mb-3 font-sans">Net Revenue Breakdown</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {selectedProductIds.map(pid => {
-                     const p = (metadata?.availableProducts || []).find((x: any) => x.id === pid);
-                     const tcv = results?.productNetTotals?.[pid] || 0;
-                     const acv = tcv / config.years;
-                     return (
-                       <div key={pid} className="border border-gray-100 dark:border-gray-700 rounded p-3 bg-gray-50 dark:bg-gray-700">
-                          <div className="text-xs font-bold text-gray-700 dark:text-gray-200 font-sans mb-2">{p?.shortName}</div>
-                          <div className="flex justify-between items-center mb-1">
-                             <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Net TCV</span>
-                             <span className="text-xs font-sans tabular-nums font-medium text-gray-900 dark:text-white">{formatCurrency(tcv, 'USD')}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                             <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Net ACV</span>
-                             <span className="text-xs font-sans tabular-nums font-medium text-gray-900 dark:text-white">{formatCurrency(acv, 'USD')}</span>
-                          </div>
-                       </div>
-                     );
-                  })}
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            )}
-          </div>
-          </>
+
+              {/* Summary Metrics (ACV & Splits) */}
+              <div className="font-sans">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-blue-500 dark:border-blue-400 transition-colors">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                      Customer TCV
+                    </div>
+                    <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                      {formatCurrency(results?.totalGrossUSD || 0, "USD")}
+                    </div>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-indigo-500 dark:border-indigo-400 transition-colors">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                      Customer ACV
+                    </div>
+                    <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                      {formatCurrency(results?.acvUSD || 0, "USD")}
+                    </div>
+                  </div>
+
+                  {/* Net Metrics (Only for Indirect Channels) */}
+                  {isIndirect && (
+                    <>
+                      <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-gray-500 dark:border-gray-400 transition-colors">
+                        <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">
+                          Net TCV
+                        </div>
+                        <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">
+                          {formatCurrency(results?.totalNetUSD || 0, "USD")}
+                        </div>
+                      </div>
+                      <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-gray-500 dark:border-gray-400 transition-colors">
+                        <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">
+                          Net ACV
+                        </div>
+                        <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">
+                          {formatCurrency(results?.netACV || 0, "USD")}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {dealType === DealType.RENEWAL && (
+                    <>
+                      {/* Renewal Base ACV (Gross) */}
+                      <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-green-500 dark:border-green-400 transition-colors">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                          Renewal Base ACV
+                        </div>
+                        <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                          {formatCurrency(results?.renewalBaseACV || 0, "USD")}
+                        </div>
+                      </div>
+
+                      {/* Net Renewal Base ACV (New for Indirect) */}
+                      {isIndirect && (
+                        <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-green-500 dark:border-green-400 transition-colors">
+                          <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">
+                            Net Renewal Base
+                          </div>
+                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">
+                            {formatCurrency(
+                              results?.netRenewalBaseACV || 0,
+                              "USD",
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Upsell ACV (Gross) */}
+                      <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-orange-500 dark:border-orange-400 transition-colors">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                          Upsell ACV
+                        </div>
+                        <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                          {formatCurrency(results?.upsellACV || 0, "USD")}
+                        </div>
+                      </div>
+
+                      {/* Net Upsell ACV (New for Indirect) */}
+                      {isIndirect && (
+                        <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-orange-500 dark:border-orange-400 transition-colors">
+                          <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">
+                            Net Upsell
+                          </div>
+                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">
+                            {formatCurrency(results?.netUpsellACV || 0, "USD")}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* NEW: Net Revenue Breakdown Section with ACV and TCV */}
+                {isIndirect && selectedProductIds.length > 0 && (
+                  <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border border-gray-200 dark:border-gray-700 mb-4 transition-colors">
+                    <h4 className="text-sm font-bold text-gray-800 dark:text-white mb-3 font-sans">
+                      Net Revenue Breakdown
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {selectedProductIds.map((pid) => {
+                        const p = (metadata?.availableProducts || []).find(
+                          (x: any) => x.id === pid,
+                        );
+                        const tcv = results?.productNetTotals?.[pid] || 0;
+                        const acv = tcv / config.years;
+                        return (
+                          <div
+                            key={pid}
+                            className="border border-gray-100 dark:border-gray-700 rounded p-3 bg-gray-50 dark:bg-gray-700"
+                          >
+                            <div className="text-xs font-bold text-gray-700 dark:text-gray-200 font-sans mb-2">
+                              {p?.shortName}
+                            </div>
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase">
+                                Net TCV
+                              </span>
+                              <span className="text-xs font-sans tabular-nums font-medium text-gray-900 dark:text-white">
+                                {formatCurrency(tcv, "USD")}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase">
+                                Net ACV
+                              </span>
+                              <span className="text-xs font-sans tabular-nums font-medium text-gray-900 dark:text-white">
+                                {formatCurrency(acv, "USD")}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
           )}
 
-            <ExportSection 
+          <ExportSection
             key={resetKey}
-            data={results} 
-            config={config} 
+            data={results}
+            config={config}
             useStartDate={useStartDate}
             setUseStartDate={setUseStartDate}
             startMonthYear={startMonthYear}
@@ -1818,61 +2837,94 @@ const App: React.FC = () => {
 
           {!isExtensionQuote && (
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-md transition-colors">
-               <button 
-                 onClick={() => setIsArchitectNotesOpen(!isArchitectNotesOpen)}
-                 className="w-full flex justify-between items-center p-4 focus:outline-none"
-               >
-                 <div className="flex items-center space-x-2">
-                   <h4 className="text-sm font-bold text-yellow-800 dark:text-yellow-200">Architect Notes</h4>
-                   {utdEeWarning && (
-                     <span className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded">
-                       {utdEeWarning}
-                     </span>
-                   )}
-                 </div>
-                 <svg 
-                   className={`w-5 h-5 text-yellow-700 dark:text-yellow-300 transform transition-transform duration-200 ${isArchitectNotesOpen ? 'rotate-180' : ''}`} 
-                   fill="none" 
-                   stroke="currentColor" 
-                   viewBox="0 0 24 24"
-                 >
-                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                 </svg>
-               </button>
-               
-               {isArchitectNotesOpen && (
-                 <div className="px-4 pb-4 border-t border-yellow-200 dark:border-yellow-700/50 mt-2 pt-2">
-                   <ul className="text-xs text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-1">
-                      <li><strong>Base Calculation:</strong> UTD (HC × Rate) / LXD (BC × Rate).</li>
-                      <li><strong>WHT Adjustment:</strong> {applyWHT ? "Prices grossed up (divided by 0.95)." : "No WHT gross up applied."}</li>
-                      <li><strong>Floor Rules:</strong> Single Deal Min $6,842. Combo Deal LXD Min $4,210. (Adjusted dynamically for WHT).</li>
-                      <li><strong>Recognized Revenue:</strong> Applied {dealType} {channel} factor. 
-                         {channel !== ChannelType.DIRECT && dealType === DealType.NEW_LOGO && " (Y1 vs Y2+ margins applied)."}
+              <button
+                onClick={() => setIsArchitectNotesOpen(!isArchitectNotesOpen)}
+                className="w-full flex justify-between items-center p-4 focus:outline-none"
+              >
+                <div className="flex items-center space-x-2">
+                  <h4 className="text-sm font-bold text-yellow-800 dark:text-yellow-200">
+                    Architect Notes
+                  </h4>
+                  {utdEeWarning && (
+                    <span className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded">
+                      {utdEeWarning}
+                    </span>
+                  )}
+                </div>
+                <svg
+                  className={`w-5 h-5 text-yellow-700 dark:text-yellow-300 transform transition-transform duration-200 ${isArchitectNotesOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M19 9l-7 7-7-7"
+                  ></path>
+                </svg>
+              </button>
+
+              {isArchitectNotesOpen && (
+                <div className="px-4 pb-4 border-t border-yellow-200 dark:border-yellow-700/50 mt-2 pt-2">
+                  <ul className="text-xs text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-1">
+                    <li>
+                      <strong>Base Calculation:</strong> UTD (HC × Rate) / LXD
+                      (BC × Rate).
+                    </li>
+                    <li>
+                      <strong>WHT Adjustment:</strong>{" "}
+                      {applyWHT
+                        ? "Prices grossed up (divided by 0.95)."
+                        : "No WHT gross up applied."}
+                    </li>
+                    <li>
+                      <strong>Floor Rules:</strong> Single Deal Min $6,842.
+                      Combo Deal LXD Min $4,210. (Adjusted dynamically for WHT).
+                    </li>
+                    <li>
+                      <strong>Recognized Revenue:</strong> Applied {dealType}{" "}
+                      {channel} factor.
+                      {channel !== ChannelType.DIRECT &&
+                        dealType === DealType.NEW_LOGO &&
+                        " (Y1 vs Y2+ margins applied)."}
+                    </li>
+                    {dealType === DealType.RENEWAL && (
+                      <li>
+                        <strong>Renewal Split:</strong> Renewal Base calculated
+                        as sum of [Product Expiring × (1 + Product Uplift
+                        Rate)]. Upsell is the remainder of ACV.
                       </li>
-                      {dealType === DealType.RENEWAL && (
-                        <li><strong>Renewal Split:</strong> Renewal Base calculated as sum of [Product Expiring × (1 + Product Uplift Rate)]. Upsell is the remainder of ACV.</li>
-                      )}
-                      {results?.yearlyResults?.[0]?.floorAdjusted && (
-                        <li><strong>Auto-Adjustment:</strong> Pricing was automatically raised to meet the minimum floor requirements.</li>
-                      )}
-                      {/* Monthly Cost Analysis */}
-                      {monthlyCosts.length > 0 && (
-                         <li className="font-semibold italic pt-1 text-yellow-900 dark:text-yellow-100">
-                           Unit Economics: {monthlyCosts.join(', ')}.
-                         </li>
-                      )}
-                      {renewalNotes.length > 0 && (
-                        <>
-                          {renewalNotes.map((note, idx) => (
-                             <li key={`ren-note-${idx}`} className="font-semibold pt-1 text-yellow-900 dark:text-yellow-100">
-                               {note}
-                             </li>
-                          ))}
-                        </>
-                      )}
-                   </ul>
-                 </div>
-               )}
+                    )}
+                    {results?.yearlyResults?.[0]?.floorAdjusted && (
+                      <li>
+                        <strong>Auto-Adjustment:</strong> Pricing was
+                        automatically raised to meet the minimum floor
+                        requirements.
+                      </li>
+                    )}
+                    {/* Monthly Cost Analysis */}
+                    {monthlyCosts.length > 0 && (
+                      <li className="font-semibold italic pt-1 text-yellow-900 dark:text-yellow-100">
+                        Unit Economics: {monthlyCosts.join(", ")}.
+                      </li>
+                    )}
+                    {renewalNotes.length > 0 && (
+                      <>
+                        {renewalNotes.map((note, idx) => (
+                          <li
+                            key={`ren-note-${idx}`}
+                            className="font-semibold pt-1 text-yellow-900 dark:text-yellow-100"
+                          >
+                            {note}
+                          </li>
+                        ))}
+                      </>
+                    )}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>
