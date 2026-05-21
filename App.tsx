@@ -1606,9 +1606,6 @@ const App: React.FC = () => {
                                 disabled={
                                   dealType === DealType.RENEWAL &&
                                   !(
-                                    (productInputs.utd?.variant === "UTDEE" ||
-                                      productInputs.utd?.variant ===
-                                        "UTDEE-EAI") &&
                                     productInputs.utd?.changeInStats &&
                                     (productInputs.utd?.count || 0) >
                                       (productInputs.utd?.existingCount || 0)
@@ -1672,8 +1669,6 @@ const App: React.FC = () => {
                               dealType === DealType.RENEWAL &&
                               selectedProductIds.includes("utd") &&
                               !(
-                                (productInputs.utd?.variant === "UTDEE" ||
-                                  productInputs.utd?.variant === "UTDEE-EAI") &&
                                 productInputs.utd?.changeInStats &&
                                 (productInputs.utd?.count || 0) >
                                   (productInputs.utd?.existingCount || 0)
@@ -1872,7 +1867,7 @@ const App: React.FC = () => {
                         {(() => {
                           const y1Breakdown =
                             results?.yearlyResults?.[0]?.breakdown || [];
-                          const alerts = [];
+                          const alerts: string[] = [];
 
                           if (showSplitRates) {
                             if (productMethods.utd === PricingMethod.MYPP) {
@@ -1911,6 +1906,14 @@ const App: React.FC = () => {
                               });
                             }
                           }
+
+                          // Dynamically pull any MYPP reversion notes from backend
+                          const backendNotes = results?.yearlyResults?.[0]?.notes || [];
+                          backendNotes.forEach((note: string) => {
+                            if (note.includes("Reverted to MYFPI") && !alerts.includes(note)) {
+                              alerts.push(note);
+                            }
+                          });
 
                           if (alerts.length > 0) {
                             return (

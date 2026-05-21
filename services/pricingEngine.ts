@@ -496,6 +496,21 @@ export const calculatePricing = (
       );
     }
 
+    if (specificMethod === PricingMethod.MYPP && dealType === DealType.RENEWAL) {
+      const expiring = productInputs[prodId]?.expiringAmount || 0;
+      let tempY1 = y1Value;
+      for (let i = years - 2; i >= 0; i--) {
+        const discountRate = specificRates[i + 1] || 0;
+        tempY1 = tempY1 / (1 + discountRate / 100);
+      }
+      if (tempY1 <= expiring) {
+        specificMethod = PricingMethod.MYFPI;
+        productNotes.push(
+          `${prodId.toUpperCase()} MYPP Year 1 renewal ($${tempY1.toFixed(0)}) cannot be less than or equal to expiring ($${expiring.toFixed(0)}). Reverted to MYFPI.`,
+        );
+      }
+    }
+
     if (specificMethod === PricingMethod.MYFPI) {
       schedule[0] = y1Value;
       for (let i = 1; i < years; i++) {

@@ -11,7 +11,11 @@ export const CHANGELOG = [
       'Extension Option B Expansion: Added customizable Uplift FPI% input applying specified rate to current spend for exact fractional and integer month calculation within 100K SAR limits.',
       'UI Refinement: Redesigned the Uplift FPI% fields with interactive "+" and "-" step buttons (incrementing/decrementing whole values) while supporting manual decimal inputs (up to one decimal place).',
       'Rules Update: Simplified the Extension Finance approval threshold to apply selectively on any Uplift FPI% below 5% across both Option A and Option B.',
-      'UI Cleanup: Renamed "Difference to Extension (FPI %)" labels to "Uplift FPI%" for consistency with renewal uplift fields.'
+      'UI Cleanup: Renamed "Difference to Extension (FPI %)" labels to "Uplift FPI%" for consistency with renewal uplift fields.',
+      'Loosened Variant Criteria for Rightsizing: MYPP is now fully unlocked for any UTD variant in renewal (including standard Anywhere, UTDADV, etc.)',
+      'Expiring Spend Floor Safeguard: Incorporated a strict mathematical check inside Step 3 (Multi-Year Projection) of the calculation engine.',
+      'Synchronized Real-Time Warning Alert Banner: The frontend client now dynamically extracts these reversion logs from the backend response in real-time, rendering a high-visibility red alert banner some commercial options.',
+      'Architect Notes & Build Safety Logs: These warnings are automatically archived inside the Architect Notes section and are formatted in both PDF and Excel exports.'
     ]
   },
   {
