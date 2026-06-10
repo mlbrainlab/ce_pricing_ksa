@@ -120,6 +120,15 @@ const App: React.FC = () => {
   // Deal State
   const [dealType, setDealType] = useState<DealType>(DealType.NEW_LOGO);
   const [channel, setChannel] = useState<ChannelType>(ChannelType.DIRECT);
+  
+  // Mid-Cycle State Variables
+  const [midCycleExpiryDate, setMidCycleExpiryDate] = useState<string>("");
+  const [midCycleStartDate, setMidCycleStartDate] = useState<string>("");
+  const [midCycleProduct, setMidCycleProduct] = useState<string>("UTD_ADV"); 
+  const [midCycleExistingSpend, setMidCycleExistingSpend] = useState<number | "">("");
+  const [midCycleBedCount, setMidCycleBedCount] = useState<number | "">("");
+  const [midCycleWHT, setMidCycleWHT] = useState<boolean>(false);
+
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [years, setYears] = useState<number>(3);
   const [method, setMethod] = useState<PricingMethod>(PricingMethod.MYFPI);
@@ -136,6 +145,7 @@ const App: React.FC = () => {
 
   // Extension Quote State
   const isExtensionQuote = dealType === DealType.EXTENSION;
+  const isMidCycleQuote = dealType === DealType.MID_CYCLE;
   const [extensionOption, setExtensionOption] = useState<"A" | "B">("A");
   const [expiringTerm, setExpiringTerm] = useState<"multi" | "single">("multi");
   const [expiringTCV, setExpiringTCV] = useState<number>(0);
@@ -404,6 +414,12 @@ const App: React.FC = () => {
       extensionFPI,
       extensionVariant,
       useFullExtension,
+      midCycleExpiryDate,
+      midCycleStartDate,
+      midCycleWHT,
+      midCycleProduct,
+      midCycleExistingSpend,
+      midCycleBedCount,
     };
   }, [
     dealType,
@@ -434,6 +450,12 @@ const App: React.FC = () => {
     extensionFPI,
     extensionVariant,
     useFullExtension,
+    midCycleExpiryDate,
+    midCycleStartDate,
+    midCycleWHT,
+    midCycleProduct,
+    midCycleExistingSpend,
+    midCycleBedCount,
   ]);
 
   // Results
@@ -857,6 +879,7 @@ const App: React.FC = () => {
                   <option value={DealType.NEW_LOGO}>New Logo</option>
                   <option value={DealType.RENEWAL}>Renewal</option>
                   <option value={DealType.EXTENSION}>Extension</option>
+                  <option value={DealType.MID_CYCLE}>Mid-Cycle Add-on</option>
                 </select>
               </div>
               <div>
@@ -1059,7 +1082,102 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {!isExtensionQuote && (
+          {/* Mid-Cycle Configuration */}
+          {isMidCycleQuote && (
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-5 border border-gray-100 dark:border-gray-700 transition-colors">
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mb-4">
+                Mid-Cycle Configuration
+              </h2>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Expiry Date
+                    </label>
+                    <input
+                      type="date"
+                      value={midCycleExpiryDate}
+                      onChange={(e) => setMidCycleExpiryDate(e.target.value)}
+                      className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={midCycleStartDate}
+                      onChange={(e) => setMidCycleStartDate(e.target.value)}
+                      className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    Add-on Product
+                  </label>
+                  <select
+                    className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    value={midCycleProduct}
+                    onChange={(e) => setMidCycleProduct(e.target.value)}
+                  >
+                    <option value="UTD_ADV">UTD: ADV over UTDANYWHERE (8% of expiry)</option>
+                    <option value="LXD_FLINK">LXD: FLINK ($12/bed)</option>
+                    <option value="LXD_IPE">LXD: IPE ($16/bed)</option>
+                    <option value="LXD_FLINK_IPE">LXD: FLINK+IPE ($28/bed)</option>
+                  </select>
+                </div>
+
+                {midCycleProduct === "UTD_ADV" && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Existing Expiring Spend (USD)
+                    </label>
+                    <input
+                      type="number"
+                      value={midCycleExistingSpend}
+                      onChange={(e) => setMidCycleExistingSpend(e.target.value === "" ? "" : Number(e.target.value))}
+                      className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                )}
+
+                {midCycleProduct.startsWith("LXD_") && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Existing Bed Count
+                    </label>
+                    <input
+                      type="number"
+                      value={midCycleBedCount}
+                      onChange={(e) => setMidCycleBedCount(e.target.value === "" ? "" : Number(e.target.value))}
+                      className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                )}
+
+                <div className="flex items-center mt-2">
+                  <input
+                    type="checkbox"
+                    id="mid-cycle-wht"
+                    checked={midCycleWHT}
+                    onChange={(e) => setMidCycleWHT(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label
+                    htmlFor="mid-cycle-wht"
+                    className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Apply WHT
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!isExtensionQuote && !isMidCycleQuote && (
             <>
               {/* Section 2: Products & Inputs */}
               <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-5 border border-gray-100 dark:border-gray-700 transition-colors">
@@ -2443,7 +2561,131 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {!isExtensionQuote && !results && (
+          {isMidCycleQuote && !results?.midCycleResults && (
+            <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-12 flex flex-col items-center justify-center border border-gray-200 dark:border-gray-700">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+              <p className="text-gray-500 dark:text-gray-400">
+                Calculating mid-cycle add-on...
+              </p>
+            </div>
+          )}
+
+          {isMidCycleQuote && results?.midCycleResults && (
+            <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 transition-colors">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white">
+                  Mid-Cycle Add-on Results
+                </h3>
+                <div className="text-xs font-sans tabular-nums text-gray-500 dark:text-gray-400">
+                  1 USD = {sarRate} SAR
+                </div>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
+                    <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">
+                      Months Covered
+                    </div>
+                    <div className="text-xl font-bold text-blue-700 dark:text-blue-300 font-sans">
+                      {results.midCycleResults.durationMonths.toFixed(2)}
+                    </div>
+                  </div>
+                  <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-100 dark:border-green-800">
+                    <div className="text-xs text-green-600 dark:text-green-400 uppercase font-sans">
+                      Calculated Annual Rate
+                    </div>
+                    <div className="text-xl font-bold text-green-700 dark:text-green-300 font-sans">
+                      {formatCurrency(results.midCycleResults.annualRate, "USD")}
+                    </div>
+                  </div>
+                  {results.midCycleResults.whtApplied && (
+                    <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800">
+                      <div className="text-xs text-purple-600 dark:text-purple-400 uppercase font-sans">
+                        WHT Factor Applied
+                      </div>
+                      <div className="text-xl font-bold text-purple-700 dark:text-purple-300 font-sans">
+                        0.95
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <h4 className="text-sm font-bold text-gray-800 dark:text-white mb-3 font-sans">
+                    Pricing Breakdown
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-blue-500 dark:border-blue-400">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                        End-User Price
+                      </div>
+                      <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                        {formatCurrency(results.midCycleResults.endUserGrossUSD, "USD")}
+                      </div>
+                      {isIndirect && (
+                        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                          <div>
+                            SAR: {formatCurrency(results.midCycleResults.grossSAR, "SAR")}
+                          </div>
+                          <div>
+                            VAT (15%): {formatCurrency(results.midCycleResults.vatSAR, "SAR")}
+                          </div>
+                          <div className="font-bold text-gray-700 dark:text-gray-300">
+                            Total: {formatCurrency(results.midCycleResults.grandTotalSAR, "SAR")}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-orange-500 dark:border-orange-400">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                        Reseller Fees
+                      </div>
+                      <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                        {formatCurrency(results.midCycleResults.commissionUSD, "USD")}
+                      </div>
+                      {isIndirect && (
+                        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                          <div>
+                            SAR: {formatCurrency(results.midCycleResults.commissionSAR, "SAR")}
+                          </div>
+                          <div>
+                            VAT (15%): {formatCurrency(results.midCycleResults.commissionSAR * 0.15, "SAR")}
+                          </div>
+                          <div className="font-bold text-gray-700 dark:text-gray-300">
+                            Total: {formatCurrency(results.midCycleResults.commissionSAR * 1.15, "SAR")}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-gray-500 dark:border-gray-400">
+                      <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">
+                        Net Price
+                      </div>
+                      <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">
+                        {formatCurrency(results.midCycleResults.netPriceUSD, "USD")}
+                      </div>
+                      {isIndirect && (
+                        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                          <div>
+                            SAR: {formatCurrency(results.midCycleResults.netPriceSAR, "SAR")}
+                          </div>
+                          <div>
+                            VAT (15%): {formatCurrency(results.midCycleResults.netPriceSAR * 0.15, "SAR")}
+                          </div>
+                          <div className="font-bold text-gray-700 dark:text-gray-300">
+                            Total: {formatCurrency(results.midCycleResults.netPriceSAR * 1.15, "SAR")}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!isExtensionQuote && !isMidCycleQuote && !results && (
             <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-12 flex flex-col items-center justify-center border border-gray-200 dark:border-gray-700">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
               <p className="text-gray-500 dark:text-gray-400">
@@ -2452,7 +2694,7 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {!isExtensionQuote && results && (
+          {!isExtensionQuote && !isMidCycleQuote && results && (
             <>
               <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 transition-colors">
                 <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
@@ -2835,6 +3077,7 @@ const App: React.FC = () => {
             setStartMonthYear={setStartMonthYear}
             isExtensionQuote={isExtensionQuote}
             extensionResults={extensionResults}
+            isMidCycleQuote={isMidCycleQuote}
             renewalNotes={renewalNotes}
           />
 

@@ -20,6 +20,7 @@ interface ExportSectionProps {
   setStartMonthYear: (val: string) => void;
   isExtensionQuote?: boolean;
   extensionResults?: any;
+  isMidCycleQuote?: boolean;
   renewalNotes?: string[];
 }
 
@@ -67,7 +68,7 @@ const formatMoney = (amount: number, currency: string) => {
 
 export const ExportSection: React.FC<ExportSectionProps> = ({ 
   data, config, useStartDate, setUseStartDate, startMonthYear, setStartMonthYear,
-  isExtensionQuote, extensionResults, renewalNotes = []
+  isExtensionQuote, extensionResults, isMidCycleQuote, renewalNotes = []
 }) => {
   const [customerName, setCustomerName] = useState('');
   const [repName, setRepName] = useState(() => localStorage.getItem('wk_rep_name') || '');
@@ -291,6 +292,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       let proposalTitle = "BUDGETARY COMMERCIAL\nPROPOSAL";
       if (config.dealType === DealType.RENEWAL) proposalTitle = "BUDGETARY COMMERCIAL\nPROPOSAL [RENEWAL]";
       else if (config.dealType === DealType.EXTENSION) proposalTitle = "BUDGETARY COMMERCIAL\nPROPOSAL [EXTENSION]";
+      else if (config.dealType === DealType.MID_CYCLE) proposalTitle = "BUDGETARY COMMERCIAL\nPROPOSAL [MID-CYCLE ADD-ON]";
       doc.text(proposalTitle, 105, 95, { align: 'center' });
 
     let currentY = 170;
@@ -433,6 +435,17 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           ['Total (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')]
         ];
       }
+    } else if (isMidCycleQuote && data.midCycleResults) {
+      tableHead = [['Description', 'Value']];
+      tableBody = [
+        ['Product', data.midCycleResults.product],
+        ['Calculated Annual Rate (USD)', formatMoney(data.midCycleResults.annualRate, 'USD')],
+        ['Months Covered', data.midCycleResults.durationMonths.toFixed(2)],
+        ['End-User Price (USD)', formatMoney(data.midCycleResults.endUserGrossUSD, 'USD')],
+        ['End-User Price (SAR)', formatMoney(data.midCycleResults.grossSAR, 'SAR')],
+        ['VAT (15%) (SAR)', formatMoney(data.midCycleResults.vatSAR, 'SAR')],
+        ['Total (SAR)', formatMoney(data.midCycleResults.grandTotalSAR, 'SAR')]
+      ];
     } else {
       const productColIndices: Record<string, number> = {};
       config.selectedProducts.forEach((pid, idx) => { productColIndices[pid] = 1 + idx; });
@@ -513,7 +526,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       return currentY;
     };
 
-    if (!isExtensionQuote) {
+    if (!isExtensionQuote && !isMidCycleQuote) {
       doc.setFontSize(14); doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.setFont(fontName, 'bold'); doc.text("Operating Statistics", 14, finalY); finalY += 6;
       doc.setFontSize(9); doc.setTextColor(0, 0, 0);
@@ -571,8 +584,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     if (hasDesignatedSites) {
         if (isBreakdownPerSite && siteBreakdown.length > 0) {
             doc.setFont(fontName, 'bold'); doc.text("Price Breakdown per Site:", 14, finalY); finalY += 6;
-            const siteHeaders = ['Site Name'];
-            config.selectedProducts.forEach(pid => siteHeaders.push(`${AVAILABLE_PRODUCTS.find(x => x.id === pid)?.shortName || AVAILABLE_PRODUCTS.find(x => x.id === pid)?.name} Count`));
+            const siteHeaders = ['Hospital Name'];
+            config.selectedProducts.forEach(pid => {
+                if (pid === 'utd') siteHeaders.push('Clinicians');
+                else if (pid === 'lxd') siteHeaders.push('Bed Count');
+                else siteHeaders.push(`${AVAILABLE_PRODUCTS.find(x => x.id === pid)?.shortName || AVAILABLE_PRODUCTS.find(x => x.id === pid)?.name} Count`);
+            });
             if (!showSitesOnly) siteHeaders.push(`Est. Annual Cost (${displayCurrency})`);
 
             const siteBody = siteBreakdown.map(site => {
@@ -620,7 +637,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     doc.setFontSize(9); doc.setTextColor(0, 0, 0); doc.setFont(fontName, 'normal');
     
     const terms: { text: string, isRich?: boolean }[] = [];
-    if (isExtensionQuote) {
+    if (isExtensionQuote || isMidCycleQuote) {
         terms.push({ text: "The prices mentioned above are not final and subject to change in case of releasing an official RFP." });
         terms.push({ text: "The Internet access is a must for this subscription to be utilized." });
         terms.push({ text: "This budgetary proposal is valid for 30-days." });
@@ -658,7 +675,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     if (finalY > (isCp ? 250 : 260)) { doc.addPage(); finalY = 55; }
     
     // --- TECHNICAL SPECIFICATIONS SECTION ---
-    if (!isExtensionQuote) {
+    if (!isExtensionQuote && !isMidCycleQuote) {
       if (finalY > (isCp ? 230 : 245)) {
           doc.addPage();
           // Header rendered in loop at end
@@ -848,6 +865,16 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
              const totRow = ws.addRow(['Total (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15]); totRow.font = { bold: true }; totRow.numFmt = '#,##0.00';
              contentRowStart = 18;
          }
+      } else if (isMidCycleQuote && data.midCycleResults) {
+         const headRow = ws.addRow(['Description', 'Value']); headRow.font = { bold: true };
+         ws.addRow(['Product', data.midCycleResults.product]);
+         ws.addRow(['Calculated Annual Rate (USD)', data.midCycleResults.annualRate]).numFmt = '#,##0.00';
+         ws.addRow(['Months Covered', data.midCycleResults.durationMonths]).numFmt = '0.00';
+         ws.addRow(['End-User Price (USD)', data.midCycleResults.endUserGrossUSD]).numFmt = '#,##0.00';
+         ws.addRow(['End-User Price (SAR)', data.midCycleResults.grossSAR]).numFmt = '#,##0.00';
+         ws.addRow(['VAT (15%) (SAR)', data.midCycleResults.vatSAR]).numFmt = '#,##0.00';
+         ws.addRow(['Total (SAR)', data.midCycleResults.grandTotalSAR]).numFmt = '#,##0.00';
+         contentRowStart = ws.rowCount + 2;
       } else {
           let headers = ['Year', ...prodNames];
           if (isIndirect) headers.push('Total Net (USD)', 'Total (SAR)', 'VAT (15%)', 'Grand Total (SAR)');
@@ -971,7 +998,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           ws.addRow([]); ws.addRow([]);
           const siteTitle = ws.addRow(["Price Breakdown per Site"]); siteTitle.font = { bold: true, size: 14, color: { argb: 'FF007AC3' } };
           ws.addRow([]);
-          const siteHeaders = ['Site Name', ...prodNames]; if (!showSitesOnly) siteHeaders.push(`Est. Annual Cost (${displayCurrency})`);
+          const siteHeaders = ['Hospital Name'];
+          config.selectedProducts.forEach(pid => {
+              if (pid === 'utd') siteHeaders.push('Clinicians');
+              else if (pid === 'lxd') siteHeaders.push('Bed Count');
+              else siteHeaders.push(`${AVAILABLE_PRODUCTS.find(x => x.id === pid)?.shortName || pid} Count`);
+          });
+          if (!showSitesOnly) siteHeaders.push(`Est. Annual Cost (${displayCurrency})`);
           const sHeaderRow = ws.addRow(siteHeaders); sHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
           sHeaderRow.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF007AC3' } }; cell.alignment = { vertical: 'middle', horizontal: 'center' }; });
 
@@ -1201,10 +1234,31 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Designated Sites</h3>
             
-            <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer mb-4">
-              <input type="checkbox" checked={isBreakdownPerSite} onChange={e => setIsBreakdownPerSite(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+            <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+              <input type="checkbox" checked={isBreakdownPerSite} onChange={e => {
+                const checked = e.target.checked;
+                setIsBreakdownPerSite(checked);
+                if (checked && designatedSites.trim()) {
+                  setBulkPasteText(designatedSites);
+                  setDesignatedSites(''); // clear simple mode
+                } else if (!checked && siteBreakdown.length === 0 && bulkPasteText.trim()) {
+                  setDesignatedSites(bulkPasteText);
+                  setBulkPasteText(''); // clear advanced bulk mode if not used
+                } else if (!checked && siteBreakdown.length > 0) {
+                  setDesignatedSites(siteBreakdown.map(s => s.name).join('\n'));
+                }
+              }} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
               <span>Allow Price Breakdown per Site</span>
             </label>
+            
+            {isBreakdownPerSite && (
+              <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                <input type="checkbox" checked={showSitesOnly} onChange={e => setShowSitesOnly(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                <span>Hide price breakdown (Show sites and capacity only)</span>
+              </label>
+            )}
+
+            <div className="mb-4"></div>
 
             {!isBreakdownPerSite ? (
               <textarea
@@ -1224,32 +1278,70 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                 <button onClick={handleBulkPaste} className="mb-4 bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm font-medium hover:bg-blue-200">
                   Add Sites to List
                 </button>
-                <div className="space-y-2 mb-4">
-                  {siteBreakdown.map(site => (
-                    <div key={site.id} className="flex gap-2">
-                      <input
-                        type="text"
-                        className="flex-1 px-2 py-1 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        placeholder="Site name"
-                        value={site.name}
-                        onChange={e => {
-                          setSiteBreakdown(prev => prev.map(s => s.id === site.id ? { ...s, name: e.target.value } : s));
-                        }}
-                      />
-                      <button
-                        onClick={() => setSiteBreakdown(prev => prev.filter(s => s.id !== site.id))}
-                        className="text-red-500 hover:text-red-700 font-bold px-2"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    onClick={() => setSiteBreakdown(prev => [...prev, { id: Date.now().toString(), name: '', counts: {} }])}
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    + Add row
-                  </button>
+                <div className="flex flex-col h-[40vh]"> {/* scroll container context */}
+                  {/* Totals Counter - Sticky */}
+                  <div className="sticky top-0 z-10 flex flex-wrap gap-4 text-xs font-bold text-gray-600 dark:text-gray-400 p-2 mb-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 shadow-sm">
+                    <div className="w-full mb-1 text-gray-800 dark:text-gray-200">Expected Totals:</div>
+                    {config.selectedProducts.map(pid => {
+                      const expectedCount = config.productInputs[pid]?.count || 0;
+                      const enteredCount = siteBreakdown.reduce((sum, site) => sum + (site.counts[pid] || 0), 0);
+                      const isOver = enteredCount > expectedCount;
+                      const label = AVAILABLE_PRODUCTS.find(x => x.id === pid)?.shortName || pid;
+                      const unit = AVAILABLE_PRODUCTS.find(x => x.id === pid)?.countLabel || 'Count';
+                      return (
+                        <div key={pid} className={isOver ? 'text-red-500' : 'text-green-600 dark:text-green-400'}>
+                          {label} ({unit}): {enteredCount} / {expectedCount}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto pr-2 space-y-2">
+                    {siteBreakdown.map(site => (
+                      <div key={site.id} className="flex flex-row items-center gap-3 p-2 border rounded border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
+                        <input
+                          type="text"
+                          className="flex-1 min-w-[150px] px-3 py-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                          placeholder="Hospital name"
+                          value={site.name}
+                          onChange={e => setSiteBreakdown(prev => prev.map(s => s.id === site.id ? { ...s, name: e.target.value } : s))}
+                        />
+                        <div className="flex flex-wrap gap-4 items-center">
+                          {config.selectedProducts.map(pid => {
+                            const unit = AVAILABLE_PRODUCTS.find(x => x.id === pid)?.countLabel || 'Count';
+                            const label = AVAILABLE_PRODUCTS.find(x => x.id === pid)?.shortName || pid;
+                            return (
+                              <div key={pid} className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{label} {unit}:</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  className="w-16 px-2 py-1 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                  value={site.counts[pid] !== undefined ? site.counts[pid] : ''}
+                                  onChange={e => {
+                                    const val = e.target.value === '' ? '' : (parseInt(e.target.value) || 0);
+                                    setSiteBreakdown(prev => prev.map(s => s.id === site.id ? { ...s, counts: { ...s.counts, [pid]: val === '' ? 0 : val } } : s));
+                                  }}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <button
+                          onClick={() => setSiteBreakdown(prev => prev.filter(s => s.id !== site.id))}
+                          className="text-red-500 hover:text-red-700 font-bold px-2 text-lg shrink-0"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => setSiteBreakdown(prev => [...prev, { id: Date.now().toString(), name: '', counts: {} }])}
+                      className="text-sm mt-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 hover:underline font-medium block"
+                    >
+                      + Add Site Row
+                    </button>
+                  </div>
                 </div>
               </>
             )}

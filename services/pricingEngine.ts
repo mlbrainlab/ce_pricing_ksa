@@ -716,5 +716,56 @@ export const calculatePricing = (
     }
   }
 
+  // Mid-Cycle Add-on Logic
+  if (dealType === DealType.MID_CYCLE) {
+    let durationMonths = 0;
+    if (config.midCycleExpiryDate && config.midCycleStartDate) {
+      const expDate = new Date(config.midCycleExpiryDate);
+      const startDate = new Date(config.midCycleStartDate);
+      const diffTime = expDate.getTime() - startDate.getTime();
+      const diffDays = diffTime / (1000 * 3600 * 24);
+      durationMonths = diffDays > 0 ? diffDays / (365.25 / 12) : 0;
+    }
+
+    let netFactor = 1.0;
+    if (channel === ChannelType.FULFILMENT) netFactor = 0.95;
+    if (channel === ChannelType.PARTNER_SOURCED) netFactor = 0.9;
+    
+    let annualRate = 0;
+    if (config.midCycleProduct === "UTD_ADV") {
+      const spend = Number(config.midCycleExistingSpend) || 0;
+      annualRate = spend * 0.08;
+    } else if (config.midCycleProduct === "LXD_FLINK") {
+      const beds = Number(config.midCycleBedCount) || 0;
+      annualRate = beds * 12;
+    } else if (config.midCycleProduct === "LXD_IPE") {
+      const beds = Number(config.midCycleBedCount) || 0;
+      annualRate = beds * 16;
+    } else if (config.midCycleProduct === "LXD_FLINK_IPE") {
+      const beds = Number(config.midCycleBedCount) || 0;
+      annualRate = beds * 28;
+    }
+
+    let totalGross = (annualRate / 12) * Math.max(0, durationMonths);
+    if (config.midCycleWHT) {
+      totalGross = totalGross / WHT_FACTOR;
+    }
+
+    results.midCycleResults = {
+      product: config.midCycleProduct,
+      durationMonths,
+      annualRate,
+      endUserGrossUSD: totalGross,
+      netPriceUSD: totalGross * netFactor,
+      commissionUSD: totalGross * (1 - netFactor),
+      grossSAR: totalGross * EXCHANGE_RATE_SAR,
+      vatSAR: totalGross * EXCHANGE_RATE_SAR * 0.15,
+      grandTotalSAR: totalGross * EXCHANGE_RATE_SAR * 1.15,
+      netPriceSAR: totalGross * netFactor * EXCHANGE_RATE_SAR,
+      commissionSAR: totalGross * (1 - netFactor) * EXCHANGE_RATE_SAR,
+      whtApplied: config.midCycleWHT
+    };
+  }
+
   return results;
 };

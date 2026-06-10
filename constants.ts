@@ -1,12 +1,23 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.6.4';
+export const APP_VERSION = '6.6.5';
 
 export const CHANGELOG = [
   {
-    version: '6.6.4',
+    version: '6.6.5',
     date: new Date().toISOString().split('T')[0],
+    changes: [
+      'Mid-Cycle Add-on Quote functionality: Added structured workflows for UTD ADV, LXD FLINK, LXD IPE, and LXD FLINK+IPE expansions, including pro-rated monthly calculations and WHT adaptations.',
+      'Designated Sites UX enhancements: In-window site addition logic now arrays hospital name, clinicians, and bed count on simplified single rows.',
+      'Designated Sites workflow persistence: Ensures pasted text converts seamlessly to full site breakdowns dynamically without state loss when toggling.',
+      'Sites Export clarity: Export table headers now properly denote site names as "Hospital Name" and distinguish between "Clinicians" (UTD) and "Bed Count" (LXD).',
+      'Sites Export minimalism: Added functionality to omit extensive monetary distributions in exported sheets/PDFs, prioritizing clean site capability distributions.'
+    ]
+  },
+  {
+    version: '6.6.4',
+    date: '2025-06-05',
     changes: [
       'Extension Option B Expansion: Added customizable Uplift FPI% input applying specified rate to current spend for exact fractional and integer month calculation within 100K SAR limits.',
       'UI Refinement: Redesigned the Uplift FPI% fields with interactive "+" and "-" step buttons (incrementing/decrementing whole values) while supporting manual decimal inputs (up to one decimal place).',

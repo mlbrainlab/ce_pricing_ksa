@@ -2,6 +2,7 @@ export enum DealType {
   NEW_LOGO = "New Logo",
   RENEWAL = "Renewal",
   EXTENSION = "Extension",
+  MID_CYCLE = "Mid-Cycle Add-on",
 }
 
 export enum ChannelType {
@@ -82,6 +83,13 @@ export interface DealConfiguration {
   extensionFPI?: number | null;
   extensionVariant?: string;
   useFullExtension?: boolean;
+  // Mid-Cycle Add-on Fields
+  midCycleExpiryDate?: string;
+  midCycleStartDate?: string;
+  midCycleWHT?: boolean;
+  midCycleProduct?: string;
+  midCycleExistingSpend?: number | "";
+  midCycleBedCount?: number | "";
 }
 
 export interface CalculationOutput {
@@ -106,5 +114,6 @@ export interface CalculationOutput {
 
   currencyToDisplay: "USD" | "SAR";
   extensionResults?: any;
+  midCycleResults?: any;
   renewalNotes?: string[];
 }
