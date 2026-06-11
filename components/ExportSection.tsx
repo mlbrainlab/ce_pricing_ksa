@@ -297,11 +297,17 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
     let currentY = 170;
     doc.setTextColor(60, 60, 60);
-    const hasUTD = config.selectedProducts.includes('utd');
-    const hasLXD = config.selectedProducts.includes('lxd');
+
+    let hasUTD = config.selectedProducts.includes('utd');
+    let hasLXD = config.selectedProducts.includes('lxd');
+    
+    if (isMidCycleQuote) {
+        hasUTD = config.midCycleProduct === 'UTD_ADV';
+        hasLXD = config.midCycleProduct?.startsWith('LXD_') ?? false;
+    }
     
     if (hasUTD) {
-        const variant = config.productInputs['utd']?.variant || '';
+        const variant = isMidCycleQuote ? 'UTDADV' : (config.productInputs['utd']?.variant || '');
         let title = "UpToDate\u00AE";
         if (variant === 'ANYWHERE') title = "UpToDate\u00AE Anywhere";
         if (variant === 'UTDADV') title = "UpToDate\u00AE Advanced";
@@ -311,24 +317,45 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         
         doc.setFontSize(14); doc.setFont(fontName, 'normal');
         let subHeading = "Clinical Decision Support Solution";
+        if (isMidCycleQuote) subHeading = "";
+        
         if (variant === 'UTDEE-EAI') {
             doc.text(`${subHeading} with Expert AI`, 105, currentY, { align: 'center' });
             const textWidth = doc.getTextWidth(`${subHeading} with Expert AI`);
             doc.addImage(EAI_LOGO_BASE64, 'PNG', 105 + (textWidth / 2) + 2, currentY - 4.5, 5, 5, 'EAI_LOGO', 'FAST');
             currentY += 20;
-        } else {
+        } else if (subHeading) {
             doc.setFontSize(12);
             doc.text(subHeading, 105, currentY, { align: 'center' });
+            currentY += 20;
+        } else {
             currentY += 20;
         }
     }
     
     if (hasLXD) {
-        const variant = config.productInputs['lxd']?.variant || '';
+        let variant = config.productInputs['lxd']?.variant || '';
+        if (isMidCycleQuote) variant = config.midCycleProduct?.replace('LXD_', '') || '';
         let subHeading = "Drug Referential Solution";
         if (variant.includes('FLINK')) subHeading = variant.includes('IPE') ? "including Formulink\u2122 and Integrated Patient Education" : "including Formulink\u2122";
-        doc.setFontSize(22); doc.setFont(fontName, 'bold'); doc.text("Lexidrug\u00AE", 105, currentY, { align: 'center' }); currentY += 8;
-        doc.setFontSize(12); doc.setFont(fontName, 'normal'); doc.text(subHeading, 105, currentY, { align: 'center' }); currentY += 15;
+        
+        let title = "Lexidrug\u00AE";
+        if (isMidCycleQuote) {
+            title = "Formulink\u2122";
+            if (variant === 'FLINK_IPE') {
+                title = "Formulink\u2122 & Integrated Patient Education Solution";
+            } else if (variant === 'IPE') {
+                title = "Integrated Patient Education Solution";
+            }
+            subHeading = "";
+        }
+        
+        doc.setFontSize(22); doc.setFont(fontName, 'bold'); doc.text(title, 105, currentY, { align: 'center' }); currentY += 8;
+        if (subHeading) {
+            doc.setFontSize(12); doc.setFont(fontName, 'normal'); doc.text(subHeading, 105, currentY, { align: 'center' }); currentY += 15;
+        } else {
+            currentY += 15;
+        }
     }
     
     const finalRepName = isCp ? "Alaa Hanafy" : repName;
@@ -436,16 +463,43 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         ];
       }
     } else if (isMidCycleQuote && data.midCycleResults) {
-      tableHead = [['Description', 'Value']];
-      tableBody = [
-        ['Product', data.midCycleResults.product],
-        ['Calculated Annual Rate (USD)', formatMoney(data.midCycleResults.annualRate, 'USD')],
-        ['Months Covered', data.midCycleResults.durationMonths.toFixed(2)],
-        ['End-User Price (USD)', formatMoney(data.midCycleResults.endUserGrossUSD, 'USD')],
-        ['End-User Price (SAR)', formatMoney(data.midCycleResults.grossSAR, 'SAR')],
-        ['VAT (15%) (SAR)', formatMoney(data.midCycleResults.vatSAR, 'SAR')],
-        ['Total (SAR)', formatMoney(data.midCycleResults.grandTotalSAR, 'SAR')]
-      ];
+      let productDisplay = data.midCycleResults.product;
+      if (data.midCycleResults.dlmSelected) {
+          productDisplay += " + DLM Service";
+      }
+
+      const formatD = (d: string) => { 
+        if(!d) return 'N/A';
+        const date = new Date(d);
+        const mo = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; 
+        return `${mo[date.getMonth()]} ${date.getDate().toString().padStart(2, '0')}, ${date.getFullYear()}`; 
+      };
+      const durationLabel = `${formatD(config.midCycleStartDate)} to\n${formatD(config.midCycleExpiryDate)}\n(${Math.round(data.midCycleResults.durationMonths)} Months)`;
+
+      const isLxd = config.midCycleProduct?.startsWith('LXD_');
+      columnStyles[1] = isLxd ? { fillColor: [224, 242, 254] } : { fillColor: [220, 252, 231] };
+      columnStyles[2] = { fontStyle: 'bold' };
+
+      const productNameDisplay = isLxd ? 'Lexidrug' : 'UpToDate';
+
+      if (isIndirect) {
+        columnStyles[4] = { fontStyle: 'bold' };
+        tableHead = [['Duration', `${productNameDisplay} (SAR)`, 'Total (SAR)', 'VAT (15%)', 'Grand Total\n(SAR)']];
+        tableBody = [[
+          durationLabel,
+          formatMoney(data.midCycleResults.grossSAR, 'SAR'),
+          formatMoney(data.midCycleResults.grossSAR, 'SAR'),
+          formatMoney(data.midCycleResults.vatSAR, 'SAR'),
+          formatMoney(data.midCycleResults.grandTotalSAR, 'SAR')
+        ]];
+      } else {
+        tableHead = [['Duration', `${productNameDisplay} (USD)`, 'Total (USD)']];
+        tableBody = [[
+          durationLabel,
+          formatMoney(data.midCycleResults.endUserGrossUSD, 'USD'),
+          formatMoney(data.midCycleResults.endUserGrossUSD, 'USD')
+        ]];
+      }
     } else {
       const productColIndices: Record<string, number> = {};
       config.selectedProducts.forEach((pid, idx) => { productColIndices[pid] = 1 + idx; });
@@ -526,24 +580,32 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       return currentY;
     };
 
-    if (!isExtensionQuote && !isMidCycleQuote) {
+    if (!isExtensionQuote) {
       doc.setFontSize(14); doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.setFont(fontName, 'bold'); doc.text("Operating Statistics", 14, finalY); finalY += 6;
       doc.setFontSize(9); doc.setTextColor(0, 0, 0);
 
       const statsParts: string[] = [];
-      config.selectedProducts.forEach(pid => {
-          const p = AVAILABLE_PRODUCTS.find(x => x.id === pid); const inp = config.productInputs[pid];
-          if(p && inp) {
-              let productName = p.name;
-              if (pid === 'utd') productName = 'UpToDate'; if (pid === 'lxd') productName = 'Lexidrug';
-              let countLabelText = p.countLabel;
-              if (p.countLabel === 'HC') countLabelText = 'clinicians'; if (p.countLabel === 'BC') countLabelText = 'active beds';
-              if (pid === 'lxd' && inp.variant && (inp.variant.includes('Seats') || inp.variant === 'Hospital Pharmacy Model')) countLabelText = 'seats';
-              const statsToPrint = inp.count > 0 ? inp.count : (inp.existingCount || 0);
-              if (statsToPrint > 0) statsParts.push(`${statsToPrint.toLocaleString('en-US')} ${countLabelText} for ${productName}`);
+      if (isMidCycleQuote) {
+          if (config.midCycleProduct === 'UTD_ADV' && config.midCycleExistingSpend) {
+               statsParts.push(`$${Number(config.midCycleExistingSpend).toLocaleString('en-US')} existing spend for UpToDate`);
+          } else if (config.midCycleProduct?.startsWith('LXD_') && config.midCycleBedCount) {
+               statsParts.push(`${Number(config.midCycleBedCount).toLocaleString('en-US')} active beds for Lexidrug`);
           }
-      });
+      } else {
+          config.selectedProducts.forEach(pid => {
+              const p = AVAILABLE_PRODUCTS.find(x => x.id === pid); const inp = config.productInputs[pid];
+              if(p && inp) {
+                  let productName = p.name;
+                  if (pid === 'utd') productName = 'UpToDate'; if (pid === 'lxd') productName = 'Lexidrug';
+                  let countLabelText = p.countLabel;
+                  if (p.countLabel === 'HC') countLabelText = 'clinicians'; if (p.countLabel === 'BC') countLabelText = 'active beds';
+                  if (pid === 'lxd' && inp.variant && (inp.variant.includes('Seats') || inp.variant === 'Hospital Pharmacy Model')) countLabelText = 'seats';
+                  const statsToPrint = inp.count > 0 ? inp.count : (inp.existingCount || 0);
+                  if (statsToPrint > 0) statsParts.push(`${statsToPrint.toLocaleString('en-US')} ${countLabelText} for ${productName}`);
+              }
+          });
+      }
       
       if(statsParts.length > 0 && showStats) {
           doc.setFont(fontName, 'normal');
@@ -637,7 +699,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     doc.setFontSize(9); doc.setTextColor(0, 0, 0); doc.setFont(fontName, 'normal');
     
     const terms: { text: string, isRich?: boolean }[] = [];
-    if (isExtensionQuote || isMidCycleQuote) {
+    if (isExtensionQuote) {
         terms.push({ text: "The prices mentioned above are not final and subject to change in case of releasing an official RFP." });
         terms.push({ text: "The Internet access is a must for this subscription to be utilized." });
         terms.push({ text: "This budgetary proposal is valid for 30-days." });
@@ -866,14 +928,55 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
              contentRowStart = 18;
          }
       } else if (isMidCycleQuote && data.midCycleResults) {
-         const headRow = ws.addRow(['Description', 'Value']); headRow.font = { bold: true };
-         ws.addRow(['Product', data.midCycleResults.product]);
-         ws.addRow(['Calculated Annual Rate (USD)', data.midCycleResults.annualRate]).numFmt = '#,##0.00';
-         ws.addRow(['Months Covered', data.midCycleResults.durationMonths]).numFmt = '0.00';
-         ws.addRow(['End-User Price (USD)', data.midCycleResults.endUserGrossUSD]).numFmt = '#,##0.00';
-         ws.addRow(['End-User Price (SAR)', data.midCycleResults.grossSAR]).numFmt = '#,##0.00';
-         ws.addRow(['VAT (15%) (SAR)', data.midCycleResults.vatSAR]).numFmt = '#,##0.00';
-         ws.addRow(['Total (SAR)', data.midCycleResults.grandTotalSAR]).numFmt = '#,##0.00';
+         let productDisplay = data.midCycleResults.product;
+         if (data.midCycleResults.dlmSelected) {
+             productDisplay += " + DLM Service";
+         }
+         
+         const formatD = (d: string) => { 
+            if(!d) return 'N/A';
+            const date = new Date(d);
+            const mo = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; 
+            return `${mo[date.getMonth()]} ${date.getDate().toString().padStart(2, '0')}, ${date.getFullYear()}`; 
+         };
+         
+         const isLxd = config.midCycleProduct?.startsWith('LXD_');
+         const productNameDisplay = isLxd ? 'Lexidrug' : 'UpToDate';
+         const durationLabel = `${formatD(config.midCycleStartDate)} to ${formatD(config.midCycleExpiryDate)} (${Math.round(data.midCycleResults.durationMonths)} Months)`;
+
+         if (isIndirect) {
+             const headers = ['Duration', `${productNameDisplay} (SAR)`, 'Total (SAR)', 'VAT (15%)', 'Grand Total (SAR)'];
+             const headerRow = ws.addRow(headers);
+             headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+             headerRow.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF007AC3' } }; cell.alignment = { vertical: 'middle', horizontal: 'center' }; });
+
+             const row = ws.addRow([
+                 durationLabel,
+                 data.midCycleResults.grossSAR,
+                 data.midCycleResults.grossSAR,
+                 data.midCycleResults.vatSAR,
+                 data.midCycleResults.grandTotalSAR
+             ]);
+             row.getCell(2).numFmt = '#,##0.00';
+             row.getCell(3).numFmt = '#,##0.00';
+             row.getCell(4).numFmt = '#,##0.00';
+             row.getCell(5).numFmt = '#,##0.00';
+             row.getCell(5).font = { bold: true };
+         } else {
+             const headers = ['Duration', `${productNameDisplay} (USD)`, 'Total (USD)'];
+             const headerRow = ws.addRow(headers);
+             headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+             headerRow.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF007AC3' } }; cell.alignment = { vertical: 'middle', horizontal: 'center' }; });
+
+             const row = ws.addRow([
+                 durationLabel,
+                 data.midCycleResults.endUserGrossUSD,
+                 data.midCycleResults.endUserGrossUSD
+             ]);
+             row.getCell(2).numFmt = '#,##0.00';
+             row.getCell(3).numFmt = '#,##0.00';
+             row.getCell(3).font = { bold: true };
+         }
          contentRowStart = ws.rowCount + 2;
       } else {
           let headers = ['Year', ...prodNames];
@@ -1103,10 +1206,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                     <input type="checkbox" checked={isUtdSm ? false : showEmrIntegration} onChange={(e) => setShowEmrIntegration(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                     <span>Include EMR Term</span>
                   </label>
-                  <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                    <input type="checkbox" checked={isUtdSm ? false : hasOptOutClause} onChange={(e) => setHasOptOutClause(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
-                    <span>Opt-Out Clause</span>
-                  </label>
+                  {!isMidCycleQuote && (
+                    <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input type="checkbox" checked={isUtdSm ? false : hasOptOutClause} onChange={(e) => setHasOptOutClause(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
+                      <span>Opt-Out Clause</span>
+                    </label>
+                  )}
                   {canShowFLinkIntegration && (
                     <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                       <input type="checkbox" checked={showFLinkIntegration} onChange={(e) => setShowFLinkIntegration(e.target.checked)} className="rounded text-purple-600 focus:ring-purple-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
@@ -1427,10 +1532,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                                 <input type="checkbox" checked={isUtdSm ? false : showEmrIntegration} onChange={(e) => setShowEmrIntegration(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                                 <span>Include EMR Term</span>
                             </label>
-                            <label className={`flex items-center space-x-2 text-xs ${isUtdSm ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}>
-                                <input type="checkbox" checked={isUtdSm ? false : hasOptOutClause} onChange={(e) => setHasOptOutClause(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
-                                <span>Opt-Out Clause</span>
-                            </label>
+                            {!isMidCycleQuote && (
+                                <label className={`flex items-center space-x-2 text-xs ${isUtdSm ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}>
+                                    <input type="checkbox" checked={isUtdSm ? false : hasOptOutClause} onChange={(e) => setHasOptOutClause(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
+                                    <span>Opt-Out Clause</span>
+                                </label>
+                            )}
                             {canShowFLinkIntegration && (
                                 <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                                     <input type="checkbox" checked={showFLinkIntegration} onChange={(e) => setShowFLinkIntegration(e.target.checked)} className="rounded text-purple-600 focus:ring-purple-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />

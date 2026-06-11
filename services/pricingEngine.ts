@@ -724,7 +724,7 @@ export const calculatePricing = (
       const startDate = new Date(config.midCycleStartDate);
       const diffTime = expDate.getTime() - startDate.getTime();
       const diffDays = diffTime / (1000 * 3600 * 24);
-      durationMonths = diffDays > 0 ? diffDays / (365.25 / 12) : 0;
+      durationMonths = diffDays > 0 ? Math.ceil(diffDays / (365.25 / 12)) : 0;
     }
 
     let netFactor = 1.0;
@@ -741,18 +741,34 @@ export const calculatePricing = (
     } else if (config.midCycleProduct === "LXD_IPE") {
       const beds = Number(config.midCycleBedCount) || 0;
       annualRate = beds * 16;
+      if (config.midCycleDlm) annualRate += 15000;
     } else if (config.midCycleProduct === "LXD_FLINK_IPE") {
       const beds = Number(config.midCycleBedCount) || 0;
       annualRate = beds * 28;
+      if (config.midCycleDlm) annualRate += 15000;
     }
 
-    let totalGross = (annualRate / 12) * Math.max(0, durationMonths);
+    let totalGross = 0;
+    
     if (config.midCycleWHT) {
-      totalGross = totalGross / WHT_FACTOR;
+      annualRate = annualRate / WHT_FACTOR;
+    }
+
+    totalGross = (annualRate / 12) * Math.max(0, durationMonths);
+
+    if (config.rounding) {
+        if (channel === ChannelType.DIRECT) {
+            totalGross = Math.ceil(totalGross / 100) * 100;
+        } else {
+            const rawSAR = totalGross * EXCHANGE_RATE_SAR;
+            const roundedSAR = Math.ceil(rawSAR / 1000) * 1000;
+            totalGross = roundedSAR / EXCHANGE_RATE_SAR;
+        }
     }
 
     results.midCycleResults = {
       product: config.midCycleProduct,
+      dlmSelected: config.midCycleDlm,
       durationMonths,
       annualRate,
       endUserGrossUSD: totalGross,

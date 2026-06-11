@@ -1,9 +1,17 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.6.5';
+export const APP_VERSION = '6.6.6';
 
 export const CHANGELOG = [
+  {
+    version: '6.6.6',
+    date: new Date().toISOString().split('T')[0],
+    changes: [
+      'Applying WHT on DLM and including DLM in prorated mid-cycle calculation.',
+      'Adjusted mid-cycle duration calculation to prorate annual rates including DLM additions and factoring WHT into the base calculation.'
+    ]
+  },
   {
     version: '6.6.5',
     date: new Date().toISOString().split('T')[0],

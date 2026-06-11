@@ -90,6 +90,7 @@ export interface DealConfiguration {
   midCycleProduct?: string;
   midCycleExistingSpend?: number | "";
   midCycleBedCount?: number | "";
+  midCycleDlm?: boolean;
 }
 
 export interface CalculationOutput {

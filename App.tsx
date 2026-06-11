@@ -128,6 +128,7 @@ const App: React.FC = () => {
   const [midCycleExistingSpend, setMidCycleExistingSpend] = useState<number | "">("");
   const [midCycleBedCount, setMidCycleBedCount] = useState<number | "">("");
   const [midCycleWHT, setMidCycleWHT] = useState<boolean>(false);
+  const [midCycleDlm, setMidCycleDlm] = useState<boolean>(false);
 
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [years, setYears] = useState<number>(3);
@@ -273,6 +274,16 @@ const App: React.FC = () => {
       setChannel(ChannelType.FULFILMENT);
     }
   }, [dealType]);
+
+  useEffect(() => {
+    if (dealType === DealType.MID_CYCLE && midCycleStartDate) {
+      setUseStartDate(true);
+      const [year, month] = midCycleStartDate.split("-");
+      if (year && month) {
+        setStartMonthYear(`${year}-${month}`);
+      }
+    }
+  }, [dealType, midCycleStartDate]);
 
   // EFFECT: Auto-enable rounding when Fulfillment or Partner Sourced
   useEffect(() => {
@@ -420,6 +431,7 @@ const App: React.FC = () => {
       midCycleProduct,
       midCycleExistingSpend,
       midCycleBedCount,
+      midCycleDlm,
     };
   }, [
     dealType,
@@ -456,6 +468,7 @@ const App: React.FC = () => {
     midCycleProduct,
     midCycleExistingSpend,
     midCycleBedCount,
+    midCycleDlm,
   ]);
 
   // Results
@@ -1158,16 +1171,31 @@ const App: React.FC = () => {
                   </div>
                 )}
 
+                {(midCycleProduct === "LXD_IPE" || midCycleProduct === "LXD_FLINK_IPE") && (
+                  <div>
+                    <label className={`flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 w-full p-2 rounded border shadow-sm transition ${!midCycleBedCount ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700' : 'cursor-pointer bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750'}`}>
+                      <input
+                        type="checkbox"
+                        checked={midCycleDlm}
+                        onChange={(e) => setMidCycleDlm(e.target.checked)}
+                        disabled={!midCycleBedCount}
+                        className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 w-4 h-4 disabled:cursor-not-allowed cursor-pointer"
+                      />
+                      <span className="font-medium">Include DLM Service (+$15,000 WHT-applicable)</span>
+                    </label>
+                  </div>
+                )}
+                
                 <div className="flex items-center mt-2">
                   <input
                     type="checkbox"
-                    id="mid-cycle-wht"
+                    id="mid-cycle-wht-checkbox"
                     checked={midCycleWHT}
                     onChange={(e) => setMidCycleWHT(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
                   />
                   <label
-                    htmlFor="mid-cycle-wht"
+                    htmlFor="mid-cycle-wht-checkbox"
                     className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
                     Apply WHT
@@ -2582,13 +2610,13 @@ const App: React.FC = () => {
               </div>
               
               <div className="p-6 space-y-6">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
                   <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
                     <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">
                       Months Covered
                     </div>
                     <div className="text-xl font-bold text-blue-700 dark:text-blue-300 font-sans">
-                      {results.midCycleResults.durationMonths.toFixed(2)}
+                      {Math.round(results.midCycleResults.durationMonths)}
                     </div>
                   </div>
                   <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-100 dark:border-green-800">
@@ -2599,16 +2627,6 @@ const App: React.FC = () => {
                       {formatCurrency(results.midCycleResults.annualRate, "USD")}
                     </div>
                   </div>
-                  {results.midCycleResults.whtApplied && (
-                    <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800">
-                      <div className="text-xs text-purple-600 dark:text-purple-400 uppercase font-sans">
-                        WHT Factor Applied
-                      </div>
-                      <div className="text-xl font-bold text-purple-700 dark:text-purple-300 font-sans">
-                        0.95
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
@@ -2621,13 +2639,12 @@ const App: React.FC = () => {
                         End-User Price
                       </div>
                       <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
-                        {formatCurrency(results.midCycleResults.endUserGrossUSD, "USD")}
+                        {isIndirect 
+                          ? formatCurrency(results.midCycleResults.grossSAR, "SAR")
+                          : formatCurrency(results.midCycleResults.endUserGrossUSD, "USD")}
                       </div>
                       {isIndirect && (
                         <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                          <div>
-                            SAR: {formatCurrency(results.midCycleResults.grossSAR, "SAR")}
-                          </div>
                           <div>
                             VAT (15%): {formatCurrency(results.midCycleResults.vatSAR, "SAR")}
                           </div>
