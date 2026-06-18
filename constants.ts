@@ -1,9 +1,17 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.6.6';
+export const APP_VERSION = '6.6.7';
 
 export const CHANGELOG = [
+  {
+    version: '6.6.7',
+    date: new Date().toISOString().split('T')[0],
+    changes: [
+      'Added EAI Activation toggle for UTD with a 3% uplift defaults to ON for new business and 2026 renewals.',
+      'Reflected EAI inclusion silently within core FPI and List computations as per 2026 mandates.'
+    ]
+  },
   {
     version: '6.6.6',
     date: new Date().toISOString().split('T')[0],

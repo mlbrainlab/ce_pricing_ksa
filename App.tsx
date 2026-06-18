@@ -266,8 +266,16 @@ const App: React.FC = () => {
   useEffect(() => {
     if (dealType === DealType.RENEWAL) {
       setApplyWHT(false);
+      // Sync UTD EAI Activation to 11% baseline for renewals
+      if (selectedProductIds.includes("utd")) {
+        const utdInput = productInputs["utd"];
+        if (utdInput && (utdInput.eaiActivation === true || utdInput.eaiActivation === undefined)) {
+          setRenewalUpliftUTD(11);
+        }
+      }
     } else {
       setApplyWHT(true);
+      // If going from Renewal back to New Logo, no UI rate to change, but if needed we could reset
     }
 
     if (dealType === DealType.EXTENSION) {
@@ -305,7 +313,12 @@ const App: React.FC = () => {
         setUtdRateVal(8);
         // Uplift Rates
         setRenewalUpliftGlobal(8);
-        setRenewalUpliftUTD(8);
+        const utdInput = productInputs["utd"];
+        if (dealType === DealType.RENEWAL && utdInput && (utdInput.eaiActivation === true || utdInput.eaiActivation === undefined)) {
+          setRenewalUpliftUTD(11);
+        } else {
+          setRenewalUpliftUTD(8);
+        }
       } else if (selectedProductIds.includes("lxd")) {
         // Structure Rates
         setGlobalRateVal(5);
@@ -636,6 +649,15 @@ const App: React.FC = () => {
     field: keyof ProductInput,
     value: string | number | boolean,
   ) => {
+    // EAI Activation Renewal Uplift sync
+    if (id === "utd" && field === "eaiActivation" && dealType === DealType.RENEWAL) {
+      if (value === true) {
+        setRenewalUpliftUTD(11);
+      } else {
+        setRenewalUpliftUTD(8);
+      }
+    }
+
     setProductInputs((prev) => {
       const prevInput = prev[id];
       const newState = {
@@ -683,7 +705,11 @@ const App: React.FC = () => {
           newState[id].variant = "UTDEE";
           if (id === "utd") {
             setUtdRateVal(8);
-            setRenewalUpliftUTD(8);
+            if (newState[id].eaiActivation === true || newState[id].eaiActivation === undefined) {
+              setRenewalUpliftUTD(11);
+            } else {
+              setRenewalUpliftUTD(8);
+            }
           }
         } else {
           newState[id].variant = value as string;
@@ -1647,6 +1673,27 @@ const App: React.FC = () => {
                                     </button>
                                   </div>
                                 </div>
+
+                                {/* EAI Activation Checkbox */}
+                                {product.id === "utd" && (dealType === DealType.NEW_LOGO || dealType === DealType.RENEWAL) && (
+                                  <div className="col-span-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 p-2 rounded flex items-center mt-1">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                      checked={input.eaiActivation ?? true}
+                                      onChange={(e) =>
+                                        handleInputChange(
+                                          product.id,
+                                          "eaiActivation",
+                                          e.target.checked,
+                                        )
+                                      }
+                                    />
+                                    <span className="ml-2 text-xs text-indigo-700 dark:text-indigo-300 font-medium tracking-tight">
+                                      EAI Activation (+3%)
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )}

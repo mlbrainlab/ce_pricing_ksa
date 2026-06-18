@@ -35,6 +35,7 @@ export interface ProductInput {
   dph?: number; // Dollars Per Head (for UTD Renewal)
   forceHeadcountOverride?: boolean; // If true, prioritize HC calculation if higher
   changeInStats?: boolean; // For UTD EE Upsell (Switching/Changing stats)
+  eaiActivation?: boolean; // Toggle for EAI 3% uplift
 }
 
 export interface ProductYearlyData {

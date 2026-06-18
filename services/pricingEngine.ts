@@ -120,6 +120,12 @@ export const calculatePricing = (
       } else {
         listRate = UTD_VARIANTS[inputs.variant] || 0;
       }
+      
+      // EAI Activation: +3% on list price for New Business / base list conversions
+      const eaiActive = inputs.eaiActivation ?? true;
+      if (eaiActive) {
+        listRate = listRate * 1.03;
+      }
     } else if (prodId === "lxd") {
       listRate = LXD_VARIANTS[inputs.variant] || 0;
     } else {
@@ -201,7 +207,7 @@ export const calculatePricing = (
           } else {
             if (isStatsIncrease) {
               // If stats changed and are higher, AND VARIANT CHANGED, use the list price
-              const gross = UTD_VARIANTS[currentTarget] * inputs.count;
+              const gross = listRate * inputs.count;
               const net =
                 gross *
                 (1 - (parseFloat(inputs.baseDiscount as any) || 0) / 100);
