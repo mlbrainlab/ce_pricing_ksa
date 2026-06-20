@@ -9,6 +9,7 @@ import ExcelJS from 'exceljs';
 
 import { SAMIR_WHITE_LOGO_BASE64 } from '../samirLogo';
 import { WK_LOGO_BASE64 } from '../wkLogo';
+import { EAI_LOGO_BASE64 } from '../eaiLogo';
 
 interface ExportSectionProps {
   data: CalculationOutput;
@@ -19,6 +20,7 @@ interface ExportSectionProps {
   setStartMonthYear: (val: string) => void;
   isExtensionQuote?: boolean;
   extensionResults?: any;
+  isMidCycleQuote?: boolean;
   renewalNotes?: string[];
 }
 
@@ -43,6 +45,7 @@ export const PRODUCT_FULL_NAMES: Record<string, string> = {
   "ANYWHERE": "UpToDate® Anywhere",
   "UTDADV": "UpToDate® Advanced™",
   "UTDEE": "UpToDate® Enterprise™",
+  "UTDEE-EAI": "UpToDate® Enterprise with Expert AI",
   "SM": "UpToDate® Subscriber Manager",
   "BASE PKG": "Lexidrug® Base Package",
   "BASE PKG+FLINK": "Lexidrug® Base Package + Formulary Link",
@@ -59,9 +62,13 @@ interface SiteBreakdownItem {
   counts: Record<string, number>; // productId -> count
 }
 
+const formatMoney = (amount: number, currency: string) => { 
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount); 
+};
+
 export const ExportSection: React.FC<ExportSectionProps> = ({ 
   data, config, useStartDate, setUseStartDate, startMonthYear, setStartMonthYear,
-  isExtensionQuote, extensionResults, renewalNotes = []
+  isExtensionQuote, extensionResults, isMidCycleQuote, renewalNotes = []
 }) => {
   const [customerName, setCustomerName] = useState('');
   const [repName, setRepName] = useState(() => localStorage.getItem('wk_rep_name') || '');
@@ -71,6 +78,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const [isExcelLoading, setIsExcelLoading] = useState(false);
   
   const [includeRenewalIncreaseInfo, setIncludeRenewalIncreaseInfo] = useState(false);
+  const [includeCalcDetails, setIncludeCalcDetails] = useState(true);
   React.useEffect(() => {
     const authName = localStorage.getItem('wk_auth_name');
     if (authName) {
@@ -88,6 +96,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const [pdfError, setPdfError] = useState<string | null>(null);
 
   const isUtdSm = config.selectedProducts.includes('utd') && config.productInputs['utd']?.variant === 'SM';
+  const isIndirect = config.channel !== ChannelType.DIRECT;
   const [showStats, setShowStats] = useState(true);
   const [showMonthlyCost, setShowMonthlyCost] = useState(false);
   const [showTotals, setShowTotals] = useState(true);
@@ -277,38 +286,76 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           }
       };
 
-      const formatMoney = (amount: number, currency: string) => { return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount); };
-
       renderHeader(true);
       doc.setFontSize(26); doc.setFont(fontName, 'bold'); doc.setTextColor(255, 255, 255);
       
       let proposalTitle = "BUDGETARY COMMERCIAL\nPROPOSAL";
       if (config.dealType === DealType.RENEWAL) proposalTitle = "BUDGETARY COMMERCIAL\nPROPOSAL [RENEWAL]";
       else if (config.dealType === DealType.EXTENSION) proposalTitle = "BUDGETARY COMMERCIAL\nPROPOSAL [EXTENSION]";
+      else if (config.dealType === DealType.MID_CYCLE) proposalTitle = "BUDGETARY COMMERCIAL\nPROPOSAL [MID-CYCLE ADD-ON]";
       doc.text(proposalTitle, 105, 95, { align: 'center' });
 
     let currentY = 170;
     doc.setTextColor(60, 60, 60);
-    const hasUTD = config.selectedProducts.includes('utd');
-    const hasLXD = config.selectedProducts.includes('lxd');
+
+    let hasUTD = config.selectedProducts.includes('utd');
+    let hasLXD = config.selectedProducts.includes('lxd');
+    
+    if (isMidCycleQuote) {
+        hasUTD = config.midCycleProduct === 'UTD_ADV';
+        hasLXD = config.midCycleProduct?.startsWith('LXD_') ?? false;
+    }
     
     if (hasUTD) {
-        const variant = config.productInputs['utd']?.variant || '';
+        const variant = isMidCycleQuote ? 'UTDADV' : (config.productInputs['utd']?.variant || '');
         let title = "UpToDate\u00AE";
         if (variant === 'ANYWHERE') title = "UpToDate\u00AE Anywhere";
         if (variant === 'UTDADV') title = "UpToDate\u00AE Advanced";
-        if (variant === 'UTDEE') title = "UpToDate\u00AE Enterprise";
+        if (variant === 'UTDEE' || variant === 'UTDEE-EAI') title = "UpToDate\u00AE Enterprise";
         if (variant === 'SM') title = "UpToDate\u00AE Subscriber Manager";
         doc.setFontSize(22); doc.setFont(fontName, 'bold'); doc.text(title, 105, currentY, { align: 'center' }); currentY += 8;
-        doc.setFontSize(12); doc.setFont(fontName, 'normal'); doc.text("Clinical Decision Support Solution", 105, currentY, { align: 'center' }); currentY += 20;
+        
+        doc.setFontSize(14); doc.setFont(fontName, 'normal');
+        let subHeading = "Clinical Decision Support Solution";
+        if (isMidCycleQuote) subHeading = "";
+        
+        if (variant === 'UTDEE-EAI') {
+            doc.text(`${subHeading} with Expert AI`, 105, currentY, { align: 'center' });
+            const textWidth = doc.getTextWidth(`${subHeading} with Expert AI`);
+            doc.addImage(EAI_LOGO_BASE64, 'PNG', 105 + (textWidth / 2) + 2, currentY - 4.5, 5, 5, 'EAI_LOGO', 'FAST');
+            currentY += 20;
+        } else if (subHeading) {
+            doc.setFontSize(12);
+            doc.text(subHeading, 105, currentY, { align: 'center' });
+            currentY += 20;
+        } else {
+            currentY += 20;
+        }
     }
     
     if (hasLXD) {
-        const variant = config.productInputs['lxd']?.variant || '';
+        let variant = config.productInputs['lxd']?.variant || '';
+        if (isMidCycleQuote) variant = config.midCycleProduct?.replace('LXD_', '') || '';
         let subHeading = "Drug Referential Solution";
         if (variant.includes('FLINK')) subHeading = variant.includes('IPE') ? "including Formulink\u2122 and Integrated Patient Education" : "including Formulink\u2122";
-        doc.setFontSize(22); doc.setFont(fontName, 'bold'); doc.text("Lexidrug\u00AE", 105, currentY, { align: 'center' }); currentY += 8;
-        doc.setFontSize(12); doc.setFont(fontName, 'normal'); doc.text(subHeading, 105, currentY, { align: 'center' }); currentY += 15;
+        
+        let title = "Lexidrug\u00AE";
+        if (isMidCycleQuote) {
+            title = "Formulink\u2122";
+            if (variant === 'FLINK_IPE') {
+                title = "Formulink\u2122 & Integrated Patient Education Solution";
+            } else if (variant === 'IPE') {
+                title = "Integrated Patient Education Solution";
+            }
+            subHeading = "";
+        }
+        
+        doc.setFontSize(22); doc.setFont(fontName, 'bold'); doc.text(title, 105, currentY, { align: 'center' }); currentY += 8;
+        if (subHeading) {
+            doc.setFontSize(12); doc.setFont(fontName, 'normal'); doc.text(subHeading, 105, currentY, { align: 'center' }); currentY += 15;
+        } else {
+            currentY += 15;
+        }
     }
     
     const finalRepName = isCp ? "Alaa Hanafy" : repName;
@@ -406,12 +453,52 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           ['Product', PRODUCT_FULL_NAMES[extensionResults.variant] || extensionResults.variant],
           ['Dates', getExtensionDates()],
           ['Current Spend of Last Year (SAR)', formatMoney(extensionResults.currentSpend * EXCHANGE_RATE_SAR, 'SAR')],
+          ['Extension FPI Percentage', `${(extensionResults.fpiPercentage || 0).toFixed(2)}%`],
+          ['Effective Monthly Cost (SAR)', formatMoney(extensionResults.monthlyCostSAR, 'SAR')],
           ['Daily Cost (SAR)', formatMoney((extensionResults.monthlyCost / 30) * EXCHANGE_RATE_SAR, 'SAR')],
-          ['Extension Duration', `${Math.round(extensionResults.monthsCovered * 30)} days (${extensionResults.monthsCovered} months)`],
+          ['Extension Duration', `${Math.round(extensionResults.monthsCovered * 30)} days (${extensionResults.monthsCovered} months) (Exact: ${extensionResults.monthsAvailable?.toFixed(2)} months)`],
           ['End-User Price (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')],
           ['VAT (15%) (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')],
           ['Total (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')]
         ];
+      }
+    } else if (isMidCycleQuote && data.midCycleResults) {
+      let productDisplay = data.midCycleResults.product;
+      if (data.midCycleResults.dlmSelected) {
+          productDisplay += " + DLM Service";
+      }
+
+      const formatD = (d: string) => { 
+        if(!d) return 'N/A';
+        const date = new Date(d);
+        const mo = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; 
+        return `${mo[date.getMonth()]} ${date.getDate().toString().padStart(2, '0')}, ${date.getFullYear()}`; 
+      };
+      const durationLabel = `${formatD(config.midCycleStartDate)} to\n${formatD(config.midCycleExpiryDate)}\n(${Math.round(data.midCycleResults.durationMonths)} Months)`;
+
+      const isLxd = config.midCycleProduct?.startsWith('LXD_');
+      columnStyles[1] = isLxd ? { fillColor: [224, 242, 254] } : { fillColor: [220, 252, 231] };
+      columnStyles[2] = { fontStyle: 'bold' };
+
+      const productNameDisplay = isLxd ? 'Lexidrug' : 'UpToDate';
+
+      if (isIndirect) {
+        columnStyles[4] = { fontStyle: 'bold' };
+        tableHead = [['Duration', `${productNameDisplay} (SAR)`, 'Total (SAR)', 'VAT (15%)', 'Grand Total\n(SAR)']];
+        tableBody = [[
+          durationLabel,
+          formatMoney(data.midCycleResults.grossSAR, 'SAR'),
+          formatMoney(data.midCycleResults.grossSAR, 'SAR'),
+          formatMoney(data.midCycleResults.vatSAR, 'SAR'),
+          formatMoney(data.midCycleResults.grandTotalSAR, 'SAR')
+        ]];
+      } else {
+        tableHead = [['Duration', `${productNameDisplay} (USD)`, 'Total (USD)']];
+        tableBody = [[
+          durationLabel,
+          formatMoney(data.midCycleResults.endUserGrossUSD, 'USD'),
+          formatMoney(data.midCycleResults.endUserGrossUSD, 'USD')
+        ]];
       }
     } else {
       const productColIndices: Record<string, number> = {};
@@ -499,18 +586,26 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       doc.setFontSize(9); doc.setTextColor(0, 0, 0);
 
       const statsParts: string[] = [];
-      config.selectedProducts.forEach(pid => {
-          const p = AVAILABLE_PRODUCTS.find(x => x.id === pid); const inp = config.productInputs[pid];
-          if(p && inp) {
-              let productName = p.name;
-              if (pid === 'utd') productName = 'UpToDate'; if (pid === 'lxd') productName = 'Lexidrug';
-              let countLabelText = p.countLabel;
-              if (p.countLabel === 'HC') countLabelText = 'clinicians'; if (p.countLabel === 'BC') countLabelText = 'active beds';
-              if (pid === 'lxd' && inp.variant && (inp.variant.includes('Seats') || inp.variant === 'Hospital Pharmacy Model')) countLabelText = 'seats';
-              const statsToPrint = inp.count > 0 ? inp.count : (inp.existingCount || 0);
-              if (statsToPrint > 0) statsParts.push(`${statsToPrint.toLocaleString('en-US')} ${countLabelText} for ${productName}`);
+      if (isMidCycleQuote) {
+          if (config.midCycleProduct === 'UTD_ADV' && config.midCycleExistingSpend) {
+               statsParts.push(`$${Number(config.midCycleExistingSpend).toLocaleString('en-US')} existing spend for UpToDate`);
+          } else if (config.midCycleProduct?.startsWith('LXD_') && config.midCycleBedCount) {
+               statsParts.push(`${Number(config.midCycleBedCount).toLocaleString('en-US')} active beds for Lexidrug`);
           }
-      });
+      } else {
+          config.selectedProducts.forEach(pid => {
+              const p = AVAILABLE_PRODUCTS.find(x => x.id === pid); const inp = config.productInputs[pid];
+              if(p && inp) {
+                  let productName = p.name;
+                  if (pid === 'utd') productName = 'UpToDate'; if (pid === 'lxd') productName = 'Lexidrug';
+                  let countLabelText = p.countLabel;
+                  if (p.countLabel === 'HC') countLabelText = 'clinicians'; if (p.countLabel === 'BC') countLabelText = 'active beds';
+                  if (pid === 'lxd' && inp.variant && (inp.variant.includes('Seats') || inp.variant === 'Hospital Pharmacy Model')) countLabelText = 'seats';
+                  const statsToPrint = inp.count > 0 ? inp.count : (inp.existingCount || 0);
+                  if (statsToPrint > 0) statsParts.push(`${statsToPrint.toLocaleString('en-US')} ${countLabelText} for ${productName}`);
+              }
+          });
+      }
       
       if(statsParts.length > 0 && showStats) {
           doc.setFont(fontName, 'normal');
@@ -551,8 +646,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     if (hasDesignatedSites) {
         if (isBreakdownPerSite && siteBreakdown.length > 0) {
             doc.setFont(fontName, 'bold'); doc.text("Price Breakdown per Site:", 14, finalY); finalY += 6;
-            const siteHeaders = ['Site Name'];
-            config.selectedProducts.forEach(pid => siteHeaders.push(`${AVAILABLE_PRODUCTS.find(x => x.id === pid)?.shortName || AVAILABLE_PRODUCTS.find(x => x.id === pid)?.name} Count`));
+            const siteHeaders = ['Hospital Name'];
+            config.selectedProducts.forEach(pid => {
+                if (pid === 'utd') siteHeaders.push('Clinicians');
+                else if (pid === 'lxd') siteHeaders.push('Bed Count');
+                else siteHeaders.push(`${AVAILABLE_PRODUCTS.find(x => x.id === pid)?.shortName || AVAILABLE_PRODUCTS.find(x => x.id === pid)?.name} Count`);
+            });
             if (!showSitesOnly) siteHeaders.push(`Est. Annual Cost (${displayCurrency})`);
 
             const siteBody = siteBreakdown.map(site => {
@@ -623,6 +722,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         if (canShowFLinkIntegration && showFLinkIntegration) terms.push({ text: "With this subscription, your formulary will be integrated into UpToDate directly at no additional cost." });
         if (config.selectedProducts.includes('lxd') && config.productInputs['lxd']?.variant === 'Hospital Pharmacy Model') terms.push({ text: "This subscription is limited to the above number of seats." });
         if (isUtdSm) terms.push({ text: "This subscription is limited to the number of seats mentioned above." });
+        if (config.selectedProducts.includes('utd') && config.productInputs['utd']?.variant === 'UTDEE-EAI') {
+            terms.push({ text: "This subscription includes UpToDate Expert AI site-wide access." });
+            terms.push({ text: "Expert AI site-wide access will be enabled upon technical evaluation after service activation." });
+        }
     }
 
     terms.forEach(term => {
@@ -634,7 +737,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     if (finalY > (isCp ? 250 : 260)) { doc.addPage(); finalY = 55; }
     
     // --- TECHNICAL SPECIFICATIONS SECTION ---
-    if (!isExtensionQuote) {
+    if (!isExtensionQuote && !isMidCycleQuote) {
       if (finalY > (isCp ? 230 : 245)) {
           doc.addPage();
           // Header rendered in loop at end
@@ -815,13 +918,66 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
              ws.addRow(['Product', PRODUCT_FULL_NAMES[extensionResults.variant] || extensionResults.variant]);
              ws.addRow(['Current Spend of Last Year (SAR)', extensionResults.currentSpend * EXCHANGE_RATE_SAR]).numFmt = '#,##0.00';
              ws.addRow(['Daily Cost (SAR)', (extensionResults.monthlyCost / 30) * EXCHANGE_RATE_SAR]).numFmt = '#,##0.00';
-             ws.addRow(['Extension Duration', `${Math.round(extensionResults.monthsCovered * 30)} days`]);
+             ws.addRow(['Extension FPI Percentage', `${(extensionResults.fpiPercentage || 0).toFixed(2)}%`]);
+             ws.addRow(['Effective Monthly Cost (SAR)', extensionResults.monthlyCostSAR]).numFmt = '#,##0.00';
+             ws.addRow(['Extension Duration', `${Math.round(extensionResults.monthsCovered * 30)} days (${extensionResults.monthsCovered} months)`]);
              
              const euRow = ws.addRow(['End-User Price (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR]); euRow.font = { bold: true }; euRow.numFmt = '#,##0.00';
              const vatRow = ws.addRow(['VAT (15%) (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15]); vatRow.font = { bold: true }; vatRow.numFmt = '#,##0.00';
              const totRow = ws.addRow(['Total (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15]); totRow.font = { bold: true }; totRow.numFmt = '#,##0.00';
-             contentRowStart = 16;
+             contentRowStart = 18;
          }
+      } else if (isMidCycleQuote && data.midCycleResults) {
+         let productDisplay = data.midCycleResults.product;
+         if (data.midCycleResults.dlmSelected) {
+             productDisplay += " + DLM Service";
+         }
+         
+         const formatD = (d: string) => { 
+            if(!d) return 'N/A';
+            const date = new Date(d);
+            const mo = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; 
+            return `${mo[date.getMonth()]} ${date.getDate().toString().padStart(2, '0')}, ${date.getFullYear()}`; 
+         };
+         
+         const isLxd = config.midCycleProduct?.startsWith('LXD_');
+         const productNameDisplay = isLxd ? 'Lexidrug' : 'UpToDate';
+         const durationLabel = `${formatD(config.midCycleStartDate)} to ${formatD(config.midCycleExpiryDate)} (${Math.round(data.midCycleResults.durationMonths)} Months)`;
+
+         if (isIndirect) {
+             const headers = ['Duration', `${productNameDisplay} (SAR)`, 'Total (SAR)', 'VAT (15%)', 'Grand Total (SAR)'];
+             const headerRow = ws.addRow(headers);
+             headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+             headerRow.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF007AC3' } }; cell.alignment = { vertical: 'middle', horizontal: 'center' }; });
+
+             const row = ws.addRow([
+                 durationLabel,
+                 data.midCycleResults.grossSAR,
+                 data.midCycleResults.grossSAR,
+                 data.midCycleResults.vatSAR,
+                 data.midCycleResults.grandTotalSAR
+             ]);
+             row.getCell(2).numFmt = '#,##0.00';
+             row.getCell(3).numFmt = '#,##0.00';
+             row.getCell(4).numFmt = '#,##0.00';
+             row.getCell(5).numFmt = '#,##0.00';
+             row.getCell(5).font = { bold: true };
+         } else {
+             const headers = ['Duration', `${productNameDisplay} (USD)`, 'Total (USD)'];
+             const headerRow = ws.addRow(headers);
+             headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+             headerRow.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF007AC3' } }; cell.alignment = { vertical: 'middle', horizontal: 'center' }; });
+
+             const row = ws.addRow([
+                 durationLabel,
+                 data.midCycleResults.endUserGrossUSD,
+                 data.midCycleResults.endUserGrossUSD
+             ]);
+             row.getCell(2).numFmt = '#,##0.00';
+             row.getCell(3).numFmt = '#,##0.00';
+             row.getCell(3).font = { bold: true };
+         }
+         contentRowStart = ws.rowCount + 2;
       } else {
           let headers = ['Year', ...prodNames];
           if (isIndirect) headers.push('Total Net (USD)', 'Total (SAR)', 'VAT (15%)', 'Grand Total (SAR)');
@@ -834,24 +990,109 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           const startRowIndex = ws.rowCount + 1;
           data.yearlyResults.forEach((r, idx) => {
               const rowData: any[] = [`Year ${r.year}`];
-              config.selectedProducts.forEach(pid => { const bd = r.breakdown.find(x => x.id === pid); rowData.push(bd ? (isIndirect ? bd.net : bd.gross) : 0); });
-              if (isIndirect) rowData.push(r.netUSD, r.grossSAR, r.vatSAR, r.grandTotalSAR); else rowData.push(r.grossUSD);
+              config.selectedProducts.forEach(pid => { 
+                const bd = r.breakdown.find(x => x.id === pid); 
+                rowData.push(bd ? (isIndirect ? bd.net : bd.gross) : 0); 
+              });
+              
+              if (isIndirect) {
+                  // Net USD, Gross SAR, VAT, Grand Total
+                  rowData.push(r.netUSD, r.grossSAR, r.vatSAR, r.grandTotalSAR);
+              } else {
+                  rowData.push(r.grossUSD);
+              }
+
               const newRow = ws.addRow(rowData);
+              
+              // Add formulas for years 2+ if it's MYFPI method and rates are simple
+              if (idx > 0 && config.method === 'MYFPI' && !config.flatPricing) {
+                  config.selectedProducts.forEach((pid, pIdx) => {
+                      const rate = (config.productRates[pid] || config.rates)[idx] || 0;
+                      if (rate > 0) {
+                          const colLetter = getColLetter(2 + pIdx);
+                          const prevCell = `${colLetter}${newRow.number - 1}`;
+                          newRow.getCell(2 + pIdx).value = { formula: `${prevCell}*(1+${rate/100})` };
+                      }
+                  });
+              }
+
               newRow.eachCell((cell, colNum) => { if (colNum > 1) cell.numFmt = '#,##0.00'; });
           });
 
           if (showTotals) {
               const totalRowData: any[] = ['TOTAL'];
-              config.selectedProducts.forEach(pid => {
-                  const prodTotal = data.yearlyResults.reduce((sum, r) => { const bd = r.breakdown.find(x => x.id === pid); return sum + (bd ? (isIndirect ? bd.net : bd.gross) : 0); }, 0);
-                  totalRowData.push(prodTotal);
+              const startDataRow = startRowIndex;
+              const endDataRow = ws.rowCount;
+              
+              config.selectedProducts.forEach((pid, pIdx) => {
+                  const colLetter = getColLetter(2 + pIdx);
+                  totalRowData.push({ formula: `SUM(${colLetter}${startDataRow}:${colLetter}${endDataRow})` });
               });
-              if (isIndirect) totalRowData.push(data.totalNetUSD, data.totalGrossSAR, data.totalVatSAR, data.totalGrandTotalSAR); 
-              else totalRowData.push(data.totalGrossUSD);
+
+              if (isIndirect) {
+                  const netUsdCol = getColLetter(2 + config.selectedProducts.length);
+                  const grossSarCol = getColLetter(3 + config.selectedProducts.length);
+                  const vatCol = getColLetter(4 + config.selectedProducts.length);
+                  const grandTotalCol = getColLetter(5 + config.selectedProducts.length);
+                  
+                  totalRowData.push(
+                    { formula: `SUM(${netUsdCol}${startDataRow}:${netUsdCol}${endDataRow})` },
+                    { formula: `SUM(${grossSarCol}${startDataRow}:${grossSarCol}${endDataRow})` },
+                    { formula: `SUM(${vatCol}${startDataRow}:${vatCol}${endDataRow})` },
+                    { formula: `SUM(${grandTotalCol}${startDataRow}:${grandTotalCol}${endDataRow})` }
+                  );
+              } else {
+                  const totalUsdCol = getColLetter(2 + config.selectedProducts.length);
+                  totalRowData.push({ formula: `SUM(${totalUsdCol}${startDataRow}:${totalUsdCol}${endDataRow})` });
+              }
               
               const totalRow = ws.addRow(totalRowData);
               totalRow.font = { bold: true };
               totalRow.eachCell((cell, colNum) => { if (colNum > 1) cell.numFmt = '#,##0.00'; });
+          }
+          
+          if (includeCalcDetails) {
+              const calcWs = wb.addWorksheet('Calculation Details');
+              calcWs.addRow(['Detailed Calculation Breakdown']).font = { bold: true, size: 14 };
+              calcWs.addRow([]);
+              
+              calcWs.addRow(['Product', 'Metric', 'Formula / Logic', 'Value']);
+              const hRow = calcWs.getRow(3);
+              hRow.font = { bold: true };
+              hRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+              config.selectedProducts.forEach(pid => {
+                  const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                  const inp = config.productInputs[pid];
+                  if (!p || !inp) return;
+
+                  calcWs.addRow([p.name, 'Base Count', 'User Input', inp.count || inp.existingCount]);
+                  calcWs.addRow(['', 'Pricing Method', 'Logic Select', config.productMethods[pid] || config.method]);
+                  
+                  const y1Net = data.yearlyResults[0]?.breakdown.find(b => b.id === pid)?.net || 0;
+                  calcWs.addRow(['', 'Year 1 Net (USD)', 'Final After Discounts/Floors', y1Net]).getCell(4).numFmt = '#,##0.00';
+                  
+                  if (config.dealType === 'RENEWAL') {
+                      calcWs.addRow(['', 'Expiring Amount', 'Previous Contract', inp.expiringAmount || 0]).getCell(4).numFmt = '#,##0.00';
+                      calcWs.addRow(['', 'Uplift Rate', 'Annual Increase %', (config.renewalUpliftRates[pid] || 0) + '%']);
+                  }
+                  
+                  if (pid === 'utd') {
+                      calcWs.addRow(['', 'Variant', 'Selected Tier', inp.variant]);
+                  } else if (pid === 'lxd') {
+                      calcWs.addRow(['', 'Variant', 'Selected Tier', inp.variant]);
+                  }
+
+                  calcWs.addRow([]);
+              });
+
+              calcWs.addRow(['Global Settings']).font = { bold: true };
+              calcWs.addRow(['WHT Applied', config.applyWHT ? 'Yes (5%)' : 'No']);
+              calcWs.addRow(['Exchange Rate', `1 USD = ${EXCHANGE_RATE_SAR} SAR`]);
+              calcWs.addRow(['Channel', config.channel]);
+              calcWs.addRow(['Start Date', config.useStartDate ? config.startMonthYear : 'Not Set']);
+              
+              calcWs.columns.forEach(column => { column.width = 30; });
           }
           contentRowStart = ws.rowCount + 2;
       }
@@ -860,7 +1101,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           ws.addRow([]); ws.addRow([]);
           const siteTitle = ws.addRow(["Price Breakdown per Site"]); siteTitle.font = { bold: true, size: 14, color: { argb: 'FF007AC3' } };
           ws.addRow([]);
-          const siteHeaders = ['Site Name', ...prodNames]; if (!showSitesOnly) siteHeaders.push(`Est. Annual Cost (${displayCurrency})`);
+          const siteHeaders = ['Hospital Name'];
+          config.selectedProducts.forEach(pid => {
+              if (pid === 'utd') siteHeaders.push('Clinicians');
+              else if (pid === 'lxd') siteHeaders.push('Bed Count');
+              else siteHeaders.push(`${AVAILABLE_PRODUCTS.find(x => x.id === pid)?.shortName || pid} Count`);
+          });
+          if (!showSitesOnly) siteHeaders.push(`Est. Annual Cost (${displayCurrency})`);
           const sHeaderRow = ws.addRow(siteHeaders); sHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
           sHeaderRow.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF007AC3' } }; cell.alignment = { vertical: 'middle', horizontal: 'center' }; });
 
@@ -936,7 +1183,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
           <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-700">
             <h3 className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Export Contents</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <input type="checkbox" checked={includeCalcDetails} onChange={(e) => setIncludeCalcDetails(e.target.checked)} className="rounded text-green-600 focus:ring-green-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                  <span>Include Calc Details</span>
+                </label>
               {!isExtensionQuote && (
                 <>
                   <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
@@ -955,10 +1206,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                     <input type="checkbox" checked={isUtdSm ? false : showEmrIntegration} onChange={(e) => setShowEmrIntegration(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                     <span>Include EMR Term</span>
                   </label>
-                  <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                    <input type="checkbox" checked={isUtdSm ? false : hasOptOutClause} onChange={(e) => setHasOptOutClause(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
-                    <span>Opt-Out Clause</span>
-                  </label>
+                  {!isMidCycleQuote && (
+                    <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input type="checkbox" checked={isUtdSm ? false : hasOptOutClause} onChange={(e) => setHasOptOutClause(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
+                      <span>Opt-Out Clause</span>
+                    </label>
+                  )}
                   {canShowFLinkIntegration && (
                     <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                       <input type="checkbox" checked={showFLinkIntegration} onChange={(e) => setShowFLinkIntegration(e.target.checked)} className="rounded text-purple-600 focus:ring-purple-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
@@ -1037,6 +1290,34 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               Please select "Include Start Date" to enable exporting for Renewals and Extensions.
             </div>
           )}
+          {includeCalcDetails && (
+            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-700">
+               <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-3">Calculation Audit Trail</h4>
+               <div className="space-y-3">
+                  {config.selectedProducts.map(pid => {
+                     const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+                     const y1 = data.yearlyResults[0]?.breakdown.find(b => b.id === pid);
+                     if (!p || !y1) return null;
+                     return (
+                        <div key={pid} className="text-xs flex flex-col gap-1 border-b border-gray-100 dark:border-gray-700 pb-2 last:border-0 last:pb-0">
+                           <div className="flex justify-between">
+                              <span className="font-semibold text-gray-900 dark:text-white">{p.name}</span>
+                              <span className="text-blue-600 dark:text-blue-400 font-mono">
+                                 {formatMoney(isIndirect ? y1.grossSAR : y1.gross, isIndirect ? 'SAR' : 'USD')}
+                              </span>
+                           </div>
+                           <div className="text-gray-500 dark:text-gray-400 italic">
+                              {config.dealType === 'RENEWAL' ? 
+                                `Expiring: ${formatMoney(config.productInputs[pid]?.expiringAmount || 0, 'USD')} @ ${config.renewalUpliftRates[pid] || 0}% uplift` :
+                                `Base: ${config.productInputs[pid]?.count || 0} units @ ${config.productInputs[pid]?.variant}`
+                              }
+                           </div>
+                        </div>
+                     );
+                  })}
+               </div>
+            </div>
+          )}
           {pdfError && <div className="text-red-500 text-sm mt-2">{pdfError}</div>}
         </div>
       </div>
@@ -1058,10 +1339,31 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Designated Sites</h3>
             
-            <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer mb-4">
-              <input type="checkbox" checked={isBreakdownPerSite} onChange={e => setIsBreakdownPerSite(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+            <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+              <input type="checkbox" checked={isBreakdownPerSite} onChange={e => {
+                const checked = e.target.checked;
+                setIsBreakdownPerSite(checked);
+                if (checked && designatedSites.trim()) {
+                  setBulkPasteText(designatedSites);
+                  setDesignatedSites(''); // clear simple mode
+                } else if (!checked && siteBreakdown.length === 0 && bulkPasteText.trim()) {
+                  setDesignatedSites(bulkPasteText);
+                  setBulkPasteText(''); // clear advanced bulk mode if not used
+                } else if (!checked && siteBreakdown.length > 0) {
+                  setDesignatedSites(siteBreakdown.map(s => s.name).join('\n'));
+                }
+              }} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
               <span>Allow Price Breakdown per Site</span>
             </label>
+            
+            {isBreakdownPerSite && (
+              <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                <input type="checkbox" checked={showSitesOnly} onChange={e => setShowSitesOnly(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                <span>Hide price breakdown (Show sites and capacity only)</span>
+              </label>
+            )}
+
+            <div className="mb-4"></div>
 
             {!isBreakdownPerSite ? (
               <textarea
@@ -1081,32 +1383,70 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                 <button onClick={handleBulkPaste} className="mb-4 bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm font-medium hover:bg-blue-200">
                   Add Sites to List
                 </button>
-                <div className="space-y-2 mb-4">
-                  {siteBreakdown.map(site => (
-                    <div key={site.id} className="flex gap-2">
-                      <input
-                        type="text"
-                        className="flex-1 px-2 py-1 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        placeholder="Site name"
-                        value={site.name}
-                        onChange={e => {
-                          setSiteBreakdown(prev => prev.map(s => s.id === site.id ? { ...s, name: e.target.value } : s));
-                        }}
-                      />
-                      <button
-                        onClick={() => setSiteBreakdown(prev => prev.filter(s => s.id !== site.id))}
-                        className="text-red-500 hover:text-red-700 font-bold px-2"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    onClick={() => setSiteBreakdown(prev => [...prev, { id: Date.now().toString(), name: '', counts: {} }])}
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    + Add row
-                  </button>
+                <div className="flex flex-col h-[40vh]"> {/* scroll container context */}
+                  {/* Totals Counter - Sticky */}
+                  <div className="sticky top-0 z-10 flex flex-wrap gap-4 text-xs font-bold text-gray-600 dark:text-gray-400 p-2 mb-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 shadow-sm">
+                    <div className="w-full mb-1 text-gray-800 dark:text-gray-200">Expected Totals:</div>
+                    {config.selectedProducts.map(pid => {
+                      const expectedCount = config.productInputs[pid]?.count || 0;
+                      const enteredCount = siteBreakdown.reduce((sum, site) => sum + (site.counts[pid] || 0), 0);
+                      const isOver = enteredCount > expectedCount;
+                      const label = AVAILABLE_PRODUCTS.find(x => x.id === pid)?.shortName || pid;
+                      const unit = AVAILABLE_PRODUCTS.find(x => x.id === pid)?.countLabel || 'Count';
+                      return (
+                        <div key={pid} className={isOver ? 'text-red-500' : 'text-green-600 dark:text-green-400'}>
+                          {label} ({unit}): {enteredCount} / {expectedCount}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto pr-2 space-y-2">
+                    {siteBreakdown.map(site => (
+                      <div key={site.id} className="flex flex-row items-center gap-3 p-2 border rounded border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
+                        <input
+                          type="text"
+                          className="flex-1 min-w-[150px] px-3 py-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                          placeholder="Hospital name"
+                          value={site.name}
+                          onChange={e => setSiteBreakdown(prev => prev.map(s => s.id === site.id ? { ...s, name: e.target.value } : s))}
+                        />
+                        <div className="flex flex-wrap gap-4 items-center">
+                          {config.selectedProducts.map(pid => {
+                            const unit = AVAILABLE_PRODUCTS.find(x => x.id === pid)?.countLabel || 'Count';
+                            const label = AVAILABLE_PRODUCTS.find(x => x.id === pid)?.shortName || pid;
+                            return (
+                              <div key={pid} className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{label} {unit}:</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  className="w-16 px-2 py-1 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                  value={site.counts[pid] !== undefined ? site.counts[pid] : ''}
+                                  onChange={e => {
+                                    const val = e.target.value === '' ? '' : (parseInt(e.target.value) || 0);
+                                    setSiteBreakdown(prev => prev.map(s => s.id === site.id ? { ...s, counts: { ...s.counts, [pid]: val === '' ? 0 : val } } : s));
+                                  }}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <button
+                          onClick={() => setSiteBreakdown(prev => prev.filter(s => s.id !== site.id))}
+                          className="text-red-500 hover:text-red-700 font-bold px-2 text-lg shrink-0"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => setSiteBreakdown(prev => [...prev, { id: Date.now().toString(), name: '', counts: {} }])}
+                      className="text-sm mt-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 hover:underline font-medium block"
+                    >
+                      + Add Site Row
+                    </button>
+                  </div>
                 </div>
               </>
             )}
@@ -1192,10 +1532,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                                 <input type="checkbox" checked={isUtdSm ? false : showEmrIntegration} onChange={(e) => setShowEmrIntegration(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                                 <span>Include EMR Term</span>
                             </label>
-                            <label className={`flex items-center space-x-2 text-xs ${isUtdSm ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}>
-                                <input type="checkbox" checked={isUtdSm ? false : hasOptOutClause} onChange={(e) => setHasOptOutClause(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
-                                <span>Opt-Out Clause</span>
-                            </label>
+                            {!isMidCycleQuote && (
+                                <label className={`flex items-center space-x-2 text-xs ${isUtdSm ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}>
+                                    <input type="checkbox" checked={isUtdSm ? false : hasOptOutClause} onChange={(e) => setHasOptOutClause(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
+                                    <span>Opt-Out Clause</span>
+                                </label>
+                            )}
                             {canShowFLinkIntegration && (
                                 <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                                     <input type="checkbox" checked={showFLinkIntegration} onChange={(e) => setShowFLinkIntegration(e.target.checked)} className="rounded text-purple-600 focus:ring-purple-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />

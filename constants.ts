@@ -1,9 +1,58 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.6.2';
+export const APP_VERSION = '6.6.7';
 
 export const CHANGELOG = [
+  {
+    version: '6.6.7',
+    date: new Date().toISOString().split('T')[0],
+    changes: [
+      'Added EAI Activation toggle for UTD with a 3% uplift defaults to ON for new business and 2026 renewals.',
+      'Reflected EAI inclusion silently within core FPI and List computations as per 2026 mandates.'
+    ]
+  },
+  {
+    version: '6.6.6',
+    date: new Date().toISOString().split('T')[0],
+    changes: [
+      'Applying WHT on DLM and including DLM in prorated mid-cycle calculation.',
+      'Adjusted mid-cycle duration calculation to prorate annual rates including DLM additions and factoring WHT into the base calculation.'
+    ]
+  },
+  {
+    version: '6.6.5',
+    date: new Date().toISOString().split('T')[0],
+    changes: [
+      'Mid-Cycle Add-on Quote functionality: Added structured workflows for UTD ADV, LXD FLINK, LXD IPE, and LXD FLINK+IPE expansions, including pro-rated monthly calculations and WHT adaptations.',
+      'Designated Sites UX enhancements: In-window site addition logic now arrays hospital name, clinicians, and bed count on simplified single rows.',
+      'Designated Sites workflow persistence: Ensures pasted text converts seamlessly to full site breakdowns dynamically without state loss when toggling.',
+      'Sites Export clarity: Export table headers now properly denote site names as "Hospital Name" and distinguish between "Clinicians" (UTD) and "Bed Count" (LXD).',
+      'Sites Export minimalism: Added functionality to omit extensive monetary distributions in exported sheets/PDFs, prioritizing clean site capability distributions.'
+    ]
+  },
+  {
+    version: '6.6.4',
+    date: '2025-06-05',
+    changes: [
+      'Extension Option B Expansion: Added customizable Uplift FPI% input applying specified rate to current spend for exact fractional and integer month calculation within 100K SAR limits.',
+      'UI Refinement: Redesigned the Uplift FPI% fields with interactive "+" and "-" step buttons (incrementing/decrementing whole values) while supporting manual decimal inputs (up to one decimal place).',
+      'Rules Update: Simplified the Extension Finance approval threshold to apply selectively on any Uplift FPI% below 5% across both Option A and Option B.',
+      'UI Cleanup: Renamed "Difference to Extension (FPI %)" labels to "Uplift FPI%" for consistency with renewal uplift fields.',
+      'Loosened Variant Criteria for Rightsizing: MYPP is now fully unlocked for any UTD variant in renewal (including standard Anywhere, UTDADV, etc.)',
+      'Expiring Spend Floor Safeguard: Incorporated a strict mathematical check inside Step 3 (Multi-Year Projection) of the calculation engine.',
+      'Synchronized Real-Time Warning Alert Banner: The frontend client now dynamically extracts these reversion logs from the backend response in real-time, rendering a high-visibility red alert banner some commercial options.',
+      'Architect Notes & Build Safety Logs: These warnings are automatically archived inside the Architect Notes section and are formatted in both PDF and Excel exports.'
+    ]
+  },
+  {
+    version: '6.6.3',
+    date: '2026-05-20',
+    changes: [
+      'Feature: Added UTDEE-EAI Pricing.',
+      'Pricing: Enable FPI less than standard with warning.'
+    ]
+  },
   {
     version: '6.6.2',
     date: new Date().toISOString().split('T')[0],
@@ -199,6 +248,7 @@ export const UTD_VARIANTS: Record<string, number> = {
   "ANYWHERE": 259,
   "UTDADV": 259 * 1.08,
   "UTDEE": 265,
+  "UTDEE-EAI": 278.25,
   "SM": 0, // Special bucket pricing
 };
 

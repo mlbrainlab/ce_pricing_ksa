@@ -1,19 +1,19 @@
-
 export enum DealType {
-  NEW_LOGO = 'New Logo',
-  RENEWAL = 'Renewal',
-  EXTENSION = 'Extension',
+  NEW_LOGO = "New Logo",
+  RENEWAL = "Renewal",
+  EXTENSION = "Extension",
+  MID_CYCLE = "Mid-Cycle Add-on",
 }
 
 export enum ChannelType {
-  DIRECT = 'Direct',
-  FULFILMENT = 'Fulfilment',
-  PARTNER_SOURCED = 'Partner Sourced',
+  DIRECT = "Direct",
+  FULFILMENT = "Fulfilment",
+  PARTNER_SOURCED = "Partner Sourced",
 }
 
 export enum PricingMethod {
-  MYPP = 'MYPP (Price Protection)',
-  MYFPI = 'MYFPI (Inflation)',
+  MYPP = "MYPP (Price Protection)",
+  MYFPI = "MYFPI (Inflation)",
 }
 
 export interface ProductDefinition {
@@ -35,6 +35,7 @@ export interface ProductInput {
   dph?: number; // Dollars Per Head (for UTD Renewal)
   forceHeadcountOverride?: boolean; // If true, prioritize HC calculation if higher
   changeInStats?: boolean; // For UTD EE Upsell (Switching/Changing stats)
+  eaiActivation?: boolean; // Toggle for EAI 3% uplift
 }
 
 export interface ProductYearlyData {
@@ -49,13 +50,13 @@ export interface PricingResult {
   breakdown: ProductYearlyData[]; // Per product values
   grossUSD: number;
   grossSAR: number;
-  vatSAR: number;       // New: 15% VAT
+  vatSAR: number; // New: 15% VAT
   grandTotalSAR: number; // New: Gross + VAT
   netUSD: number;
   netSAR: number;
   floorAdjusted: boolean;
   notes: string[];
-  currencyToDisplay: 'USD' | 'SAR';
+  currencyToDisplay: "USD" | "SAR";
 }
 
 export interface DealConfiguration {
@@ -75,14 +76,22 @@ export interface DealConfiguration {
   useStartDate?: boolean;
   startMonthYear?: string;
   // Extension Fields
-  extensionOption?: 'A' | 'B';
-  expiringTerm?: 'multi' | 'single';
+  extensionOption?: "A" | "B";
+  expiringTerm?: "multi" | "single";
   expiringTCV?: number;
   currentSpend?: number;
   extensionPercentage?: number;
   extensionFPI?: number | null;
   extensionVariant?: string;
   useFullExtension?: boolean;
+  // Mid-Cycle Add-on Fields
+  midCycleExpiryDate?: string;
+  midCycleStartDate?: string;
+  midCycleWHT?: boolean;
+  midCycleProduct?: string;
+  midCycleExistingSpend?: number | "";
+  midCycleBedCount?: number | "";
+  midCycleDlm?: boolean;
 }
 
 export interface CalculationOutput {
@@ -93,19 +102,20 @@ export interface CalculationOutput {
   totalGrandTotalSAR: number;
   totalNetUSD: number;
   totalNetSAR: number;
-  
+
   // Per Product Total Net (for summary)
   productNetTotals: Record<string, number>;
 
   // ACV & Splits
   acvUSD: number;
-  netACV: number; 
+  netACV: number;
   renewalBaseACV: number;
   netRenewalBaseACV: number; // New: Net value of Renewal Base
   upsellACV: number;
   netUpsellACV: number; // New: Net value of Upsell
-  
-  currencyToDisplay: 'USD' | 'SAR';
+
+  currencyToDisplay: "USD" | "SAR";
   extensionResults?: any;
+  midCycleResults?: any;
   renewalNotes?: string[];
 }
