@@ -1,7 +1,5 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
 import { calculatePricing } from './services/pricingEngine.js';
 import { getPublicMetadata } from './services/metadata.js';
 import { generateQuotePDF } from './services/pdfGenerator.js';
@@ -11,7 +9,7 @@ const app = express();
 app.set('trust proxy', 1);
 
 app.use((req, res, next) => {
-    if (req.body && Object.keys(req.body).length > 0) {
+    if (req.body !== undefined) {
         next();
     } else {
         express.json({ limit: '50mb' })(req, res, next);
@@ -19,83 +17,78 @@ app.use((req, res, next) => {
 });
 app.use(cookieParser());
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-for-dev-only-do-not-use-in-prod';
+// Middleware to protect routes using Firebase Auth
+import { getAuth } from "firebase-admin/auth";
+import { initializeApp, getApps } from "firebase-admin/app";
+import fs from 'fs';
+import path from 'path';
 
-const MONTHLY_HASHES: Record<string, string> = {
-  "2026-04": "5433f0bcf3b7783c10e3d318ec310a9cdb2458762a7ddcbd42dbb925b476423a",
-  "2026-05": "6c5f4d35c898ed832c1fb718fee0696efa56914a758f3a3a1a1d43b7ab60b6f4",
-  "2026-06": "aeacf76e0047f395f680741ae73ea13382abf97fa2f4bceccf4166856c31f1e6",
-  "2026-07": "57691dc4cd926dea5d550026764ca9d5d93cfe958269350d1dac611c688317fe",
-  "2026-08": "e80d219edb1d229a6edd058d1bb30a316d66ad921f37eca6d7757ce730163859",
-  "2026-09": "621e329fdfc17f98aa3143bc170c74d34c1b92931b85600c926cbd6d50616b77",
-  "2026-10": "f51a7660f584b2f9d5243a449d6705d9c3d5b8a335b9679e0e911038bf7b3df8",
-  "2026-11": "fda5e13af645d6783a6a84b6314c42d7fbc3916279ca33cbe0f3fd7f656a9320",
-  "2026-12": "ef0ddba4c0d30c5fec550110f26d9a95fd688e7b49f60d8d7e8192fb95f286d0",
-  "2027-01": "8b2f06979c82e7e84acdb460632d4ca8b2c749947a16500ef13af22e2e2e45b9",
-  "2027-02": "89349352e0ede47079ef0dc615952527c5beba1e92bae9fe1c0a2dc1e12088df",
-  "2027-03": "8895edca1938e77a50f280282a30295a77f821ebf1facc9fe132c715f81810db"
-};
+// Initialize Firebase Admin
+let projectId: string | undefined = undefined;
+try {
+    if (getApps().length === 0) {
+        try {
+            const cwd = process.cwd();
+            const configPaths = [
+                path.join(cwd, 'firebase-applet-config.json'),
+                path.join(cwd, '..', 'firebase-applet-config.json')
+            ];
+            
+            for (const p of configPaths) {
+                if (fs.existsSync(p)) {
+                    projectId = JSON.parse(fs.readFileSync(p, 'utf8')).projectId;
+                    break;
+                }
+            }
+        } catch (e: any) {
+            console.warn("Could not find or parse firebase-applet-config.json", e.message);
+        }
 
-function hashPasscodeNode(passcode: string) {
-    return crypto.createHash('sha256').update(passcode).digest('hex');
+        if (!projectId) {
+             projectId = 'gen-lang-client-0528663295';
+        }
+        
+        initializeApp({ projectId });
+        console.log("Firebase Admin initialized" + (projectId ? ` with project ${projectId}` : " without project ID"));
+    }
+} catch (e: any) {
+    console.error("FATAL ERROR initializing Firebase Admin:", e);
 }
 
-app.post('/api/login', (req, res) => {
+const requireAuth = async (req: any, res: any, next: any) => {
     try {
-        const { passcode } = req.body;
-        const currentMonth = new Date().toISOString().slice(0, 7);
-        const expectedHash = MONTHLY_HASHES[currentMonth];
-
-        if (!expectedHash) {
-            return res.status(401).json({ error: 'No hash for current month' });
+        let idToken;
+        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+            idToken = req.headers.authorization.split('Bearer ')[1];
+        }
+        
+        if (!idToken) {
+            return res.status(401).json({ error: 'Unauthorized: No token provided' });
         }
 
-        if (typeof passcode !== 'string') {
-            return res.status(400).json({ error: 'Passcode must be a string', body: req.body });
+        // Wrap getAuth() so if it throws synchronously it is caught!
+        let authService;
+        try {
+            authService = getAuth();
+        } catch (e: any) {
+            console.error("Firebase not initialized:", e);
+            return res.status(500).json({ error: 'Internal Server Error: Auth Service Unavailable', details: e.message });
         }
 
-        const inputHash = hashPasscodeNode(passcode);
-        if (inputHash === expectedHash) {
-            const token = jwt.sign({ authenticated: true }, JWT_SECRET, { expiresIn: '12h' });
-            res.cookie('auth_token', token, { 
-                httpOnly: true, 
-                secure: true, 
-                sameSite: 'none',
-                maxAge: 12 * 60 * 60 * 1000 // 12 hours
-            });
-            res.json({ success: true });
-        } else {
-            res.status(401).json({ error: 'Invalid passcode' });
-        }
-    } catch (err: any) {
-        res.status(500).json({ error: err.message, stack: err.stack });
-    }
-});
-
-app.post('/api/logout', (_req, res) => {
-    res.clearCookie('auth_token', {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none'
-    });
-    res.json({ success: true });
-});
-
-// Middleware to protect routes
-const requireAuth = (req: any, res: any, next: any) => {
-    const token = req.cookies?.auth_token;
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
-    try {
-        jwt.verify(token, JWT_SECRET);
+        const decodedToken = await authService.verifyIdToken(idToken);
+        req.user = decodedToken;
         next();
-    } catch (err) {
-        res.status(401).json({ error: 'Invalid token' });
+    } catch (error: any) {
+        if (error.code !== 'auth/argument-error' && process.env.NODE_ENV !== 'production') {
+            console.error('Firebase Auth Error:', error.message);
+        }
+        res.status(401).json({ error: 'Unauthorized: Invalid token' });
     }
 };
 
-app.get('/api/verify', requireAuth, (_req, res) => {
-    res.json({ success: true });
-});
+
+
+
 
 app.get('/api/metadata', (_req, res) => {
     res.json(getPublicMetadata());
@@ -158,6 +151,26 @@ app.get('/api/proxy-font', async (req, res) => {
     } catch (e) {
         console.error('Proxy Error:', e);
         res.status(500).send('Error proxying font');
+    }
+});
+
+app.post('/api/notify-admin', requireAuth, async (req, res) => {
+    try {
+        const { event, quoteId, authorName, quoteName } = req.body;
+        // In a real application, you would integrate a mailer service here, e.g., NodeMailer, SendGrid, Mailchimp.
+        // For now, we simulate the email behavior with console.log on the server.
+        console.log(`[EMAIL NOTIFICATION TO ADMIN] Event: ${event} | Quote ID: ${quoteId} | Author: ${authorName} | Name: ${quoteName}`);
+        res.json({ success: true, notified: true });
+    } catch (e) {
+        console.error('Notify admin error:', e);
+        res.status(500).json({ error: 'Notification failed' });
+    }
+});
+
+app.use((err: any, _req: any, res: any, _next: any) => {
+    console.error('Unhandled error in Express middleware:', err);
+    if (!res.headersSent) {
+        res.status(500).json({ error: 'Internal Server Error', details: err.message || String(err) });
     }
 });
 

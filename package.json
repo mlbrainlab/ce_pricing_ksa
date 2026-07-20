@@ -1,7 +1,7 @@
 {
   "name": "pricing-calculator",
   "private": true,
-  "version": "6.6.7",
+  "version": "6.7.2",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -16,6 +16,8 @@
     "cors": "^2.8.6",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
+    "firebase": "^12.15.0",
+    "firebase-admin": "^14.0.0",
     "http-proxy-middleware": "^3.0.5",
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^2.5.1",
@@ -31,6 +33,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
+    "@vercel/node": "^5.8.19",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.19",
     "esbuild": "^0.28.0",

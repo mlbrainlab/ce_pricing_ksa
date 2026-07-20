@@ -1,19 +1,12 @@
 {
+  "version": 2,
   "rewrites": [
     {
-      "source": "/p/static/:path(.*)",
-      "destination": "https://eu-assets.i.posthog.com/static/:path"
-    },
-    {
-      "source": "/p/:path(.*)",
-      "destination": "https://eu.i.posthog.com/:path"
-    },
-    {
       "source": "/api/(.*)",
-      "destination": "/api/index"
+      "destination": "/api"
     },
     {
-      "source": "/((?!api/.*).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]

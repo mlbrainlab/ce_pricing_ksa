@@ -910,8 +910,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
              ws.addRow(['Extension Duration', extensionResults.useFullExtension ? `${extensionResults.days} days` : `${Math.round(extensionResults.monthsAvailable * 30)} days`]);
              
              const euRow = ws.addRow(['End-User Price (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR]); euRow.font = { bold: true }; euRow.numFmt = '#,##0.00';
-             const vatRow = ws.addRow(['VAT (15%) (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15]); vatRow.font = { bold: true }; vatRow.numFmt = '#,##0.00';
-             const totRow = ws.addRow(['Total (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15]); totRow.font = { bold: true }; totRow.numFmt = '#,##0.00';
+             const vatRow = ws.addRow(['VAT (15%) (SAR)']); vatRow.getCell(2).value = { formula: `B${euRow.number}*0.15` }; vatRow.font = { bold: true }; vatRow.numFmt = '#,##0.00';
+             const totRow = ws.addRow(['Total (SAR)']); totRow.getCell(2).value = { formula: `B${euRow.number}+B${vatRow.number}` }; totRow.font = { bold: true }; totRow.numFmt = '#,##0.00';
              contentRowStart = 19;
          } else {
              const headRow = ws.addRow(['Description', 'Value']); headRow.font = { bold: true };
@@ -923,8 +923,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
              ws.addRow(['Extension Duration', `${Math.round(extensionResults.monthsCovered * 30)} days (${extensionResults.monthsCovered} months)`]);
              
              const euRow = ws.addRow(['End-User Price (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR]); euRow.font = { bold: true }; euRow.numFmt = '#,##0.00';
-             const vatRow = ws.addRow(['VAT (15%) (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15]); vatRow.font = { bold: true }; vatRow.numFmt = '#,##0.00';
-             const totRow = ws.addRow(['Total (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15]); totRow.font = { bold: true }; totRow.numFmt = '#,##0.00';
+             const vatRow = ws.addRow(['VAT (15%) (SAR)']); vatRow.getCell(2).value = { formula: `B${euRow.number}*0.15` }; vatRow.font = { bold: true }; vatRow.numFmt = '#,##0.00';
+             const totRow = ws.addRow(['Total (SAR)']); totRow.getCell(2).value = { formula: `B${euRow.number}+B${vatRow.number}` }; totRow.font = { bold: true }; totRow.numFmt = '#,##0.00';
              contentRowStart = 18;
          }
       } else if (isMidCycleQuote && data.midCycleResults) {
@@ -952,11 +952,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
              const row = ws.addRow([
                  durationLabel,
-                 data.midCycleResults.grossSAR,
-                 data.midCycleResults.grossSAR,
-                 data.midCycleResults.vatSAR,
-                 data.midCycleResults.grandTotalSAR
+                 data.midCycleResults.grossSAR
              ]);
+             row.getCell(3).value = { formula: `B${row.number}` };
+             row.getCell(4).value = { formula: `C${row.number}*0.15` };
+             row.getCell(5).value = { formula: `C${row.number}+D${row.number}` };
              row.getCell(2).numFmt = '#,##0.00';
              row.getCell(3).numFmt = '#,##0.00';
              row.getCell(4).numFmt = '#,##0.00';
@@ -970,17 +970,18 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
              const row = ws.addRow([
                  durationLabel,
-                 data.midCycleResults.endUserGrossUSD,
                  data.midCycleResults.endUserGrossUSD
              ]);
+             row.getCell(3).value = { formula: `B${row.number}` };
              row.getCell(2).numFmt = '#,##0.00';
              row.getCell(3).numFmt = '#,##0.00';
              row.getCell(3).font = { bold: true };
          }
          contentRowStart = ws.rowCount + 2;
       } else {
-          let headers = ['Year', ...prodNames];
-          if (isIndirect) headers.push('Total Net (USD)', 'Total (SAR)', 'VAT (15%)', 'Grand Total (SAR)');
+          const prodCols = config.selectedProducts.map(pid => `${pid === 'utd' ? 'UpToDate' : pid === 'lxd' ? 'Lexidrug' : pid} (${displayCurrency})`);
+          let headers = ['Year', ...prodCols];
+          if (isIndirect) headers.push('Total (SAR)', 'VAT (15%)', 'Grand Total (SAR)');
           else headers.push('Total (USD)');
 
           const headerRow = ws.addRow(headers);
@@ -992,18 +993,25 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               const rowData: any[] = [`Year ${r.year}`];
               config.selectedProducts.forEach(pid => { 
                 const bd = r.breakdown.find(x => x.id === pid); 
-                rowData.push(bd ? (isIndirect ? bd.net : bd.gross) : 0); 
+                rowData.push(bd ? (isIndirect ? bd.grossSAR : bd.gross) : 0); 
               });
               
-              if (isIndirect) {
-                  // Net USD, Gross SAR, VAT, Grand Total
-                  rowData.push(r.netUSD, r.grossSAR, r.vatSAR, r.grandTotalSAR);
-              } else {
-                  rowData.push(r.grossUSD);
-              }
-
               const newRow = ws.addRow(rowData);
               
+              const sumRangeStart = getColLetter(2);
+              const sumRangeEnd = getColLetter(1 + config.selectedProducts.length);
+              
+              if (isIndirect) {
+                  const totalSarCol = getColLetter(2 + config.selectedProducts.length);
+                  const vatCol = getColLetter(3 + config.selectedProducts.length);
+                  
+                  newRow.getCell(2 + config.selectedProducts.length).value = { formula: `SUM(${sumRangeStart}${newRow.number}:${sumRangeEnd}${newRow.number})` };
+                  newRow.getCell(3 + config.selectedProducts.length).value = { formula: `${totalSarCol}${newRow.number}*0.15` };
+                  newRow.getCell(4 + config.selectedProducts.length).value = { formula: `${totalSarCol}${newRow.number}+${vatCol}${newRow.number}` };
+              } else {
+                  newRow.getCell(2 + config.selectedProducts.length).value = { formula: `SUM(${sumRangeStart}${newRow.number}:${sumRangeEnd}${newRow.number})` };
+              }
+
               // Add formulas for years 2+ if it's MYFPI method and rates are simple
               if (idx > 0 && config.method === 'MYFPI' && !config.flatPricing) {
                   config.selectedProducts.forEach((pid, pIdx) => {
@@ -1030,14 +1038,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               });
 
               if (isIndirect) {
-                  const netUsdCol = getColLetter(2 + config.selectedProducts.length);
-                  const grossSarCol = getColLetter(3 + config.selectedProducts.length);
-                  const vatCol = getColLetter(4 + config.selectedProducts.length);
-                  const grandTotalCol = getColLetter(5 + config.selectedProducts.length);
+                  const totalSarCol = getColLetter(2 + config.selectedProducts.length);
+                  const vatCol = getColLetter(3 + config.selectedProducts.length);
+                  const grandTotalCol = getColLetter(4 + config.selectedProducts.length);
                   
                   totalRowData.push(
-                    { formula: `SUM(${netUsdCol}${startDataRow}:${netUsdCol}${endDataRow})` },
-                    { formula: `SUM(${grossSarCol}${startDataRow}:${grossSarCol}${endDataRow})` },
+                    { formula: `SUM(${totalSarCol}${startDataRow}:${totalSarCol}${endDataRow})` },
                     { formula: `SUM(${vatCol}${startDataRow}:${vatCol}${endDataRow})` },
                     { formula: `SUM(${grandTotalCol}${startDataRow}:${grandTotalCol}${endDataRow})` }
                   );

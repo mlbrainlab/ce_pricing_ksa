@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { APP_VERSION, CHANGELOG } from '../constants';
 
-export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+interface LayoutProps {
+  children: React.ReactNode;
+  userProfile?: any;
+  onLogout?: () => void;
+  currentView?: 'calculator' | 'history' | 'preferences';
+  onNavigate?: (view: 'calculator' | 'history' | 'preferences') => void;
+}
+
+export const Layout: React.FC<LayoutProps> = ({ children, userProfile, onLogout, currentView = 'calculator', onNavigate }) => {
   const [themePref, setThemePref] = useState<'light' | 'dark' | 'system'>('system');
   const [mounted, setMounted] = useState(false);
   const [showReleaseAlert, setShowReleaseAlert] = useState(false);
@@ -99,6 +107,44 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </div>
           
           <div className="flex items-center space-x-4">
+            {userProfile && onNavigate && (
+              <div className="flex rounded-md shadow-sm mr-2" role="group">
+                <button
+                  type="button"
+                  onClick={() => onNavigate('calculator')}
+                  className={`px-4 py-2 text-sm font-medium border border-gray-200 dark:border-gray-700 rounded-s-lg ${
+                    currentView === 'calculator' 
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' 
+                      : 'bg-white text-gray-900 hover:bg-gray-100 hover:text-blue-700 dark:bg-gray-800 dark:text-white dark:hover:text-white dark:hover:bg-gray-700'
+                  }`}
+                >
+                  Calculator
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('history')}
+                  className={`px-4 py-2 text-sm font-medium border-t border-b border-gray-200 dark:border-gray-700 ${
+                    currentView === 'history' 
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' 
+                      : 'bg-white text-gray-900 hover:bg-gray-100 hover:text-blue-700 dark:bg-gray-800 dark:text-white dark:hover:text-white dark:hover:bg-gray-700'
+                  }`}
+                >
+                  History
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('preferences')}
+                  className={`px-4 py-2 text-sm font-medium border border-gray-200 dark:border-gray-700 rounded-e-lg ${
+                    currentView === 'preferences' 
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' 
+                      : 'bg-white text-gray-900 hover:bg-gray-100 hover:text-blue-700 dark:bg-gray-800 dark:text-white dark:hover:text-white dark:hover:bg-gray-700'
+                  }`}
+                >
+                  Preferences
+                </button>
+              </div>
+            )}
+            
             <div className="flex items-center space-x-2">
               <button
                 onClick={openReleaseModal}
@@ -133,9 +179,22 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 )}
               </button>
             </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 font-medium hidden sm:block">
-              CE Pricing Architect
-            </div>
+            
+            {userProfile && (
+              <div className="flex items-center space-x-3 ml-4 border-l pl-4 border-gray-200 dark:border-gray-700">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {userProfile.displayName || userProfile.email}
+                </span>
+                {onLogout && (
+                  <button
+                    onClick={onLogout}
+                    className="text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
+                  >
+                    Logout
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </header>

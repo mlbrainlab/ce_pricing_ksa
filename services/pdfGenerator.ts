@@ -7,7 +7,7 @@ import { WK_LOGO_BASE64 } from '../wkLogo.js';
 
 export async function generateQuotePDF(config: DealConfiguration, data: CalculationOutput, options: any) {
   const doc = new jsPDF();
-  const { customerName, repName, repPhone, repEmail, isCp, showStats, showMonthlyCost, showTotals, showEmrIntegration, hasOptOutClause, showFLinkIntegration, printNotes } = options;
+  const { customerName = "N/A", repName = "Representative", repPhone = "", repEmail = "", isCp = false, showStats = true, showMonthlyCost = false, showTotals = true, showEmrIntegration = false, hasOptOutClause = false, showFLinkIntegration = false, printNotes = false } = options || {};
   
   const isIndirect = config.channel !== ChannelType.DIRECT;
   const currencyPrefix = isIndirect ? 'SAR ' : '$';

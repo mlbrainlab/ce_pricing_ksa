@@ -1,0 +1,56 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function isAdmin() { return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; }
+    function existing() { return resource.data; }
+    function incoming() { return request.resource.data; }
+
+    function isValidUser(data) {
+      return data.keys().hasOnly(['email', 'displayName', 'phone', 'role', 'status', 'theme', 'defaultDealType', 'defaultChannel', 'createdAt'])
+        && data.email is string && data.email.size() <= 255
+        && data.role in ['admin', 'cp', 'internal']
+        && data.status in ['pending', 'approved']
+        && (data.createdAt is timestamp);
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Users can only create their own profile as pending/cp initially. 
+      // Admins (identified by email) can create their own admin profile.
+      allow create: if isSignedIn() && isValidId(userId) && request.auth.uid == userId 
+          && isValidUser(incoming()) 
+          && (
+             (incoming().role == 'cp' && incoming().status == 'pending') ||
+             (request.auth.token.email == 'mnitpro@gmail.com' && incoming().role == 'admin' && incoming().status == 'approved')
+          );
+      
+      // Allow users to update their own profile EXCEPT role and status
+      allow update: if isSignedIn() && isValidId(userId) && (
+        (request.auth.uid == userId && !incoming().diff(existing()).affectedKeys().hasAny(['role', 'status'])) 
+        || isAdmin()
+        || (request.auth.token.email == 'mnitpro@gmail.com' && request.auth.uid == userId && incoming().role == 'admin' && incoming().status == 'approved')
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /quotes/{quoteId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      
+      function isValidQuote(data) {
+        return data.userId is string && data.quoteName is string
+          && data.status in ['draft', 'final']
+          && data.version is number
+          && data.createdAt is timestamp
+          && data.updatedAt is timestamp;
+      }
+      
+      allow create: if isSignedIn() && isValidId(quoteId) && incoming().userId == request.auth.uid && isValidQuote(incoming());
+      // Users can update their own quote
+      allow update: if isSignedIn() && isValidId(quoteId) && existing().userId == request.auth.uid && incoming().userId == request.auth.uid;
+      allow delete: if isSignedIn() && isValidId(quoteId) && (existing().userId == request.auth.uid || isAdmin());
+    }
+  }
+}

@@ -3,7 +3,7 @@ import { DealConfiguration, CalculationOutput, ChannelType, DealType } from '../
 import { AVAILABLE_PRODUCTS } from '../constants.js';
 
 export async function generateQuoteExcel(config: DealConfiguration, data: CalculationOutput, options: any) {
-  const { customerName, repName } = options;
+  const { customerName = "N/A", repName = "Representative" } = options || {};
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Pricing Quote');
 
