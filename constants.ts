@@ -1,18 +1,9 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.7.0';
+export const APP_VERSION = '6.6.7';
 
 export const CHANGELOG = [
-  {
-    version: '6.7.0',
-    date: new Date().toISOString().split('T')[0],
-    changes: [
-      'Added Quote History view to load existing saved quotes.',
-      'Added Preferences pane for users to configure default channel and deal types.',
-      'Fixed authentication token validation preventing quote loading from Firebase.'
-    ]
-  },
   {
     version: '6.6.7',
     date: new Date().toISOString().split('T')[0],

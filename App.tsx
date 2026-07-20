@@ -2,9 +2,8 @@ import React, { useState, useEffect, useMemo } from "react";
 import posthog from "posthog-js";
 import Login from "./components/Login";
 import { Layout } from "./components/Layout";
-import { QuoteHistory } from "./components/QuoteHistory";
-import { Preferences } from "./components/Preferences";
 import { ExportSection } from "./components/ExportSection";
+import { logout } from "./components/auth";
 import { FormattedNumberInput } from "./components/FormattedNumberInput";
 import { UpliftFpiInput } from "./components/UpliftFpiInput";
 import {
@@ -44,131 +43,6 @@ const App: React.FC = () => {
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthChecked, setIsAuthChecked] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [currentView, setCurrentView] = useState<'calculator' | 'history' | 'preferences'>('calculator');
-  const [loadedQuote, setLoadedQuote] = useState<any>(null);
-
-  const handleLoadQuote = (quote: any) => {
-    // Populate form state from config
-    const c = quote.config;
-    if (!c) return;
-    
-    setDealType(c.dealType);
-    setChannel(c.channel);
-    setSelectedProductIds(c.selectedProducts || []);
-    setProductInputs(c.productInputs || {});
-    setYears(c.years);
-    setMethod(c.method);
-    setProductMethods(c.productMethods || {});
-    setApplyWHT(c.applyWHT);
-    setFlatPricing(c.flatPricing);
-    setRounding(c.rounding);
-    setUseStartDate(c.useStartDate);
-    if(c.startMonthYear) setStartMonthYear(c.startMonthYear);
-    
-    setExtensionOption(c.extensionOption);
-    setExpiringTerm(c.expiringTerm);
-    setExpiringTCV(c.expiringTCV);
-    setCurrentSpend(c.currentSpend);
-    setExtensionPercentage(c.extensionPercentage);
-    setExtensionFPI(c.extensionFPI);
-    setExtensionVariant(c.extensionVariant);
-    setUseFullExtension(c.useFullExtension);
-    
-    if(c.midCycleExpiryDate) setMidCycleExpiryDate(c.midCycleExpiryDate);
-    if(c.midCycleStartDate) setMidCycleStartDate(c.midCycleStartDate);
-    if(c.midCycleWHT !== undefined) setMidCycleWHT(c.midCycleWHT);
-    if(c.midCycleProduct) setMidCycleProduct(c.midCycleProduct);
-    if(c.midCycleExistingSpend !== undefined) setMidCycleExistingSpend(c.midCycleExistingSpend);
-    if(c.midCycleBedCount !== undefined) setMidCycleBedCount(c.midCycleBedCount);
-    if(c.midCycleDlm !== undefined) setMidCycleDlm(c.midCycleDlm);
-
-    setLoadedQuote(quote);
-    setCurrentView('calculator');
-  };
-
-  const handleSaveQuote = async (status: 'draft' | 'final', isNewVersion: boolean = false) => {
-    if (!isAuthenticated || !userProfile?.uid) {
-      setNotification("You must be logged in to save quotes.");
-      setTimeout(() => setNotification(null), 3000);
-      return;
-    }
-
-    try {
-      const { db } = await import('./firebaseClient');
-      const { collection, addDoc, doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
-      
-      let quoteName = "Quote - " + config.selectedProducts.join(', ') + " - " + new Date().toLocaleDateString();
-      let version = 1;
-
-      if (loadedQuote) {
-        if (isNewVersion) {
-          quoteName = loadedQuote.quoteName;
-          version = loadedQuote.version + 1;
-        } else {
-          await updateDoc(doc(db, 'quotes', loadedQuote.id), {
-            config,
-            results,
-            status,
-            updatedAt: serverTimestamp()
-          });
-          setNotification("Quote updated successfully.");
-          setTimeout(() => setNotification(null), 3000);
-          setLoadedQuote({ ...loadedQuote, status, config, results });
-          return;
-        }
-      } else {
-        const suggestedName = prompt("Enter a name for this quote:", quoteName);
-        if (suggestedName === null) return;
-        if (suggestedName) quoteName = suggestedName;
-      }
-
-      const payload = {
-        userId: userProfile.uid,
-        authorName: userProfile.displayName || userProfile.email || 'Author',
-        quoteName,
-        status,
-        version,
-        parentQuoteId: loadedQuote ? loadedQuote.id : null,
-        config,
-        results,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-
-      const docRef = await addDoc(collection(db, 'quotes'), payload);
-      // use Date.now() for optimistic local update of timestamp instead of passing serverTimestamp directly onto loadedQuote to avoid UI errors, though we don't display it immediately on the calculator.
-      setLoadedQuote({ id: docRef.id, ...payload });
-      setNotification(isNewVersion ? "New quote version saved." : "Quote saved successfully.");
-      setTimeout(() => setNotification(null), 3000);
-
-      try {
-        const { auth } = await import('./firebaseClient');
-        const idToken = await auth.currentUser?.getIdToken();
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (idToken) headers["Authorization"] = `Bearer ${idToken}`;
-
-        await fetch('/api/notify-admin', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            event: isNewVersion ? 'quote_updated' : 'quote_created',
-            quoteId: docRef.id,
-            authorName: payload.authorName,
-            quoteName: payload.quoteName
-          })
-        });
-      } catch (err) {
-        console.error("Failed to notify admin", err);
-      }
-    } catch (error) {
-      console.error("Error saving quote:", error);
-      setNotification("Failed to save quote.");
-      setTimeout(() => setNotification(null), 3000);
-    }
-  };
-
   const [metadata, setMetadata] = useState<{
     availableProducts: ProductDefinition[];
     utdVariants: Record<string, number>;
@@ -180,75 +54,15 @@ const App: React.FC = () => {
   const sarRate = metadata?.exchangeRateSAR || 3.75;
 
   useEffect(() => {
-    // Dynamic import to avoid early initialization issues
-    import('./firebaseClient').then(({ auth, db }) => {
-      import('firebase/auth').then(({ onAuthStateChanged }) => {
-        import('firebase/firestore').then(({ doc, getDoc, setDoc, updateDoc, serverTimestamp }) => {
-          onAuthStateChanged(auth, async (user) => {
-            if (user) {
-              try {
-                const userRef = doc(db, 'users', user.uid);
-                const userSnap = await getDoc(userRef);
-
-                let profile;
-                if (!userSnap.exists()) {
-                  // Create new user profile as pending CP
-                  // mnitpro@gmail.com is auto-approved admin
-                  const isAdmin = user.email === 'mnitpro@gmail.com';
-                  profile = {
-                    email: user.email || '',
-                    displayName: user.displayName || '',
-                    phone: user.phoneNumber || '',
-                    role: isAdmin ? 'admin' : 'cp',
-                    status: isAdmin ? 'approved' : 'pending',
-                    theme: 'system',
-                    defaultDealType: DealType.NEW_LOGO,
-                    defaultChannel: isAdmin ? ChannelType.DIRECT : ChannelType.FULFILMENT,
-                    createdAt: serverTimestamp()
-                  };
-                  await setDoc(userRef, profile);
-                } else {
-                  profile = userSnap.data();
-                  if (user.email === 'mnitpro@gmail.com' && profile.status !== 'approved') {
-                    profile.status = 'approved';
-                    profile.role = 'admin';
-                    await updateDoc(userRef, { status: 'approved', role: 'admin' });
-                  }
-                }
-
-                if (profile.status === 'approved') {
-                  setUserProfile({ uid: user.uid, ...profile });
-                  setIsAuthenticated(true);
-                  setAuthError(null);
-                  
-                  // Apply preferences
-                  if (profile.defaultDealType) setDealType(profile.defaultDealType as DealType);
-                  if (profile.defaultChannel && (profile.role !== 'cp' || profile.defaultChannel !== ChannelType.DIRECT)) {
-                      setChannel(profile.defaultChannel as ChannelType);
-                  } else if (profile.role === 'cp') {
-                      setChannel(ChannelType.FULFILMENT);
-                  }
-                } else {
-                  setUserProfile(null);
-                  setIsAuthenticated(false);
-                  setAuthError("Your account is pending admin approval.");
-                  await import('./firebaseClient').then(m => m.logoutGoogle());
-                }
-              } catch (err: any) {
-                console.error("Error fetching user profile:", err);
-                setAuthError("Error fetching user profile.");
-                setUserProfile(null);
-                setIsAuthenticated(false);
-              }
-            } else {
-              setIsAuthenticated(false);
-              setUserProfile(null);
-            }
-            setIsAuthChecked(true);
-          });
-        });
-      });
-    });
+    // Check if user is already authenticated via backend cookie
+    fetch("/api/verify", { credentials: "include" })
+      .then((res) => {
+        if (res.ok) {
+          setIsAuthenticated(true);
+        }
+      })
+      .catch((err) => console.error("Auth verification failed:", err))
+      .finally(() => setIsAuthChecked(true));
 
     // Fetch metadata immediately on mount (not sensitive)
     fetch("/api/metadata")
@@ -258,15 +72,13 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = () => {
-    // Firebase auth status listener will handle this
+    setIsAuthenticated(true);
     posthog.capture("user_logged_in");
   };
 
   const handleLogout = async () => {
-    const { logoutGoogle } = await import('./firebaseClient');
-    await logoutGoogle();
+    await logout();
     setIsAuthenticated(false);
-    setUserProfile(null);
     posthog.reset();
   };
 
@@ -391,7 +203,7 @@ const App: React.FC = () => {
 
   const resetForm = () => {
     setDealType(DealType.NEW_LOGO);
-    setChannel(userProfile?.role === 'cp' ? ChannelType.FULFILMENT : ChannelType.DIRECT);
+    setChannel(ChannelType.DIRECT);
     setSelectedProductIds([]);
     setYears(3);
     setMethod(PricingMethod.MYFPI);
@@ -408,7 +220,6 @@ const App: React.FC = () => {
     setExtensionFPI(null);
     setExtensionVariant("ANYWHERE");
     setUseFullExtension(false);
-    setLoadedQuote(null);
     setResetKey((prev) => prev + 1);
 
     setStartMonthYear(new Date().toISOString().slice(0, 7));
@@ -681,14 +492,9 @@ const App: React.FC = () => {
 
     const fetchPricing = async () => {
       try {
-        const { auth } = await import('./firebaseClient');
-        const idToken = await auth.currentUser?.getIdToken();
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (idToken) headers["Authorization"] = `Bearer ${idToken}`;
-
         const res = await fetch("/api/calculate", {
           method: "POST",
-          headers,
+          headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify(config),
         });
@@ -1072,37 +878,11 @@ const App: React.FC = () => {
   }
 
   if (!isAuthenticated) {
-    return (
-      <>
-        <Login onLogin={handleLogin} />
-        {authError && (
-          <div className="fixed top-4 right-4 z-50 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-lg animate-fade-in-down">
-            <p className="font-bold">Access Denied</p>
-            <p>{authError}</p>
-          </div>
-        )}
-      </>
-    );
-  }
-
-  if (currentView === 'history') {
-    return (
-      <Layout userProfile={userProfile} onLogout={handleLogout} currentView="history" onNavigate={setCurrentView}>
-        <QuoteHistory userProfile={userProfile} onLoadQuote={handleLoadQuote} />
-      </Layout>
-    );
-  }
-
-  if (currentView === 'preferences') {
-    return (
-      <Layout userProfile={userProfile} onLogout={handleLogout} currentView="preferences" onNavigate={setCurrentView}>
-        <Preferences userProfile={userProfile} onProfileUpdate={setUserProfile} />
-      </Layout>
-    );
+    return <Login onLogin={handleLogin} />;
   }
 
   return (
-    <Layout userProfile={userProfile} onLogout={handleLogout} currentView={currentView} onNavigate={setCurrentView}>
+    <Layout>
       {notification && (
         <div className="fixed top-4 right-4 z-50 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded shadow-lg animate-fade-in-down">
           <p className="font-bold">Notice</p>
@@ -1152,7 +932,7 @@ const App: React.FC = () => {
                 >
                   <option
                     value={ChannelType.DIRECT}
-                    disabled={isExtensionQuote || userProfile?.role === 'cp'}
+                    disabled={isExtensionQuote}
                   >
                     Direct (USD)
                   </option>
@@ -3350,50 +3130,6 @@ const App: React.FC = () => {
               </div>
             </>
           )}
-
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-5 border border-gray-100 dark:border-gray-700 transition-colors">
-            <div className="flex flex-col space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">
-                  Quote Status: {loadedQuote ? (loadedQuote.status === 'draft' ? <span className="text-yellow-600">Draft</span> : <span className="text-green-600">Final</span>) : <span className="text-gray-500">Unsaved</span>}
-                </h3>
-                {loadedQuote && (
-                  <div className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                    Version: {loadedQuote.version}
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-                <button
-                  type="button"
-                  onClick={() => handleSaveQuote('draft')}
-                  className="flex-1 inline-flex justify-center items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                >
-                  Save as Draft
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSaveQuote('final')}
-                  className="flex-1 inline-flex justify-center items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                >
-                  Save as Final
-                </button>
-                {loadedQuote && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if(confirm("Are you sure you want to fork this quote as a new version?")) {
-                        handleSaveQuote('draft', true);
-                      }
-                    }}
-                    className="flex-1 inline-flex justify-center items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                  >
-                    Fork as v{loadedQuote.version + 1}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
 
           <ExportSection
             key={resetKey}
