@@ -3,11 +3,11 @@
   "rewrites": [
     {
       "source": "/p/(.*)",
-      "destination": "https://eu.i.posthog.com/:1"
+      "destination": "https://eu.i.posthog.com/$1"
     },
     {
       "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "destination": "/api/[...path]"
     },
     {
       "source": "/(.*)",

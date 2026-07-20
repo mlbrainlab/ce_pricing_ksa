@@ -75,7 +75,7 @@ export const calculatePricing = (
   const renewalUpliftRates = configFallback.renewalUpliftRates || {};
   const applyWHT = configFallback.applyWHT || false;
   const flatPricing = configFallback.flatPricing || false;
-  const rounding = configFallback.rounding || "none";
+  const rounding = configFallback.rounding || false;
 
   // Define Floors based on WHT setting
   const activeStandardFloor = applyWHT

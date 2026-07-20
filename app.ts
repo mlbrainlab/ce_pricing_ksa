@@ -7,7 +7,6 @@ import { generateQuoteExcel } from './services/excelGenerator.js';
 
 const app = express();
 app.set('trust proxy', 1);
-
 app.use((req, res, next) => {
     if (req.body !== undefined) {
         next();
@@ -44,8 +43,8 @@ try {
             console.warn("Could not find or parse firebase-applet-config.json", e.message);
         }
 
-        if (!projectId) {
-             projectId = 'gen-lang-client-0528663295';
+        if (!projectId) { 
+            projectId = 'gen-lang-client-0528663295';
         }
         
         initializeApp({ projectId });
@@ -85,10 +84,6 @@ const requireAuth = async (req: any, res: any, next: any) => {
         res.status(401).json({ error: 'Unauthorized: Invalid token' });
     }
 };
-
-
-
-
 
 app.get('/api/metadata', (_req, res) => {
     res.json(getPublicMetadata());

@@ -482,16 +482,6 @@ const App: React.FC = () => {
     }
   }, [dealType, midCycleStartDate]);
 
-  // EFFECT: Auto-enable rounding when Fulfillment or Partner Sourced
-  useEffect(() => {
-    if (
-      channel === ChannelType.FULFILMENT ||
-      channel === ChannelType.PARTNER_SOURCED
-    ) {
-      setRounding(true);
-    }
-  }, [channel]);
-
   // EFFECT: Set Default Rates when selection changes
   useEffect(() => {
     // Only apply defaults if one product is selected to avoid overwriting user preference aggressively
