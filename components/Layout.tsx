@@ -195,6 +195,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, userProfile, onLogout,
                 )}
               </div>
             )}
+
+            <div className="text-sm text-gray-500 dark:text-gray-400 font-medium hidden sm:block ml-4">
+              CE Pricing Architect
+            </div>
           </div>
         </div>
       </header>

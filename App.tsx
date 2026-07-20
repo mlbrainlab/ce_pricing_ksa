@@ -236,7 +236,7 @@ const App: React.FC = () => {
                 }
               } catch (err: any) {
                 console.error("Error fetching user profile:", err);
-                setAuthError("Authentication Error: " + (err.message || "Could not load user profile"));
+                setAuthError("Error fetching user profile.");
                 setUserProfile(null);
                 setIsAuthenticated(false);
               }
@@ -481,6 +481,16 @@ const App: React.FC = () => {
       }
     }
   }, [dealType, midCycleStartDate]);
+
+  // EFFECT: Auto-enable rounding when Fulfillment or Partner Sourced
+  useEffect(() => {
+    if (
+      channel === ChannelType.FULFILMENT ||
+      channel === ChannelType.PARTNER_SOURCED
+    ) {
+      setRounding(true);
+    }
+  }, [channel]);
 
   // EFFECT: Set Default Rates when selection changes
   useEffect(() => {

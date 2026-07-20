@@ -7,8 +7,9 @@ import { generateQuoteExcel } from './services/excelGenerator.js';
 
 const app = express();
 app.set('trust proxy', 1);
+
 app.use((req, res, next) => {
-    if (req.body !== undefined) {
+    if (req.body && Object.keys(req.body).length > 0) {
         next();
     } else {
         express.json({ limit: '50mb' })(req, res, next);
@@ -23,58 +24,28 @@ import fs from 'fs';
 import path from 'path';
 
 // Initialize Firebase Admin
-let projectId: string | undefined = undefined;
-try {
-    if (getApps().length === 0) {
-        try {
-            const cwd = process.cwd();
-            const configPaths = [
-                path.join(cwd, 'firebase-applet-config.json'),
-                path.join(cwd, '..', 'firebase-applet-config.json')
-            ];
-            
-            for (const p of configPaths) {
-                if (fs.existsSync(p)) {
-                    projectId = JSON.parse(fs.readFileSync(p, 'utf8')).projectId;
-                    break;
-                }
-            }
-        } catch (e: any) {
-            console.warn("Could not find or parse firebase-applet-config.json", e.message);
-        }
-
-        if (!projectId) { 
-            projectId = 'gen-lang-client-0528663295';
-        }
-        
-        initializeApp({ projectId });
-        console.log("Firebase Admin initialized" + (projectId ? ` with project ${projectId}` : " without project ID"));
+if (getApps().length === 0) {
+    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+    let projectId = undefined;
+    if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        projectId = config.projectId;
     }
-} catch (e: any) {
-    console.error("FATAL ERROR initializing Firebase Admin:", e);
+    initializeApp(projectId ? { projectId } : undefined);
 }
 
 const requireAuth = async (req: any, res: any, next: any) => {
+    let idToken;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+        idToken = req.headers.authorization.split('Bearer ')[1];
+    }
+    
+    if (!idToken) {
+        return res.status(401).json({ error: 'Unauthorized: No token provided' });
+    }
+
     try {
-        let idToken;
-        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-            idToken = req.headers.authorization.split('Bearer ')[1];
-        }
-        
-        if (!idToken) {
-            return res.status(401).json({ error: 'Unauthorized: No token provided' });
-        }
-
-        // Wrap getAuth() so if it throws synchronously it is caught!
-        let authService;
-        try {
-            authService = getAuth();
-        } catch (e: any) {
-            console.error("Firebase not initialized:", e);
-            return res.status(500).json({ error: 'Internal Server Error: Auth Service Unavailable', details: e.message });
-        }
-
-        const decodedToken = await authService.verifyIdToken(idToken);
+        const decodedToken = await getAuth().verifyIdToken(idToken);
         req.user = decodedToken;
         next();
     } catch (error: any) {
@@ -84,6 +55,10 @@ const requireAuth = async (req: any, res: any, next: any) => {
         res.status(401).json({ error: 'Unauthorized: Invalid token' });
     }
 };
+
+
+
+
 
 app.get('/api/metadata', (_req, res) => {
     res.json(getPublicMetadata());
@@ -159,13 +134,6 @@ app.post('/api/notify-admin', requireAuth, async (req, res) => {
     } catch (e) {
         console.error('Notify admin error:', e);
         res.status(500).json({ error: 'Notification failed' });
-    }
-});
-
-app.use((err: any, _req: any, res: any, _next: any) => {
-    console.error('Unhandled error in Express middleware:', err);
-    if (!res.headersSent) {
-        res.status(500).json({ error: 'Internal Server Error', details: err.message || String(err) });
     }
 });
 

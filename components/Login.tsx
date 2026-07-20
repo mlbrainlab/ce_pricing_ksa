@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { WK_LOGO_BASE64 } from '../wkLogo';
 import { loginWithGoogle } from '../firebaseClient';
-import { APP_VERSION } from '../constants';
 
 interface LoginProps {
   onLogin: () => void;
@@ -62,9 +61,6 @@ export default function Login({ onLogin }: LoginProps) {
         <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
           Sign in with your Google Account
         </p>
-        <p className="mt-1 text-center text-xs text-gray-500 dark:text-gray-500">
-          v{APP_VERSION}
-        </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -76,12 +72,6 @@ export default function Login({ onLogin }: LoginProps) {
           >
             {isLoading ? 'Signing in...' : 'Sign in with Google'}
           </button>
-          
-          {window.self !== window.top && (
-            <div className="mt-4 w-full text-blue-700 dark:text-blue-300 text-xs text-center border-t border-gray-200 dark:border-gray-700 pt-4">
-              If the login popup closes instantly, please open this app in a new tab using the button in the top right of the AI Studio preview.
-            </div>
-          )}
           
           {error && (
             <div className="mt-4 w-full text-red-600 dark:text-red-400 text-sm font-medium bg-red-50 dark:bg-red-900/30 p-3 rounded-md border border-red-200 dark:border-red-800 transition-colors">

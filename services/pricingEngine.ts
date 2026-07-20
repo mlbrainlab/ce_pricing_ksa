@@ -62,20 +62,21 @@ const convertToSAR = (usdAmount: number): number => {
 export const calculatePricing = (
   config: DealConfiguration,
 ): CalculationOutput => {
-  const configFallback = config || {} as DealConfiguration;
-  const dealType = configFallback.dealType || DealType.NEW_LOGO;
-  const channel = configFallback.channel || ChannelType.DIRECT;
-  const selectedProducts = configFallback.selectedProducts || [];
-  const productInputs = configFallback.productInputs || {};
-  const years = configFallback.years || 1;
-  const method = configFallback.method || PricingMethod.MYFPI;
-  const productMethods = configFallback.productMethods || {};
-  const rates = configFallback.rates || [];
-  const productRates = configFallback.productRates || {};
-  const renewalUpliftRates = configFallback.renewalUpliftRates || {};
-  const applyWHT = configFallback.applyWHT || false;
-  const flatPricing = configFallback.flatPricing || false;
-  const rounding = configFallback.rounding || false;
+  const {
+    dealType,
+    channel,
+    selectedProducts,
+    productInputs,
+    years,
+    method,
+    productMethods,
+    rates,
+    productRates,
+    renewalUpliftRates,
+    applyWHT,
+    flatPricing,
+    rounding,
+  } = config;
 
   // Define Floors based on WHT setting
   const activeStandardFloor = applyWHT
@@ -421,7 +422,7 @@ export const calculatePricing = (
   };
 
   if (hasUTD && hasLXD) {
-    const lxdInputs = productInputs["lxd"] || { variant: "", count: 0 };
+    const lxdInputs = productInputs["lxd"];
     const lxdCurrentNet = year1ProductNets["lxd"];
     const lxdAddonNet = getLXDAddonNet(lxdInputs, lxdInputs.count, applyWHT);
     const lxdBaseNet = lxdCurrentNet - lxdAddonNet;
@@ -442,7 +443,7 @@ export const calculatePricing = (
       floorTriggered = true;
     }
 
-    const utdInputs = productInputs["utd"] || { variant: "", count: 0 };
+    const utdInputs = productInputs["utd"];
     let utdFloor = activeStandardFloor;
     if (utdInputs.variant === "UTDADV") utdFloor = utdFloor * 1.08;
     if (year1ProductNets["utd"] < utdFloor) {
@@ -453,7 +454,7 @@ export const calculatePricing = (
       floorTriggered = true;
     }
   } else if (hasUTD) {
-    const utdInputs = productInputs["utd"] || { variant: "", count: 0 };
+    const utdInputs = productInputs["utd"];
     let utdFloor = activeStandardFloor;
     if (utdInputs.variant === "UTDADV") utdFloor = utdFloor * 1.08;
     if (year1ProductNets["utd"] < utdFloor) {
@@ -464,7 +465,7 @@ export const calculatePricing = (
       floorTriggered = true;
     }
   } else if (hasLXD) {
-    const lxdInputs = productInputs["lxd"] || { variant: "", count: 0 };
+    const lxdInputs = productInputs["lxd"];
     const lxdCurrentNet = year1ProductNets["lxd"];
     const lxdAddonNet = getLXDAddonNet(lxdInputs, lxdInputs.count, applyWHT);
     const lxdBaseNet = lxdCurrentNet - lxdAddonNet;

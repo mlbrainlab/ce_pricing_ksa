@@ -1,26 +1,9 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.7.2';
+export const APP_VERSION = '6.7.0';
 
 export const CHANGELOG = [
-  {
-    version: '6.7.2',
-    date: new Date().toISOString().split('T')[0],
-    changes: [
-      'Updated UTD-EE pricing from $265 to $210 (and adjusted EE-Combo variants proportionally).',
-      'Fixed Excel export to write native Excel formulas instead of static values for calculated fields, matching the on-screen tables exactly.'
-    ]
-  },
-  {
-    version: '6.7.1',
-    date: new Date().toISOString().split('T')[0],
-    changes: [
-      'Added current version number to the login screen.',
-      'Removed "CE Pricing Architect" watermark from the header.',
-      'Fixed a bug causing serverless functions to fail on initial load when deployed.'
-    ]
-  },
   {
     version: '6.7.0',
     date: new Date().toISOString().split('T')[0],
@@ -273,8 +256,8 @@ export const AVAILABLE_PRODUCTS: ProductDefinition[] = [
 export const UTD_VARIANTS: Record<string, number> = {
   "ANYWHERE": 259,
   "UTDADV": 259 * 1.08,
-  "UTDEE": 210,
-  "UTDEE-EAI": 220.50,
+  "UTDEE": 265,
+  "UTDEE-EAI": 278.25,
   "SM": 0, // Special bucket pricing
 };
 
@@ -290,9 +273,9 @@ export const LXD_VARIANTS: Record<string, number> = {
   "BASE PKG": 80,
   "BASE PKG+FLINK": 92,
   "BASE PKG+FLINK+IPE": 108,
-  "EE-Combo": 52.5, // 0.25 * 210
-  "EE-Combo+FLINK": 64.5,
-  "EE-Combo+FLINK+IPE": 80.5,
+  "EE-Combo": 66.25, // 0.25 * 265
+  "EE-Combo+FLINK": 78.25,
+  "EE-Combo+FLINK+IPE": 94.25,
   "Seats": 350,
   "Seats+FLINK": 385, // 300 + 10%
   "Seats+IPE": 420,   // 300 + 20%
