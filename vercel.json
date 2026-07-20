@@ -2,8 +2,12 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/p/(.*)",
+      "destination": "https://eu.i.posthog.com/:1"
+    },
+    {
       "source": "/api/(.*)",
-      "destination": "/api"
+      "destination": "/api/$1"
     },
     {
       "source": "/(.*)",
