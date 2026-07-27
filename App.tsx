@@ -894,7 +894,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <Layout>
+    <Layout onLogout={handleLogout}>
       {notification && (
         <div className="fixed top-4 right-4 z-50 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded shadow-lg animate-fade-in-down">
           <p className="font-bold">Notice</p>
