@@ -537,7 +537,7 @@ const App: React.FC = () => {
   const utdEeWarning = useMemo(() => {
     if (selectedProductIds.includes("utd")) {
       const inputs = productInputs["utd"];
-      if (inputs.variant === "UTDEE") {
+      if (inputs.variant?.includes("UTDEE")) {
         // Check Year 1 Gross USD for UTD
         // We can find it in yearlyResults[0].breakdown
         const utdY1 = results?.yearlyResults?.[0]?.breakdown.find(
@@ -668,11 +668,11 @@ const App: React.FC = () => {
         },
       };
 
-      // Specific Logic: If UTD Variant becomes UTDEE or UTDEE-EAI, enforce min count 90
+      // Specific Logic: If UTD Variant becomes UTDEE or UTDEE (265), enforce min count 90
       if (
         id === "utd" &&
         field === "variant" &&
-        (value === "UTDEE" || value === "UTDEE-EAI")
+        (value === "UTDEE" || value === "UTDEE (265)")
       ) {
         if (newState["utd"].count < 90) {
           newState["utd"].count = 90;
@@ -701,8 +701,8 @@ const App: React.FC = () => {
         // If existing changes, reset target variant to match existing initially
         // to avoid invalid combinations.
         // EXCEPTION: If Existing is UTDEE, Target must be UTDEE
-        if (value === "UTDEE") {
-          newState[id].variant = "UTDEE";
+        if (typeof value === "string" && value.includes("UTDEE")) {
+          newState[id].variant = value as string;
           if (id === "utd") {
             setUtdRateVal(8);
             if (newState[id].eaiActivation === true || newState[id].eaiActivation === undefined) {
@@ -734,7 +734,7 @@ const App: React.FC = () => {
 
       if (id === "utd" && field === "count") {
         const currentCount = prevInput.count;
-        if (prevInput.variant === "UTDEE" && currentCount < 90) {
+        if (prevInput.variant?.includes("UTDEE") && currentCount < 90) {
           newState["utd"].variant = "UTDADV";
           setNotification(
             "Variant switched to UTD Advanced (UTD EE requires 90+ HC)",
@@ -759,14 +759,14 @@ const App: React.FC = () => {
     existingVariant: string,
   ) => {
     if (productId === "utd") {
-      if (existingVariant === "UTDEE-EAI") return ["UTDEE-EAI"];
-      if (existingVariant === "UTDEE") return ["UTDEE", "UTDEE-EAI"];
+      if (existingVariant === "UTDEE (265)") return ["UTDEE (265)"];
+      if (existingVariant === "UTDEE") return ["UTDEE", "UTDEE (265)"];
 
       // Anywhere -> Anywhere, Adv, EE, EE-EAI
       if (existingVariant === "ANYWHERE")
-        return ["ANYWHERE", "UTDADV", "UTDEE", "UTDEE-EAI"];
+        return ["ANYWHERE", "UTDADV", "UTDEE", "UTDEE (265)"];
       // Adv -> Adv, EE, EE-EAI
-      if (existingVariant === "UTDADV") return ["UTDADV", "UTDEE", "UTDEE-EAI"];
+      if (existingVariant === "UTDADV") return ["UTDADV", "UTDEE", "UTDEE (265)"];
     }
     if (productId === "lxd") {
       if (existingVariant === "BASE PKG")
@@ -1269,7 +1269,7 @@ const App: React.FC = () => {
                       const isUTDEE =
                         isUTDSelected &&
                         (currentUTDVariant === "UTDEE" ||
-                          currentUTDVariant === "UTDEE-EAI");
+                          currentUTDVariant === "UTDEE (265)");
                       const isLXDComboVariant =
                         product.id === "lxd" &&
                         input.variant.includes("EE-Combo");
@@ -2066,7 +2066,7 @@ const App: React.FC = () => {
                             if (productMethods.utd === PricingMethod.MYPP) {
                               const utdY1 =
                                 y1Breakdown.find((p: any) => p.id === "utd")
-                                  ?.net || 0;
+                                  ?.gross || 0;
                               if (utdY1 < 10000)
                                 alerts.push(
                                   "UTD MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.",
@@ -2075,7 +2075,7 @@ const App: React.FC = () => {
                             if (productMethods.lxd === PricingMethod.MYPP) {
                               const lxdY1 =
                                 y1Breakdown.find((p: any) => p.id === "lxd")
-                                  ?.net || 0;
+                                  ?.gross || 0;
                               if (lxdY1 < 10000)
                                 alerts.push(
                                   "LXD MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.",
@@ -2086,7 +2086,7 @@ const App: React.FC = () => {
                               selectedProductIds.forEach((pid) => {
                                 const y1 =
                                   y1Breakdown.find((p: any) => p.id === pid)
-                                    ?.net || 0;
+                                    ?.gross || 0;
                                 if (y1 < 10000) {
                                   const name =
                                     (metadata?.availableProducts || []).find(

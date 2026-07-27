@@ -39708,9 +39708,9 @@ var require_stream = __commonJS({
   }
 });
 
-// node_modules/jszip/node_modules/safe-buffer/index.js
+// node_modules/jszip/node_modules/readable-stream/node_modules/safe-buffer/index.js
 var require_safe_buffer = __commonJS({
-  "node_modules/jszip/node_modules/safe-buffer/index.js"(exports2, module2) {
+  "node_modules/jszip/node_modules/readable-stream/node_modules/safe-buffer/index.js"(exports2, module2) {
     var buffer = __require("buffer");
     var Buffer2 = buffer.Buffer;
     function copyProps(src, dst) {
@@ -40552,9 +40552,9 @@ var require_stream_duplex = __commonJS({
   }
 });
 
-// node_modules/jszip/node_modules/string_decoder/lib/string_decoder.js
+// node_modules/jszip/node_modules/readable-stream/node_modules/string_decoder/lib/string_decoder.js
 var require_string_decoder = __commonJS({
-  "node_modules/jszip/node_modules/string_decoder/lib/string_decoder.js"(exports2) {
+  "node_modules/jszip/node_modules/readable-stream/node_modules/string_decoder/lib/string_decoder.js"(exports2) {
     "use strict";
     var Buffer2 = require_safe_buffer().Buffer;
     var isEncoding = Buffer2.isEncoding || function(encoding) {
