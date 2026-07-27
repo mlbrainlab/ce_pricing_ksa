@@ -118,9 +118,6 @@ export default function Login({ onLogin }: LoginProps) {
               </button>
             </div>
           </form>
-          <div className="mt-6 text-center text-xs text-gray-400 dark:text-gray-500 font-mono">
-            CE Pricing KSA v{APP_VERSION}
-          </div>
         </div>
       </div>
     </div>
