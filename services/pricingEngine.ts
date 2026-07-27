@@ -92,6 +92,7 @@ export const calculatePricing = (
   // --- Step 1: Calculate Year 1 Items (Base Calculation) ---
 
   const year1ProductNets: Record<string, number> = {};
+  const year1ProductGross: Record<string, number> = {};
 
   let totalRenewalBaseForACV = 0;
 
@@ -144,6 +145,8 @@ export const calculatePricing = (
           ? count * listRate
           : definition?.defaultBasePrice || 0;
     }
+
+    year1ProductGross[prodId] = baseGross;
 
     const effectiveDiscount = parseFloat(inputs.baseDiscount as any) || 0;
     let baseNet = baseGross * (1 - effectiveDiscount / 100);
@@ -224,12 +227,12 @@ export const calculatePricing = (
                 return effectiveStats * expiringRate * 1.11;
               } else if (
                 (existing === "ANYWHERE" || existing === "UTDADV") &&
-                currentTarget === "UTDEE-EAI"
+                currentTarget === "UTDEE (265)"
               ) {
                 return effectiveStats * expiringRate * 1.14;
               } else if (
                 existing === "UTDEE" &&
-                currentTarget === "UTDEE-EAI"
+                currentTarget === "UTDEE (265)"
               ) {
                 return effectiveStats * expiringRate * 1.11;
               } else {
@@ -243,14 +246,14 @@ export const calculatePricing = (
 
         // Check EE Eligibility
         let isEligibleForEE = false;
-        if (existing === "UTDEE" || existing === "UTDEE-EAI") {
+        if (existing === "UTDEE" || existing === "UTDEE (265)") {
           isEligibleForEE = true;
         } else if (pathBasedPrice > 30000) {
           isEligibleForEE = true;
         }
 
         if (
-          (target === "UTDEE" || target === "UTDEE-EAI") &&
+          (target === "UTDEE" || target === "UTDEE (265)") &&
           !isEligibleForEE
         ) {
           productNotes.push(
@@ -260,7 +263,7 @@ export const calculatePricing = (
           pathBasedPrice = calculatePriceForTarget(finalTarget);
         } else if (
           finalTarget !== "UTDEE" &&
-          finalTarget !== "UTDEE-EAI" &&
+          finalTarget !== "UTDEE (265)" &&
           isEligibleForEE
         ) {
           productNotes.push(
@@ -286,7 +289,7 @@ export const calculatePricing = (
             productNotes.push(
               `UTD: Upsell to EE (${upliftVal < 8 ? "Exception: " : ""}11% uplift recommendation applies)`,
             );
-          } else if (finalTarget === "UTDEE-EAI") {
+          } else if (finalTarget === "UTDEE (265)") {
             productNotes.push(
               `UTD: Upsell to EE-EAI (${upliftVal < 8 ? "Exception: " : ""}${existing === "UTDEE" ? "11%" : "14%"} uplift recommendation applies)`,
             );
@@ -495,7 +498,9 @@ export const calculatePricing = (
     const specificRates = productRates[prodId] || rates;
     let specificMethod = productMethods?.[prodId] || method;
 
-    if (specificMethod === PricingMethod.MYPP && y1Value < 10000) {
+    const y1GrossForMYPP = year1ProductGross[prodId];
+
+    if (specificMethod === PricingMethod.MYPP && y1GrossForMYPP < 10000) {
       specificMethod = PricingMethod.MYFPI;
       productNotes.push(
         `${prodId.toUpperCase()} MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.`,

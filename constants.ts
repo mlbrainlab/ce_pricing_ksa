@@ -247,8 +247,8 @@ export const AVAILABLE_PRODUCTS: ProductDefinition[] = [
 export const UTD_VARIANTS: Record<string, number> = {
   "ANYWHERE": 259,
   "UTDADV": 259 * 1.08,
-  "UTDEE": 265,
-  "UTDEE-EAI": 278.25,
+  "UTDEE": 210,
+  "UTDEE (265)": 265,
   "SM": 0, // Special bucket pricing
 };
 
@@ -264,9 +264,9 @@ export const LXD_VARIANTS: Record<string, number> = {
   "BASE PKG": 80,
   "BASE PKG+FLINK": 92,
   "BASE PKG+FLINK+IPE": 108,
-  "EE-Combo": 66.25, // 0.25 * 265
-  "EE-Combo+FLINK": 78.25,
-  "EE-Combo+FLINK+IPE": 94.25,
+  "EE-Combo": 52.5, // 0.25 * 210
+  "EE-Combo+FLINK": 64.5,
+  "EE-Combo+FLINK+IPE": 80.5,
   "Seats": 350,
   "Seats+FLINK": 385, // 300 + 10%
   "Seats+IPE": 420,   // 300 + 20%
