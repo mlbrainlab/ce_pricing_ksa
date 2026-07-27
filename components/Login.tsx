@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { verifyPasscode } from './auth';
 import { WK_LOGO_BASE64 } from '../wkLogo';
+import { APP_VERSION } from '../constants';
 
 interface LoginProps {
   onLogin: () => void;
@@ -73,6 +74,11 @@ export default function Login({ onLogin }: LoginProps) {
         <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
           Please enter the monthly shared passcode.
         </p>
+        <div className="mt-2 text-center">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+            v{APP_VERSION}
+          </span>
+        </div>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -112,6 +118,9 @@ export default function Login({ onLogin }: LoginProps) {
               </button>
             </div>
           </form>
+          <div className="mt-6 text-center text-xs text-gray-400 dark:text-gray-500 font-mono">
+            CE Pricing KSA v{APP_VERSION}
+          </div>
         </div>
       </div>
     </div>
