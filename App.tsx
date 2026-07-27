@@ -155,6 +155,7 @@ const App: React.FC = () => {
   const [extensionFPI, setExtensionFPI] = useState<number | null>(null);
   const [extensionVariant, setExtensionVariant] = useState<string>("ANYWHERE");
   const [useFullExtension, setUseFullExtension] = useState<boolean>(false);
+  const [roundUpOptionB, setRoundUpOptionB] = useState<boolean>(false);
 
   // Start Date State
   const [useStartDate, setUseStartDate] = useState<boolean>(false);
@@ -220,6 +221,7 @@ const App: React.FC = () => {
     setExtensionFPI(null);
     setExtensionVariant("ANYWHERE");
     setUseFullExtension(false);
+    setRoundUpOptionB(false);
     setResetKey((prev) => prev + 1);
 
     setStartMonthYear(new Date().toISOString().slice(0, 7));
@@ -438,6 +440,7 @@ const App: React.FC = () => {
       extensionFPI,
       extensionVariant,
       useFullExtension,
+      roundUpOptionB,
       midCycleExpiryDate,
       midCycleStartDate,
       midCycleWHT,
@@ -475,6 +478,7 @@ const App: React.FC = () => {
     extensionFPI,
     extensionVariant,
     useFullExtension,
+    roundUpOptionB,
     midCycleExpiryDate,
     midCycleStartDate,
     midCycleWHT,
@@ -518,15 +522,23 @@ const App: React.FC = () => {
   // Extension Quote Logic
   const extensionResults = results?.extensionResults;
 
+  const isUtdExtensionVariant = useMemo(() => {
+    if (!extensionVariant) return true;
+    const v = extensionVariant.toUpperCase();
+    return ['ANYWHERE', 'UTDADV', 'UTDEE', 'UTDEE-EAI', 'SM'].includes(v) || v.startsWith('UTD');
+  }, [extensionVariant]);
+
+  const defaultOptionBFPI = isUtdExtensionVariant ? 8.0 : 5.0;
+
   const currentFpiVal = useMemo(() => {
     if (extensionOption === "A") {
       return extensionFPI !== null
         ? extensionFPI
         : extensionResults?.fpiPercentage ?? 0;
     } else {
-      return extensionFPI !== null ? extensionFPI : 0;
+      return extensionFPI !== null ? extensionFPI : defaultOptionBFPI;
     }
-  }, [extensionOption, extensionFPI, extensionResults]);
+  }, [extensionOption, extensionFPI, extensionResults, defaultOptionBFPI]);
 
   const extensionRequiresFinanceApproval = useMemo(() => {
     if (!isExtensionQuote) return false;
@@ -1084,19 +1096,36 @@ const App: React.FC = () => {
                 )}
 
                 {extensionOption === "B" && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                      Uplift FPI%
-                    </label>
-                    <UpliftFpiInput
-                      value={extensionFPI !== null ? extensionFPI : 0}
-                      onChange={setExtensionFPI}
-                    />
-                    {extensionRequiresFinanceApproval && (
-                      <div className="mt-1 text-[10px] font-bold text-red-600 dark:text-red-400 animate-pulse">
-                        Requires Finance approval
-                      </div>
-                    )}
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Uplift FPI%
+                      </label>
+                      <UpliftFpiInput
+                        value={extensionFPI !== null ? extensionFPI : defaultOptionBFPI}
+                        onChange={setExtensionFPI}
+                      />
+                      {extensionRequiresFinanceApproval && (
+                        <div className="mt-1 text-[10px] font-bold text-red-600 dark:text-red-400 animate-pulse">
+                          Requires Finance approval
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center pt-2 border-t border-gray-100 dark:border-gray-700">
+                      <input
+                        id="round-up-option-b-checkbox"
+                        type="checkbox"
+                        checked={roundUpOptionB}
+                        onChange={(e) => setRoundUpOptionB(e.target.checked)}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                      />
+                      <label
+                        htmlFor="round-up-option-b-checkbox"
+                        className="ml-2 text-xs font-semibold text-gray-700 dark:text-gray-300 cursor-pointer select-none"
+                      >
+                        Round up value (Option B)
+                      </label>
+                    </div>
                   </div>
                 )}
 
@@ -2523,8 +2552,15 @@ const App: React.FC = () => {
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-blue-500 dark:border-blue-400">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
-                            End-User Price
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                              End-User Price
+                            </div>
+                            {extensionResults.roundUpOptionB && (
+                              <span className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 px-1.5 py-0.5 rounded font-semibold">
+                                Rounded Up (Nearest 1,000)
+                              </span>
+                            )}
                           </div>
                           <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
                             {formatCurrency(
@@ -2537,25 +2573,27 @@ const App: React.FC = () => {
                               <div>
                                 SAR:{" "}
                                 {formatCurrency(
-                                  extensionResults.endUserPrice * sarRate,
+                                  extensionResults.roundUpOptionB
+                                    ? Math.ceil((extensionResults.endUserPrice * sarRate) / 1000) * 1000
+                                    : extensionResults.endUserPrice * sarRate,
                                   "SAR",
                                 )}
                               </div>
                               <div>
                                 VAT (15%):{" "}
                                 {formatCurrency(
-                                  extensionResults.endUserPrice *
-                                    sarRate *
-                                    0.15,
+                                  (extensionResults.roundUpOptionB
+                                    ? Math.ceil((extensionResults.endUserPrice * sarRate) / 1000) * 1000
+                                    : extensionResults.endUserPrice * sarRate) * 0.15,
                                   "SAR",
                                 )}
                               </div>
                               <div className="font-bold text-gray-700 dark:text-gray-300">
                                 Total:{" "}
                                 {formatCurrency(
-                                  extensionResults.endUserPrice *
-                                    sarRate *
-                                    1.15,
+                                  (extensionResults.roundUpOptionB
+                                    ? Math.ceil((extensionResults.endUserPrice * sarRate) / 1000) * 1000
+                                    : extensionResults.endUserPrice * sarRate) * 1.15,
                                   "SAR",
                                 )}
                               </div>

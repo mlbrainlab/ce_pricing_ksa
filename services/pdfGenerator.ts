@@ -142,33 +142,51 @@ export async function generateQuotePDF(config: DealConfiguration, data: Calculat
       extRows.push(['Dates', config.startMonthYear]);
     }
 
+    const availMonthsVal = extResults.monthsAvailable !== undefined && extResults.monthsAvailable !== null
+      ? extResults.monthsAvailable
+      : extResults.monthsCovered;
+
     if (extResults.type === 'A') {
-      const durationText = extResults.useFullExtension
+      const availTextA = `${availMonthsVal?.toFixed(2)} months (${Math.round((availMonthsVal || 0) * 30)} days)`;
+      let durationText = extResults.useFullExtension
         ? `${extResults.days} days (${extResults.integerMonths} months${extResults.extraDays > 0 ? ` and ${extResults.extraDays} days` : ''})`
         : `${Math.round(extResults.monthsAvailable * 30)} days (${extResults.monthsAvailable.toFixed(2)} months)`;
+      if (options.showAvailableMonths) {
+        durationText += ` (Exact Available: ${availTextA})`;
+      }
       extRows.push(['Extension Duration', durationText]);
+      if (options.showAvailableMonths) {
+        extRows.push(['Available Duration', availTextA]);
+      }
     } else {
-      extRows.push(['Extension Duration', `${Math.round(extResults.monthsCovered * 30)} days (${extResults.monthsCovered} months)`]);
-    }
-
-    if (options.showAvailableMonths) {
-      const availMonthsVal = extResults.monthsAvailable !== undefined && extResults.monthsAvailable !== null
-        ? extResults.monthsAvailable
-        : extResults.monthsCovered;
-      const availText = `${availMonthsVal?.toFixed(2)} months (${Math.round((availMonthsVal || 0) * 30)} days)`;
-      extRows.push(['Available Duration', availText]);
+      const availTextB = `${availMonthsVal?.toFixed(2)} months`;
+      let durationText = `${extResults.monthsCovered} months`;
+      if (options.showAvailableMonths) {
+        durationText += ` (Exact Available: ${availTextB})`;
+      }
+      extRows.push(['Extension Duration', durationText]);
+      if (options.showAvailableMonths) {
+        extRows.push(['Available Duration', availTextB]);
+      }
     }
 
     if (isIndirect) {
-      const euPriceSAR = extResults.endUserPrice * EXCHANGE_RATE_SAR;
+      let euPriceSAR = extResults.endUserPrice * EXCHANGE_RATE_SAR;
+      if (extResults.roundUpOptionB) {
+        euPriceSAR = Math.ceil(euPriceSAR / 1000) * 1000;
+      }
       extRows.push(
         ['End-User Price (SAR)', `SAR ${euPriceSAR.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`],
         ['VAT (15%) (SAR)', `SAR ${(euPriceSAR * 0.15).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`],
         ['Total (SAR)', `SAR ${(euPriceSAR * 1.15).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`]
       );
     } else {
+      let euPriceUSD = extResults.endUserPrice;
+      if (extResults.roundUpOptionB) {
+        euPriceUSD = Math.ceil(euPriceUSD / 1000) * 1000;
+      }
       extRows.push(
-        ['End-User Price (USD)', `$${extResults.endUserPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`]
+        ['End-User Price (USD)', `$${euPriceUSD.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`]
       );
     }
 

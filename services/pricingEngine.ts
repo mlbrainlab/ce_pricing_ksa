@@ -702,13 +702,24 @@ export const calculatePricing = (
       }
     } else {
       const maxSARExVAT = 100000 / 1.15;
-      const fpiPercentage = config.extensionFPI ?? 0;
+      const isUtdVar = ['ANYWHERE', 'UTDADV', 'UTDEE', 'UTDEE-EAI', 'SM'].includes((config.extensionVariant || '').toUpperCase()) || (config.extensionVariant || '').toUpperCase().startsWith('UTD');
+      const defaultFpi = isUtdVar ? 8.0 : 5.0;
+      const fpiPercentage = (config.extensionFPI !== undefined && config.extensionFPI !== null) ? config.extensionFPI : defaultFpi;
       const effectiveSpend = (config.currentSpend || 0) * (1 + (fpiPercentage / 100));
       const monthlyCost = effectiveSpend / 12;
       const monthlyCostSAR = monthlyCost * EXCHANGE_RATE_SAR;
       const monthsAvailable = monthlyCostSAR > 0 ? (maxSARExVAT / monthlyCostSAR) : 0;
       const monthsCovered = Math.floor(monthsAvailable);
-      const endUserPrice = monthsCovered * monthlyCost;
+      let endUserPrice = monthsCovered * monthlyCost;
+      if (config.roundUpOptionB) {
+        if (channel !== ChannelType.DIRECT) {
+          const rawSAR = endUserPrice * EXCHANGE_RATE_SAR;
+          const roundedSAR = Math.ceil(rawSAR / 1000) * 1000;
+          endUserPrice = roundedSAR / EXCHANGE_RATE_SAR;
+        } else {
+          endUserPrice = Math.ceil(endUserPrice / 1000) * 1000;
+        }
+      }
       results.extensionResults = {
         type: "B",
         variant: config.extensionVariant,
@@ -723,6 +734,7 @@ export const calculatePricing = (
         endUserPrice,
         commission: endUserPrice * (1 - netFactor),
         netPrice: endUserPrice * netFactor,
+        roundUpOptionB: config.roundUpOptionB,
       };
     }
   }

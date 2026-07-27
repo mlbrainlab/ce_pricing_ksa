@@ -440,33 +440,51 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         extRows.push(['Dates', getExtensionDates()]);
       }
 
+      const availMonthsVal = extensionResults.monthsAvailable !== undefined && extensionResults.monthsAvailable !== null
+        ? extensionResults.monthsAvailable
+        : extensionResults.monthsCovered;
+
       if (extensionResults.type === 'A') {
-        const durationText = extensionResults.useFullExtension
+        const availTextA = `${availMonthsVal?.toFixed(2)} months (${Math.round((availMonthsVal || 0) * 30)} days)`;
+        let durationText = extensionResults.useFullExtension
           ? `${extensionResults.days} days (${extensionResults.integerMonths} months${extensionResults.extraDays > 0 ? ` and ${extensionResults.extraDays} days` : ''})`
           : `${Math.round(extensionResults.monthsAvailable * 30)} days (${extensionResults.monthsAvailable.toFixed(2)} months)`;
+        if (showAvailableMonths) {
+          durationText += ` (Exact Available: ${availTextA})`;
+        }
         extRows.push(['Extension Duration', durationText]);
+        if (showAvailableMonths) {
+          extRows.push(['Available Duration', availTextA]);
+        }
       } else {
-        extRows.push(['Extension Duration', `${Math.round(extensionResults.monthsCovered * 30)} days (${extensionResults.monthsCovered} months)`]);
-      }
-
-      if (showAvailableMonths) {
-        const availMonthsVal = extensionResults.monthsAvailable !== undefined && extensionResults.monthsAvailable !== null
-          ? extensionResults.monthsAvailable
-          : extensionResults.monthsCovered;
-        const availText = `${availMonthsVal?.toFixed(2)} months (${Math.round((availMonthsVal || 0) * 30)} days)`;
-        extRows.push(['Available Duration', availText]);
+        const availTextB = `${availMonthsVal?.toFixed(2)} months`;
+        let durationText = `${extensionResults.monthsCovered} months`;
+        if (showAvailableMonths) {
+          durationText += ` (Exact Available: ${availTextB})`;
+        }
+        extRows.push(['Extension Duration', durationText]);
+        if (showAvailableMonths) {
+          extRows.push(['Available Duration', availTextB]);
+        }
       }
 
       if (isIndirect) {
-        const euPriceSAR = extensionResults.endUserPrice * EXCHANGE_RATE_SAR;
+        let euPriceSAR = extensionResults.endUserPrice * EXCHANGE_RATE_SAR;
+        if (extensionResults.roundUpOptionB) {
+          euPriceSAR = Math.ceil(euPriceSAR / 1000) * 1000;
+        }
         extRows.push(
           ['End-User Price (SAR)', formatMoney(euPriceSAR, 'SAR')],
           ['VAT (15%) (SAR)', formatMoney(euPriceSAR * 0.15, 'SAR')],
           ['Total (SAR)', formatMoney(euPriceSAR * 1.15, 'SAR')]
         );
       } else {
+        let euPriceUSD = extensionResults.endUserPrice;
+        if (extensionResults.roundUpOptionB) {
+          euPriceUSD = Math.ceil(euPriceUSD / 1000) * 1000;
+        }
         extRows.push(
-          ['End-User Price (USD)', formatMoney(extensionResults.endUserPrice, 'USD')]
+          ['End-User Price (USD)', formatMoney(euPriceUSD, 'USD')]
         );
       }
 
@@ -1501,8 +1519,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       )}
 
       {isPreviewModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-70">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 md:p-8 bg-black/75 backdrop-blur-sm overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-5xl h-full max-h-[85vh] flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700">
                 <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><FileText className="w-5 h-5" /> PDF Preview</h3>
                     <div className="flex gap-3">
@@ -1523,6 +1541,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                 <div className="flex-1 flex flex-col md:flex-row bg-gray-100 dark:bg-gray-700 overflow-hidden">
                     <div className="w-full md:w-64 p-6 flex flex-col gap-4 overflow-y-auto bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
                         <h4 className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-2">Export Options</h4>
+                        {isExtensionQuote && (
+                          <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                              <input type="checkbox" checked={showAvailableMonths} onChange={(e) => setShowAvailableMonths(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                              <span>Show Available Months/Days</span>
+                          </label>
+                        )}
                         {!isExtensionQuote && (
                           <>
                             <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">

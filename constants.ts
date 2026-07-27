@@ -1,9 +1,17 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.6.7';
+export const APP_VERSION = '6.6.8';
 
 export const CHANGELOG = [
+  {
+    version: '6.6.8',
+    date: new Date().toISOString().split('T')[0],
+    changes: [
+      'Extension PDF Export: Internal calculations omitted to show client values only (Product, Dates, Duration, End-User Price, VAT, Total), with optional Show Available Months/Days toggle.',
+      'Extension Option B Updates: Default Uplift FPI% set to 8.0% for UTD variants and 5.0% for LXD variants (editable), months-only Extension Duration display, and nearest-thousand value rounding (ROUNDUP to nearest 1,000).'
+    ]
+  },
   {
     version: '6.6.7',
     date: new Date().toISOString().split('T')[0],

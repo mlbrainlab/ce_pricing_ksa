@@ -84,6 +84,7 @@ export interface DealConfiguration {
   extensionFPI?: number | null;
   extensionVariant?: string;
   useFullExtension?: boolean;
+  roundUpOptionB?: boolean;
   // Mid-Cycle Add-on Fields
   midCycleExpiryDate?: string;
   midCycleStartDate?: string;
