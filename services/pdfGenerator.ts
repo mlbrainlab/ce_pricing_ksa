@@ -130,38 +130,91 @@ export async function generateQuotePDF(config: DealConfiguration, data: Calculat
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text("Commercial Schedule", 14, currentY);
   
-  const headers = ['Year'];
-  config.selectedProducts.forEach(pid => {
-      const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-      headers.push(`${p?.shortName || p?.name}`);
-  });
-  headers.push(`Total`);
-  
-  const body = data.yearlyResults.map(r => {
-      const rowData = [`Year ${r.year}`];
-      config.selectedProducts.forEach(pid => {
-          const bd = r.breakdown.find(x => x.id === pid);
-          const val = isIndirect ? (bd?.grossSAR || 0) : (bd?.gross || 0);
-          rowData.push(`${currencyPrefix}${val.toLocaleString()}`);
-      });
-      const totalNum = isIndirect ? r.grossSAR : r.grossUSD;
-      rowData.push(`${currencyPrefix}${totalNum.toLocaleString()}`);
-      return rowData;
-  });
-
   const applyAutoTable = typeof autoTablePlugin === 'function' ? autoTablePlugin : (autoTablePlugin as any).default;
-  
-  applyAutoTable(doc, {
+
+  if (config.dealType === DealType.EXTENSION && (data as any).extensionResults) {
+    const extResults = (data as any).extensionResults;
+    const extRows: string[][] = [
+      ['Product', extResults.variant]
+    ];
+
+    if (config.useStartDate && config.startMonthYear) {
+      extRows.push(['Dates', config.startMonthYear]);
+    }
+
+    if (extResults.type === 'A') {
+      const durationText = extResults.useFullExtension
+        ? `${extResults.days} days (${extResults.integerMonths} months${extResults.extraDays > 0 ? ` and ${extResults.extraDays} days` : ''})`
+        : `${Math.round(extResults.monthsAvailable * 30)} days (${extResults.monthsAvailable.toFixed(2)} months)`;
+      extRows.push(['Extension Duration', durationText]);
+    } else {
+      extRows.push(['Extension Duration', `${Math.round(extResults.monthsCovered * 30)} days (${extResults.monthsCovered} months)`]);
+    }
+
+    if (options.showAvailableMonths) {
+      const availMonthsVal = extResults.monthsAvailable !== undefined && extResults.monthsAvailable !== null
+        ? extResults.monthsAvailable
+        : extResults.monthsCovered;
+      const availText = `${availMonthsVal?.toFixed(2)} months (${Math.round((availMonthsVal || 0) * 30)} days)`;
+      extRows.push(['Available Duration', availText]);
+    }
+
+    if (isIndirect) {
+      const euPriceSAR = extResults.endUserPrice * EXCHANGE_RATE_SAR;
+      extRows.push(
+        ['End-User Price (SAR)', `SAR ${euPriceSAR.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`],
+        ['VAT (15%) (SAR)', `SAR ${(euPriceSAR * 0.15).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`],
+        ['Total (SAR)', `SAR ${(euPriceSAR * 1.15).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`]
+      );
+    } else {
+      extRows.push(
+        ['End-User Price (USD)', `$${extResults.endUserPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`]
+      );
+    }
+
+    applyAutoTable(doc, {
       startY: currentY + 5,
-      head: [headers],
-      body: body,
+      head: [['Description', 'Value']],
+      body: extRows,
       theme: 'grid',
       headStyles: { fillColor: primaryColor, textColor: 255 },
       styles: { fontSize: 9, cellPadding: 4 },
       margin: { left: 14, right: 14 }
-  });
+    });
 
-  currentY = (doc as any).lastAutoTable.finalY + 10;
+    currentY = (doc as any).lastAutoTable.finalY + 10;
+  } else {
+    const headers = ['Year'];
+    config.selectedProducts.forEach(pid => {
+        const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
+        headers.push(`${p?.shortName || p?.name}`);
+    });
+    headers.push(`Total`);
+    
+    const body = data.yearlyResults.map(r => {
+        const rowData = [`Year ${r.year}`];
+        config.selectedProducts.forEach(pid => {
+            const bd = r.breakdown.find(x => x.id === pid);
+            const val = isIndirect ? (bd?.grossSAR || 0) : (bd?.gross || 0);
+            rowData.push(`${currencyPrefix}${val.toLocaleString()}`);
+        });
+        const totalNum = isIndirect ? r.grossSAR : r.grossUSD;
+        rowData.push(`${currencyPrefix}${totalNum.toLocaleString()}`);
+        return rowData;
+    });
+
+    applyAutoTable(doc, {
+        startY: currentY + 5,
+        head: [headers],
+        body: body,
+        theme: 'grid',
+        headStyles: { fillColor: primaryColor, textColor: 255 },
+        styles: { fontSize: 9, cellPadding: 4 },
+        margin: { left: 14, right: 14 }
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 10;
+  }
 
   // Add Totals Below Table
   if (showTotals) {

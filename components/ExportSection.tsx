@@ -105,6 +105,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   
   const canShowFLinkIntegration = config.selectedProducts.includes('utd') && config.selectedProducts.includes('lxd') && (config.productInputs['lxd']?.variant || '').includes('FLINK');
   const [showFLinkIntegration, setShowFLinkIntegration] = useState(false);
+  const [showAvailableMonths, setShowAvailableMonths] = useState(false);
 
   const [hasDesignatedSites, setHasDesignatedSites] = useState(false);
   const [designatedSites, setDesignatedSites] = useState('');
@@ -162,7 +163,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     if (isPreviewModalOpen) {
         refreshPreview();
     }
-  }, [showStats, showMonthlyCost, showTotals, showEmrIntegration, hasOptOutClause, showFLinkIntegration, hasDesignatedSites, useStartDate, includeRenewalIncreaseInfo, designatedSites, siteBreakdown, isBreakdownPerSite, showSitesOnly, customerName, repName, repEmail, repPhone]);
+  }, [showStats, showMonthlyCost, showTotals, showEmrIntegration, hasOptOutClause, showFLinkIntegration, showAvailableMonths, hasDesignatedSites, useStartDate, includeRenewalIncreaseInfo, designatedSites, siteBreakdown, isBreakdownPerSite, showSitesOnly, customerName, repName, repEmail, repPhone]);
 
   const handlePDFExport = () => {
     if (!customerName.trim()) { alert("Please enter a Customer Name before exporting."); return; }
@@ -431,37 +432,46 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     };
 
     if (isExtensionQuote && extensionResults) {
-      if (extensionResults.type === 'A') {
-        const durationText = extensionResults.useFullExtension ? `${extensionResults.days} days (${extensionResults.integerMonths} months${extensionResults.extraDays > 0 ? ` and ${extensionResults.extraDays} days` : ''})` : `${Math.round(extensionResults.monthsAvailable * 30)} days (${extensionResults.monthsAvailable.toFixed(2)} months)`;
-        tableHead = [['Description', 'Value']];
-        tableBody = [
-          ['Product', PRODUCT_FULL_NAMES[extensionResults.variant] || extensionResults.variant],
-          ['Dates', getExtensionDates()],
-          ['Total Contract\'s Value (SAR)', formatMoney(extensionResults.customerTCV * EXCHANGE_RATE_SAR, 'SAR')],
-          ['Extension Percentage', `${extensionResults.extensionPercentage.toFixed(2)}%`],
-          ['Extension Value (SAR)', formatMoney(extensionResults.customerExtension * EXCHANGE_RATE_SAR, 'SAR')],
-          ['Current Spend of Last Year (SAR)', formatMoney(extensionResults.currentSpend * EXCHANGE_RATE_SAR, 'SAR')],
-          ['Daily Cost (SAR)', formatMoney((extensionResults.monthlyCost / 30) * EXCHANGE_RATE_SAR, 'SAR')],
-          ['Extension Duration', durationText],
-          ['End-User Price (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')],
-          ['VAT (15%) (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')],
-          ['Total (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')]
-        ];
-      } else {
-        tableHead = [['Description', 'Value']];
-        tableBody = [
-          ['Product', PRODUCT_FULL_NAMES[extensionResults.variant] || extensionResults.variant],
-          ['Dates', getExtensionDates()],
-          ['Current Spend of Last Year (SAR)', formatMoney(extensionResults.currentSpend * EXCHANGE_RATE_SAR, 'SAR')],
-          ['Extension FPI Percentage', `${(extensionResults.fpiPercentage || 0).toFixed(2)}%`],
-          ['Effective Monthly Cost (SAR)', formatMoney(extensionResults.monthlyCostSAR, 'SAR')],
-          ['Daily Cost (SAR)', formatMoney((extensionResults.monthlyCost / 30) * EXCHANGE_RATE_SAR, 'SAR')],
-          ['Extension Duration', `${Math.round(extensionResults.monthsCovered * 30)} days (${extensionResults.monthsCovered} months) (Exact: ${extensionResults.monthsAvailable?.toFixed(2)} months)`],
-          ['End-User Price (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')],
-          ['VAT (15%) (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')],
-          ['Total (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')]
-        ];
+      const extRows: string[][] = [
+        ['Product', PRODUCT_FULL_NAMES[extensionResults.variant] || extensionResults.variant]
+      ];
+
+      if (useStartDate && startMonthYear) {
+        extRows.push(['Dates', getExtensionDates()]);
       }
+
+      if (extensionResults.type === 'A') {
+        const durationText = extensionResults.useFullExtension
+          ? `${extensionResults.days} days (${extensionResults.integerMonths} months${extensionResults.extraDays > 0 ? ` and ${extensionResults.extraDays} days` : ''})`
+          : `${Math.round(extensionResults.monthsAvailable * 30)} days (${extensionResults.monthsAvailable.toFixed(2)} months)`;
+        extRows.push(['Extension Duration', durationText]);
+      } else {
+        extRows.push(['Extension Duration', `${Math.round(extensionResults.monthsCovered * 30)} days (${extensionResults.monthsCovered} months)`]);
+      }
+
+      if (showAvailableMonths) {
+        const availMonthsVal = extensionResults.monthsAvailable !== undefined && extensionResults.monthsAvailable !== null
+          ? extensionResults.monthsAvailable
+          : extensionResults.monthsCovered;
+        const availText = `${availMonthsVal?.toFixed(2)} months (${Math.round((availMonthsVal || 0) * 30)} days)`;
+        extRows.push(['Available Duration', availText]);
+      }
+
+      if (isIndirect) {
+        const euPriceSAR = extensionResults.endUserPrice * EXCHANGE_RATE_SAR;
+        extRows.push(
+          ['End-User Price (SAR)', formatMoney(euPriceSAR, 'SAR')],
+          ['VAT (15%) (SAR)', formatMoney(euPriceSAR * 0.15, 'SAR')],
+          ['Total (SAR)', formatMoney(euPriceSAR * 1.15, 'SAR')]
+        );
+      } else {
+        extRows.push(
+          ['End-User Price (USD)', formatMoney(extensionResults.endUserPrice, 'USD')]
+        );
+      }
+
+      tableHead = [['Description', 'Value']];
+      tableBody = extRows;
     } else if (isMidCycleQuote && data.midCycleResults) {
       let productDisplay = data.midCycleResults.product;
       if (data.midCycleResults.dlmSelected) {
@@ -547,7 +557,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       columnStyles: columnStyles, margin: { top: 35, left: 14, right: 14 },
       didParseCell: (data) => {
         if (isExtensionQuote) {
-            if (data.section === 'body' && ['Dates', 'Extension Duration', 'End-User Price (SAR)', 'Total (SAR)'].includes(Array.isArray(data.row.raw) ? String(data.row.raw[0]) : '')) data.cell.styles.fontStyle = 'bold';
+            if (data.section === 'body' && ['Dates', 'Extension Duration', 'Available Duration', 'End-User Price (SAR)', 'End-User Price (USD)', 'Total (SAR)', 'Total (USD)'].includes(Array.isArray(data.row.raw) ? String(data.row.raw[0]) : '')) data.cell.styles.fontStyle = 'bold';
         } else {
             if (showTotals && data.section === 'body' && data.row.index === tableBody.length - 1) data.cell.styles.fontStyle = 'bold'; 
         }
@@ -1181,6 +1191,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                   <input type="checkbox" checked={includeCalcDetails} onChange={(e) => setIncludeCalcDetails(e.target.checked)} className="rounded text-green-600 focus:ring-green-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                   <span>Include Calc Details</span>
                 </label>
+              {isExtensionQuote && (
+                <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <input type="checkbox" checked={showAvailableMonths} onChange={(e) => setShowAvailableMonths(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                  <span>Show Available Months/Days</span>
+                </label>
+              )}
               {!isExtensionQuote && (
                 <>
                   <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
