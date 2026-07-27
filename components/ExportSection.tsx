@@ -979,9 +979,21 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
          }
          contentRowStart = ws.rowCount + 2;
       } else {
-          let headers = ['Year', ...prodNames];
-          if (isIndirect) headers.push('Total Net (USD)', 'Total (SAR)', 'VAT (15%)', 'Grand Total (SAR)');
-          else headers.push('Total (USD)');
+          let headers = ['Year'];
+          config.selectedProducts.forEach(pid => {
+              const pName = PRODUCT_FULL_NAMES[pid] || PRODUCT_FULL_NAMES[config.productInputs[pid]?.variant] || pid;
+              headers.push(`${pName} (USD)`);
+          });
+          headers.push('Total (USD)');
+          
+          if (isIndirect) {
+              config.selectedProducts.forEach(pid => {
+                  const pName = PRODUCT_FULL_NAMES[pid] || PRODUCT_FULL_NAMES[config.productInputs[pid]?.variant] || pid;
+                  headers.push(`${pName} (SAR)`);
+              });
+              headers.push('Total (SAR)', 'VAT (15%)', 'Grand Total (SAR)');
+          }
+          headers.push('Recognized Total (USD)');
 
           const headerRow = ws.addRow(headers);
           headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -990,32 +1002,31 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           const startRowIndex = ws.rowCount + 1;
           data.yearlyResults.forEach((r, idx) => {
               const rowData: any[] = [`Year ${r.year}`];
+              
+              // Product USD columns
               config.selectedProducts.forEach(pid => { 
                 const bd = r.breakdown.find(x => x.id === pid); 
-                rowData.push(bd ? (isIndirect ? bd.net : bd.gross) : 0); 
+                rowData.push(bd ? bd.gross : 0); 
               });
               
+              // Total USD
+              rowData.push(r.grossUSD);
+              
               if (isIndirect) {
-                  // Net USD, Gross SAR, VAT, Grand Total
-                  rowData.push(r.netUSD, r.grossSAR, r.vatSAR, r.grandTotalSAR);
-              } else {
-                  rowData.push(r.grossUSD);
+                  // Product SAR columns
+                  config.selectedProducts.forEach(pid => { 
+                    const bd = r.breakdown.find(x => x.id === pid); 
+                    rowData.push(bd ? bd.grossSAR : 0); 
+                  });
+                  
+                  // Total SAR, VAT, Grand Total
+                  rowData.push(r.grossSAR, r.vatSAR, r.grandTotalSAR);
               }
+              
+              // Recognized Total USD
+              rowData.push(r.recognizedUSD);
 
               const newRow = ws.addRow(rowData);
-              
-              // Add formulas for years 2+ if it's MYFPI method and rates are simple
-              if (idx > 0 && config.method === 'MYFPI' && !config.flatPricing) {
-                  config.selectedProducts.forEach((pid, pIdx) => {
-                      const rate = (config.productRates[pid] || config.rates)[idx] || 0;
-                      if (rate > 0) {
-                          const colLetter = getColLetter(2 + pIdx);
-                          const prevCell = `${colLetter}${newRow.number - 1}`;
-                          newRow.getCell(2 + pIdx).value = { formula: `${prevCell}*(1+${rate/100})` };
-                      }
-                  });
-              }
-
               newRow.eachCell((cell, colNum) => { if (colNum > 1) cell.numFmt = '#,##0.00'; });
           });
 
@@ -1024,26 +1035,9 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               const startDataRow = startRowIndex;
               const endDataRow = ws.rowCount;
               
-              config.selectedProducts.forEach((pid, pIdx) => {
-                  const colLetter = getColLetter(2 + pIdx);
+              for (let c = 2; c <= headers.length; c++) {
+                  const colLetter = getColLetter(c);
                   totalRowData.push({ formula: `SUM(${colLetter}${startDataRow}:${colLetter}${endDataRow})` });
-              });
-
-              if (isIndirect) {
-                  const netUsdCol = getColLetter(2 + config.selectedProducts.length);
-                  const grossSarCol = getColLetter(3 + config.selectedProducts.length);
-                  const vatCol = getColLetter(4 + config.selectedProducts.length);
-                  const grandTotalCol = getColLetter(5 + config.selectedProducts.length);
-                  
-                  totalRowData.push(
-                    { formula: `SUM(${netUsdCol}${startDataRow}:${netUsdCol}${endDataRow})` },
-                    { formula: `SUM(${grossSarCol}${startDataRow}:${grossSarCol}${endDataRow})` },
-                    { formula: `SUM(${vatCol}${startDataRow}:${vatCol}${endDataRow})` },
-                    { formula: `SUM(${grandTotalCol}${startDataRow}:${grandTotalCol}${endDataRow})` }
-                  );
-              } else {
-                  const totalUsdCol = getColLetter(2 + config.selectedProducts.length);
-                  totalRowData.push({ formula: `SUM(${totalUsdCol}${startDataRow}:${totalUsdCol}${endDataRow})` });
               }
               
               const totalRow = ws.addRow(totalRowData);
@@ -1052,12 +1046,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           }
           
           if (includeCalcDetails) {
-              const calcWs = wb.addWorksheet('Calculation Details');
+              const calcWs = ws;
+              calcWs.addRow([]);
               calcWs.addRow(['Detailed Calculation Breakdown']).font = { bold: true, size: 14 };
               calcWs.addRow([]);
               
               calcWs.addRow(['Product', 'Metric', 'Formula / Logic', 'Value']);
-              const hRow = calcWs.getRow(3);
+              const hRow = calcWs.getRow(calcWs.rowCount);
               hRow.font = { bold: true };
               hRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
 
@@ -1091,8 +1086,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               calcWs.addRow(['Exchange Rate', `1 USD = ${EXCHANGE_RATE_SAR} SAR`]);
               calcWs.addRow(['Channel', config.channel]);
               calcWs.addRow(['Start Date', config.useStartDate ? config.startMonthYear : 'Not Set']);
-              
-              calcWs.columns.forEach(column => { column.width = 30; });
           }
           contentRowStart = ws.rowCount + 2;
       }
