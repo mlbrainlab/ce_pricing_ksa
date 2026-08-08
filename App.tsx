@@ -295,9 +295,12 @@ const App: React.FC = () => {
     }
   }, [dealType, midCycleStartDate]);
 
-  // EFFECT: Auto-enable rounding when Fulfillment or Partner Sourced
+  // EFFECT: Auto-enable rounding when Fulfillment or Partner Sourced, disable when Direct
   useEffect(() => {
-    if (
+    if (channel === ChannelType.DIRECT) {
+      setRounding(false);
+      setRoundUpOptionB(false);
+    } else if (
       channel === ChannelType.FULFILMENT ||
       channel === ChannelType.PARTNER_SOURCED
     ) {
@@ -1111,19 +1114,20 @@ const App: React.FC = () => {
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center pt-2 border-t border-gray-100 dark:border-gray-700">
+                    <div className={`flex items-center pt-2 border-t border-gray-100 dark:border-gray-700 ${!isIndirect ? 'opacity-50 cursor-not-allowed' : ''}`}>
                       <input
                         id="round-up-option-b-checkbox"
                         type="checkbox"
-                        checked={roundUpOptionB}
+                        disabled={!isIndirect}
+                        checked={isIndirect ? roundUpOptionB : false}
                         onChange={(e) => setRoundUpOptionB(e.target.checked)}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600 cursor-pointer disabled:cursor-not-allowed"
                       />
                       <label
                         htmlFor="round-up-option-b-checkbox"
-                        className="ml-2 text-xs font-semibold text-gray-700 dark:text-gray-300 cursor-pointer select-none"
+                        className={`ml-2 text-xs font-semibold select-none ${!isIndirect ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}
                       >
-                        Round up value (Option B)
+                        Round up value (Option B) {!isIndirect && "(Disabled for Direct)"}
                       </label>
                     </div>
                   </div>
@@ -2184,19 +2188,20 @@ const App: React.FC = () => {
                   )}
 
                   {/* Rounding Checkbox */}
-                  <div className="flex items-center mt-2">
+                  <div className={`flex items-center mt-2 ${!isIndirect ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <input
                       id="rounding-checkbox"
                       type="checkbox"
-                      checked={rounding}
+                      disabled={!isIndirect}
+                      checked={isIndirect ? rounding : false}
                       onChange={(e) => setRounding(e.target.checked)}
-                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600 disabled:cursor-not-allowed"
                     />
                     <label
                       htmlFor="rounding-checkbox"
-                      className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+                      className={`ml-2 text-sm font-medium ${!isIndirect ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}
                     >
-                      Round up prices?
+                      Round up prices? {!isIndirect && "(Disabled for Direct)"}
                     </label>
                   </div>
                 </div>
