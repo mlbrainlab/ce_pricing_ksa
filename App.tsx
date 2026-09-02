@@ -828,26 +828,36 @@ const App: React.FC = () => {
       </label>
       <div className="flex items-center">
         <div
-          className={`flex items-center border ${colorClass} dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 w-32 h-9`}
+          className={`flex items-center border ${colorClass} dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 w-36 h-9`}
         >
           <button
             type="button"
-            onClick={() => onChange(value - 1)}
+            onClick={() => onChange(parseFloat(Math.max(0, value - 1).toFixed(1)))}
             className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
           >
             -
           </button>
           <input
             type="number"
-            step="1"
+            step="0.1"
             value={value}
-            onChange={(e) => onChange(parseInt(e.target.value) || 0)}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === '') {
+                onChange(0);
+              } else {
+                const parsed = parseFloat(val);
+                if (!isNaN(parsed)) {
+                  onChange(parsed);
+                }
+              }
+            }}
             className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
             style={{ appearance: "textfield", MozAppearance: "textfield" }}
           />
           <button
             type="button"
-            onClick={() => onChange(value + 1)}
+            onClick={() => onChange(parseFloat((value + 1).toFixed(1)))}
             className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
           >
             +
