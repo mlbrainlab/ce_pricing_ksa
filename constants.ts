@@ -1,9 +1,19 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.6.8';
+export const APP_VERSION = '6.6.9';
 
 export const CHANGELOG = [
+  {
+    version: '6.6.9',
+    date: '2026-09-02',
+    changes: [
+      'Extension Option B: Enabled customizable Extension Duration (Months) input, allowing users to specify custom extension months below or up to the 100K SAR ex-VAT threshold.',
+      'UI & PDF Fixes: Captured selected Extension Variant titles accurately in PDF cover pages, export filenames, and PDF/Excel previews.',
+      'Annual Increase (FPI) Input: Decimal FPI rates (e.g. 5.5%, 8.2%) unlocked across all multi-year structure inputs.',
+      'Session Lock: Added header Lock button for quick one-click return to login screen.'
+    ]
+  },
   {
     version: '6.6.8',
     date: '2026-07-28',
