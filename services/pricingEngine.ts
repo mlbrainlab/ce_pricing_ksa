@@ -709,7 +709,10 @@ export const calculatePricing = (
       const monthlyCost = effectiveSpend / 12;
       const monthlyCostSAR = monthlyCost * EXCHANGE_RATE_SAR;
       const monthsAvailable = monthlyCostSAR > 0 ? (maxSARExVAT / monthlyCostSAR) : 0;
-      const monthsCovered = Math.floor(monthsAvailable);
+      const maxIntegerMonths = Math.floor(monthsAvailable);
+      const monthsCovered = (config.optionBMonths !== undefined && config.optionBMonths !== null && config.optionBMonths > 0)
+        ? config.optionBMonths
+        : maxIntegerMonths;
       let endUserPrice = monthsCovered * monthlyCost;
       if (config.roundUpOptionB) {
         if (channel !== ChannelType.DIRECT) {
@@ -730,6 +733,7 @@ export const calculatePricing = (
         monthlyCostSAR,
         monthsAvailable,
         monthsCovered,
+        optionBMonthsCustom: config.optionBMonths || null,
         maxSARExVAT,
         endUserPrice,
         commission: endUserPrice * (1 - netFactor),

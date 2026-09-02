@@ -156,6 +156,7 @@ const App: React.FC = () => {
   const [extensionVariant, setExtensionVariant] = useState<string>("ANYWHERE");
   const [useFullExtension, setUseFullExtension] = useState<boolean>(false);
   const [roundUpOptionB, setRoundUpOptionB] = useState<boolean>(false);
+  const [optionBMonths, setOptionBMonths] = useState<number | null>(null);
 
   // Start Date State
   const [useStartDate, setUseStartDate] = useState<boolean>(false);
@@ -222,6 +223,7 @@ const App: React.FC = () => {
     setExtensionVariant("ANYWHERE");
     setUseFullExtension(false);
     setRoundUpOptionB(false);
+    setOptionBMonths(null);
     setResetKey((prev) => prev + 1);
 
     setStartMonthYear(new Date().toISOString().slice(0, 7));
@@ -444,6 +446,7 @@ const App: React.FC = () => {
       extensionVariant,
       useFullExtension,
       roundUpOptionB,
+      optionBMonths,
       midCycleExpiryDate,
       midCycleStartDate,
       midCycleWHT,
@@ -482,6 +485,7 @@ const App: React.FC = () => {
     extensionVariant,
     useFullExtension,
     roundUpOptionB,
+    optionBMonths,
     midCycleExpiryDate,
     midCycleStartDate,
     midCycleWHT,
@@ -1123,6 +1127,67 @@ const App: React.FC = () => {
                           Requires Finance approval
                         </div>
                       )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Extension Duration (Months)
+                      </label>
+                      <div className="flex items-center space-x-2 select-none">
+                        <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 overflow-hidden w-36 h-9">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = optionBMonths !== null ? optionBMonths : (extensionResults?.monthsCovered || 1);
+                              setOptionBMonths(Math.max(1, current - 1));
+                            }}
+                            className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 font-bold text-lg cursor-pointer"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="1"
+                            value={optionBMonths !== null ? optionBMonths : (extensionResults?.monthsCovered || '')}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '') {
+                                setOptionBMonths(null);
+                              } else {
+                                const parsed = parseInt(val, 10);
+                                if (!isNaN(parsed) && parsed >= 1) {
+                                  setOptionBMonths(parsed);
+                                }
+                              }
+                            }}
+                            placeholder={String(extensionResults?.monthsCovered || 'Auto')}
+                            className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
+                            style={{ appearance: "textfield", MozAppearance: "textfield" }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = optionBMonths !== null ? optionBMonths : (extensionResults?.monthsCovered || 1);
+                              setOptionBMonths(current + 1);
+                            }}
+                            className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 font-bold text-lg cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setOptionBMonths(null)}
+                          className="text-xs text-blue-600 dark:text-blue-400 hover:underline hover:text-blue-800 font-medium select-none"
+                        >
+                          Auto
+                        </button>
+                      </div>
+                      <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                        Max threshold: {extensionResults?.monthsAvailable ? extensionResults.monthsAvailable.toFixed(2) : 'N/A'} months
+                        {optionBMonths !== null && optionBMonths > (extensionResults?.monthsAvailable || 0) && (
+                          <span className="text-red-500 font-bold ml-1">(&gt; 100K SAR threshold)</span>
+                        )}
+                      </div>
                     </div>
                     <div className={`flex items-center pt-2 border-t border-gray-100 dark:border-gray-700 ${!isIndirect ? 'opacity-50 cursor-not-allowed' : ''}`}>
                       <input
@@ -2540,14 +2605,19 @@ const App: React.FC = () => {
                         </div>
                       </div>
                       <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800 animate-fade-in">
-                        <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">
-                          Eligible Months (&lt;100k SAR)
+                        <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans flex items-center justify-between">
+                          <span>Extension Duration</span>
+                          {optionBMonths !== null && (
+                            <span className="text-[10px] bg-blue-200 text-blue-900 dark:bg-blue-800 dark:text-blue-100 px-1.5 py-0.5 rounded font-bold">
+                              Custom
+                            </span>
+                          )}
                         </div>
                         <div className="text-xl font-bold text-blue-700 dark:text-blue-300 font-sans">
-                          {extensionResults.monthsCovered}
+                          {extensionResults.monthsCovered} months
                         </div>
                         <div className="text-[10px] text-blue-500/80 mt-1 dark:text-blue-400/80 font-mono">
-                          Exact fraction: {extensionResults.monthsAvailable?.toFixed(2)} months
+                          Exact max threshold: {extensionResults.monthsAvailable?.toFixed(2)} months
                         </div>
                       </div>
                       <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800 animate-fade-in">

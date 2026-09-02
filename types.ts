@@ -85,6 +85,7 @@ export interface DealConfiguration {
   extensionVariant?: string;
   useFullExtension?: boolean;
   roundUpOptionB?: boolean;
+  optionBMonths?: number | null;
   // Mid-Cycle Add-on Fields
   midCycleExpiryDate?: string;
   midCycleStartDate?: string;
