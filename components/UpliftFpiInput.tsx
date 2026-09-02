@@ -27,13 +27,13 @@ export const UpliftFpiInput: React.FC<UpliftFpiInputProps> = ({
   }, [value]);
 
   const handleIncrement = () => {
-    const next = Math.floor(value + 1);
+    const next = parseFloat((value + 1).toFixed(1));
     onChange(next);
     setDisplayText(next.toFixed(1));
   };
 
   const handleDecrement = () => {
-    const prev = Math.ceil(value - 1);
+    const prev = parseFloat(Math.max(0, value - 1).toFixed(1));
     onChange(prev);
     setDisplayText(prev.toFixed(1));
   };
