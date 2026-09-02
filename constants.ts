@@ -6,15 +6,16 @@ export const APP_VERSION = '6.6.8';
 export const CHANGELOG = [
   {
     version: '6.6.8',
-    date: new Date().toISOString().split('T')[0],
+    date: '2026-07-28',
     changes: [
       'Extension PDF Export: Internal calculations omitted to show client values only (Product, Dates, Duration, End-User Price, VAT, Total), with optional Show Available Months/Days toggle.',
-      'Extension Option B Updates: Default Uplift FPI% set to 8.0% for UTD variants and 5.0% for LXD variants (editable), months-only Extension Duration display, and nearest-thousand value rounding (ROUNDUP to nearest 1,000).'
+      'Extension Option B Updates: Default Uplift FPI% set to 8.0% for UTD variants and 5.0% for LXD variants (editable), months-only Extension Duration display, and nearest-thousand value rounding (ROUNDUP to nearest 1,000).',
+      'Direct Context Safeguards: Automatically disables and greys out Round Up checkboxes for Direct channel context.'
     ]
   },
   {
     version: '6.6.7',
-    date: new Date().toISOString().split('T')[0],
+    date: '2026-07-15',
     changes: [
       'Added EAI Activation toggle for UTD with a 3% uplift defaults to ON for new business and 2026 renewals.',
       'Reflected EAI inclusion silently within core FPI and List computations as per 2026 mandates.'
@@ -22,7 +23,7 @@ export const CHANGELOG = [
   },
   {
     version: '6.6.6',
-    date: new Date().toISOString().split('T')[0],
+    date: '2026-07-02',
     changes: [
       'Applying WHT on DLM and including DLM in prorated mid-cycle calculation.',
       'Adjusted mid-cycle duration calculation to prorate annual rates including DLM additions and factoring WHT into the base calculation.'
@@ -30,7 +31,7 @@ export const CHANGELOG = [
   },
   {
     version: '6.6.5',
-    date: new Date().toISOString().split('T')[0],
+    date: '2026-06-25',
     changes: [
       'Mid-Cycle Add-on Quote functionality: Added structured workflows for UTD ADV, LXD FLINK, LXD IPE, and LXD FLINK+IPE expansions, including pro-rated monthly calculations and WHT adaptations.',
       'Designated Sites UX enhancements: In-window site addition logic now arrays hospital name, clinicians, and bed count on simplified single rows.',
@@ -63,7 +64,7 @@ export const CHANGELOG = [
   },
   {
     version: '6.6.2',
-    date: new Date().toISOString().split('T')[0],
+    date: '2026-05-12',
     changes: [
       'UI: Redesigned and streamlined Export Options section.',
       'Feature: Restored and improved "Multiple Sites" list functionality allowing precise price breakdowns per site.',
