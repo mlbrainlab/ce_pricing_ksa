@@ -305,10 +305,17 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     if (isMidCycleQuote) {
         hasUTD = config.midCycleProduct === 'UTD_ADV';
         hasLXD = config.midCycleProduct?.startsWith('LXD_') ?? false;
+    } else if (isExtensionQuote) {
+        const extVar = (config.extensionVariant || extensionResults?.variant || '').toUpperCase();
+        const isUtd = ['ANYWHERE', 'UTDADV', 'UTDEE', 'UTDEE-EAI', 'SM'].includes(extVar) || extVar.startsWith('UTD');
+        hasUTD = isUtd;
+        hasLXD = !isUtd;
     }
     
     if (hasUTD) {
-        const variant = isMidCycleQuote ? 'UTDADV' : (config.productInputs['utd']?.variant || '');
+        let variant = config.productInputs['utd']?.variant || '';
+        if (isMidCycleQuote) variant = 'UTDADV';
+        if (isExtensionQuote) variant = config.extensionVariant || extensionResults?.variant || '';
         let title = "UpToDate\u00AE";
         if (variant === 'ANYWHERE') title = "UpToDate\u00AE Anywhere";
         if (variant === 'UTDADV') title = "UpToDate\u00AE Advanced";
@@ -337,6 +344,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     if (hasLXD) {
         let variant = config.productInputs['lxd']?.variant || '';
         if (isMidCycleQuote) variant = config.midCycleProduct?.replace('LXD_', '') || '';
+        if (isExtensionQuote) variant = config.extensionVariant || extensionResults?.variant || '';
         let subHeading = "Drug Referential Solution";
         if (variant.includes('FLINK')) subHeading = variant.includes('IPE') ? "including Formulink\u2122 and Integrated Patient Education" : "including Formulink\u2122";
         
@@ -885,7 +893,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           addFooter(i); 
       }
 
-      const productMix = config.selectedProducts.map(p => p.toUpperCase()).join('_');
+      let productMix = config.selectedProducts.map(p => p.toUpperCase()).join('_');
+      if (isMidCycleQuote) {
+          productMix = config.midCycleProduct || 'MID_CYCLE';
+      } else if (isExtensionQuote) {
+          productMix = (config.extensionVariant || extensionResults?.variant || 'EXTENSION').replace(/\s+/g, '_');
+      }
       const filename = customerName 
        ? `Quote_${customerName.replace(/\s+/g,'_')}_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.pdf`
        : `Quote_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.pdf`;
@@ -1154,7 +1167,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = URL.createObjectURL(blob);
       const tempLink = document.createElement('a'); tempLink.href = url; 
-      const productMix = config.selectedProducts.map(p => p.toUpperCase()).join('_');
+      let productMix = config.selectedProducts.map(p => p.toUpperCase()).join('_');
+      if (isMidCycleQuote) {
+          productMix = config.midCycleProduct || 'MID_CYCLE';
+      } else if (isExtensionQuote) {
+          productMix = (config.extensionVariant || extensionResults?.variant || 'EXTENSION').replace(/\s+/g, '_');
+      }
       const filename = customerName 
        ? `Quote_${customerName.replace(/\s+/g,'_')}_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.xlsx`
        : `Quote_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.xlsx`;
