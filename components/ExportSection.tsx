@@ -617,36 +617,37 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     };
 
     if (!isExtensionQuote) {
-      doc.setFontSize(14); doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.setFont(fontName, 'bold'); doc.text("Operating Statistics", 14, finalY); finalY += 6;
-      doc.setFontSize(9); doc.setTextColor(0, 0, 0);
-
-      const statsParts: string[] = [];
-      if (isMidCycleQuote) {
-          if (config.midCycleProduct === 'UTD_ADV' && config.midCycleExistingSpend) {
-               statsParts.push(`$${Number(config.midCycleExistingSpend).toLocaleString('en-US')} existing spend for UpToDate`);
-          } else if (config.midCycleProduct?.startsWith('LXD_') && config.midCycleBedCount) {
-               statsParts.push(`${Number(config.midCycleBedCount).toLocaleString('en-US')} active beds for Lexidrug`);
-          }
-      } else {
-          config.selectedProducts.forEach(pid => {
-              const p = AVAILABLE_PRODUCTS.find(x => x.id === pid); const inp = config.productInputs[pid];
-              if(p && inp) {
-                  let productName = p.name;
-                  if (pid === 'utd') productName = 'UpToDate'; if (pid === 'lxd') productName = 'Lexidrug';
-                  let countLabelText = p.countLabel;
-                  if (p.countLabel === 'HC') countLabelText = 'clinicians'; if (p.countLabel === 'BC') countLabelText = 'active beds';
-                  if (pid === 'lxd' && inp.variant && (inp.variant.includes('Seats') || inp.variant === 'Hospital Pharmacy Model')) countLabelText = 'seats';
-                  const statsToPrint = inp.count > 0 ? inp.count : (inp.existingCount || 0);
-                  if (statsToPrint > 0) statsParts.push(`${statsToPrint.toLocaleString('en-US')} ${countLabelText} for ${productName}`);
-              }
-          });
-      }
-      
-      if(statsParts.length > 0 && showStats) {
-          doc.setFont(fontName, 'normal');
-          const splitStats = doc.splitTextToSize(`This proposal is based on the following statistics for ${customerName}: ${statsParts.join(', ')}.`, 180);
-          doc.text(splitStats, 14, finalY); finalY += (splitStats.length * 4) + 1.5;
+      if (showStats) {
+        const statsParts: string[] = [];
+        if (isMidCycleQuote) {
+            if (config.midCycleProduct === 'UTD_ADV' && config.midCycleExistingSpend) {
+                 statsParts.push(`$${Number(config.midCycleExistingSpend).toLocaleString('en-US')} existing spend for UpToDate`);
+            } else if (config.midCycleProduct?.startsWith('LXD_') && config.midCycleBedCount) {
+                 statsParts.push(`${Number(config.midCycleBedCount).toLocaleString('en-US')} active beds for Lexidrug`);
+            }
+        } else {
+            config.selectedProducts.forEach(pid => {
+                const p = AVAILABLE_PRODUCTS.find(x => x.id === pid); const inp = config.productInputs[pid];
+                if(p && inp) {
+                    let productName = p.name;
+                    if (pid === 'utd') productName = 'UpToDate'; if (pid === 'lxd') productName = 'Lexidrug';
+                    let countLabelText = p.countLabel;
+                    if (p.countLabel === 'HC') countLabelText = 'clinicians'; if (p.countLabel === 'BC') countLabelText = 'active beds';
+                    if (pid === 'lxd' && inp.variant && (inp.variant.includes('Seats') || inp.variant === 'Hospital Pharmacy Model')) countLabelText = 'seats';
+                    const statsToPrint = inp.count > 0 ? inp.count : (inp.existingCount || 0);
+                    if (statsToPrint > 0) statsParts.push(`${statsToPrint.toLocaleString('en-US')} ${countLabelText} for ${productName}`);
+                }
+            });
+        }
+        
+        if(statsParts.length > 0) {
+            doc.setFontSize(14); doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+            doc.setFont(fontName, 'bold'); doc.text("Operating Statistics", 14, finalY); finalY += 6;
+            doc.setFontSize(9); doc.setTextColor(0, 0, 0);
+            doc.setFont(fontName, 'normal');
+            const splitStats = doc.splitTextToSize(`This proposal is based on the following statistics for ${customerName}: ${statsParts.join(', ')}.`, 180);
+            doc.text(splitStats, 14, finalY); finalY += (splitStats.length * 4) + 1.5;
+        }
       }
 
       if (config.dealType === DealType.RENEWAL && includeRenewalIncreaseInfo && renewalNotes.length > 0) {
