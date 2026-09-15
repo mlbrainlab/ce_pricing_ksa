@@ -490,11 +490,14 @@ export const calculatePricing = (
 
   // --- Step 3: Multi-Year Projection (Per Product) ---
   const productSchedules: Record<string, number[]> = {};
-  const safeYears = Math.max(0, Math.floor(Number(years) || 0));
+  const totalMonths = (dealType === DealType.NEW_LOGO && config.months) ? (Number(years) * 12 + Number(config.months)) : (Number(years) * 12);
+  let safeYears = Math.max(0, Math.ceil(totalMonths / 12));
+  if (safeYears === 0 && totalMonths > 0) safeYears = 1;
+  const acvDivisor = totalMonths > 0 ? (totalMonths / 12) : 1;
 
   selectedProducts.forEach((prodId) => {
     const y1Value = year1ProductNets[prodId];
-    const schedule = new Array(safeYears).fill(0);
+    const schedule = new Array(Math.max(1, safeYears)).fill(0);
     const specificRates = productRates[prodId] || rates;
     let specificMethod = productMethods?.[prodId] || method;
 
@@ -510,7 +513,7 @@ export const calculatePricing = (
     if (specificMethod === PricingMethod.MYPP && dealType === DealType.RENEWAL) {
       const expiring = productInputs[prodId]?.expiringAmount || 0;
       let tempY1 = y1Value;
-      for (let i = years - 2; i >= 0; i--) {
+      for (let i = safeYears - 2; i >= 0; i--) {
         const discountRate = specificRates[i + 1] || 0;
         tempY1 = tempY1 / (1 + discountRate / 100);
       }
@@ -524,13 +527,13 @@ export const calculatePricing = (
 
     if (specificMethod === PricingMethod.MYFPI) {
       schedule[0] = y1Value;
-      for (let i = 1; i < years; i++) {
+      for (let i = 1; i < safeYears; i++) {
         const rate = specificRates[i] || 0;
         schedule[i] = schedule[i - 1] * (1 + rate / 100);
       }
     } else {
-      schedule[years - 1] = y1Value;
-      for (let i = years - 2; i >= 0; i--) {
+      schedule[Math.max(1, safeYears) - 1] = y1Value;
+      for (let i = safeYears - 2; i >= 0; i--) {
         const discountRate = specificRates[i + 1] || 0;
         schedule[i] = schedule[i + 1] / (1 + discountRate / 100);
       }
@@ -538,7 +541,16 @@ export const calculatePricing = (
     productSchedules[prodId] = schedule;
   });
 
-  if (flatPricing && years > 1) {
+  // Apply Proration for Partial Final Year
+  const isLastPeriodPartial = totalMonths > 0 && totalMonths % 12 !== 0;
+  const prorationFactor = isLastPeriodPartial ? (totalMonths % 12) / 12 : 1;
+  if (isLastPeriodPartial && safeYears > 0) {
+    selectedProducts.forEach((prodId) => {
+      productSchedules[prodId][safeYears - 1] *= prorationFactor;
+    });
+  }
+
+  if (flatPricing && safeYears > 1) {
     selectedProducts.forEach((prodId) => {
       const schedule = productSchedules[prodId];
       const totalPeriodCost = schedule.reduce((acc, val) => acc + val, 0);
@@ -575,7 +587,7 @@ export const calculatePricing = (
   const productNetTotals: Record<string, number> = {};
   selectedProducts.forEach((p) => (productNetTotals[p] = 0));
 
-  for (let i = 0; i < years; i++) {
+  for (let i = 0; i < safeYears; i++) {
     const breakdown: ProductYearlyData[] = [];
     let yearSum = 0;
     const netFactor = getNetFactor(dealType, channel, i);
@@ -622,8 +634,8 @@ export const calculatePricing = (
     totalNetSAR += recognizedSAR;
   }
 
-  const acvUSD = totalTCV / years;
-  const netACV = totalNetUSD / years;
+  const acvUSD = totalTCV / acvDivisor;
+  const netACV = totalNetUSD / acvDivisor;
   let upsellACV = 0;
   if (dealType === DealType.RENEWAL)
     upsellACV = Math.max(0, acvUSD - totalRenewalBaseForACV);

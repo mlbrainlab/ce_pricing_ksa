@@ -65,6 +65,7 @@ export interface DealConfiguration {
   selectedProducts: string[]; // IDs
   productInputs: Record<string, ProductInput>; // Map of product ID to inputs
   years: number;
+  months?: number; // New Logo partial year duration
   method: PricingMethod; // Keep for backwards compatibility or default
   productMethods?: Record<string, PricingMethod>; // New: Per product method
   rates: number[]; // Global fallback

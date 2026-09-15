@@ -132,6 +132,7 @@ const App: React.FC = () => {
 
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [years, setYears] = useState<number>(3);
+  const [months, setMonths] = useState<number>(0);
   const [method, setMethod] = useState<PricingMethod>(PricingMethod.MYFPI);
   const [productMethods, setProductMethods] = useState<
     Record<string, PricingMethod>
@@ -427,6 +428,7 @@ const App: React.FC = () => {
       selectedProducts: selectedProductIds,
       productInputs,
       years,
+      months,
       method,
       productMethods,
       rates,
@@ -1838,39 +1840,82 @@ const App: React.FC = () => {
                   </div>
 
                   <div className="flex space-x-4">
-                    <div className="w-1/3">
+                    <div className={dealType === DealType.NEW_LOGO ? "w-1/2" : "w-1/3"}>
                       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
-                        Duration
+                        Duration {dealType === DealType.NEW_LOGO ? "(Years / Months)" : "(Years)"}
                       </label>
-                      <div className="mt-1 flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 h-9">
-                        <button
-                          type="button"
-                          onClick={() => setYears(Math.max(1, years - 1))}
-                          className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
-                        >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          min="1"
-                          max="7"
-                          value={years}
-                          onChange={(e) =>
-                            setYears(parseInt(e.target.value) || 1)
-                          }
-                          className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
-                          style={{
-                            appearance: "textfield",
-                            MozAppearance: "textfield",
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setYears(Math.min(7, years + 1))}
-                          className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
-                        >
-                          +
-                        </button>
+                      <div className="mt-1 flex items-center space-x-2 h-9">
+                        <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 h-full flex-1">
+                          <button
+                            type="button"
+                            onClick={() => setYears(Math.max(dealType === DealType.NEW_LOGO && months > 0 ? 0 : 1, years - 1))}
+                            className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min={dealType === DealType.NEW_LOGO && months > 0 ? 0 : 1}
+                            max="7"
+                            value={years}
+                            onChange={(e) => {
+                              const v = parseInt(e.target.value) || 0;
+                              setYears(Math.min(7, Math.max(dealType === DealType.NEW_LOGO && months > 0 ? 0 : 1, v)));
+                            }}
+                            className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
+                            style={{
+                              appearance: "textfield",
+                              MozAppearance: "textfield",
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setYears(Math.min(7, years + 1))}
+                            className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+                          >
+                            +
+                          </button>
+                        </div>
+                        
+                        {dealType === DealType.NEW_LOGO && (
+                          <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 h-full flex-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newM = Math.max(0, months - 1);
+                                setMonths(newM);
+                                if (newM === 0 && years === 0) setYears(1);
+                              }}
+                              className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              min="0"
+                              max="11"
+                              value={months}
+                              onChange={(e) => {
+                                const v = parseInt(e.target.value) || 0;
+                                const newM = Math.min(11, Math.max(0, v));
+                                setMonths(newM);
+                                if (newM === 0 && years === 0) setYears(1);
+                              }}
+                              className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
+                              style={{
+                                appearance: "textfield",
+                                MozAppearance: "textfield",
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setMonths(Math.min(11, months + 1))}
+                              className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="w-2/3">
@@ -1983,6 +2028,12 @@ const App: React.FC = () => {
                       )}
                     </div>
                   </div>
+                  
+                  {dealType === DealType.NEW_LOGO && months > 0 && (
+                    <div className="p-3 mb-4 text-xs text-amber-700 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-300 rounded-md flex items-center">
+                      ⚠️ Partial-year New Logo deals require an exception form.
+                    </div>
+                  )}
 
                   {/* Renewal Uplift Rate (Specific for Renewal Base) - Show for ALL Renewals */}
                   {dealType === DealType.RENEWAL && (

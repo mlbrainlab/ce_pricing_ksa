@@ -141,6 +141,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const [previewFilename, setPreviewFilename] = useState<string>('');
 
   const handlePDFPreview = async () => {
+    if (config.dealType === DealType.NEW_LOGO && (config.months || 0) > 0 && (!useStartDate || !startMonthYear)) {
+      alert("Start Date is mandatory for partial-year New Logo deals.");
+      return;
+    }
     if (!customerName.trim()) { alert("Please enter a Customer Name before previewing."); return; }
     setIsPreviewModalOpen(true);
     await refreshPreview();
@@ -166,6 +170,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   }, [showStats, showMonthlyCost, showTotals, showEmrIntegration, hasOptOutClause, showFLinkIntegration, showAvailableMonths, hasDesignatedSites, useStartDate, includeRenewalIncreaseInfo, designatedSites, siteBreakdown, isBreakdownPerSite, showSitesOnly, customerName, repName, repEmail, repPhone]);
 
   const handlePDFExport = () => {
+    if (config.dealType === DealType.NEW_LOGO && (config.months || 0) > 0 && (!useStartDate || !startMonthYear)) {
+      alert("Start Date is mandatory for partial-year New Logo deals.");
+      return;
+    }
     if (!customerName.trim()) { alert("Please enter a Customer Name before exporting."); return; }
     if (config.channel === ChannelType.PARTNER_SOURCED) { executePDFExport(true); } 
     else if (config.channel === ChannelType.FULFILMENT) { setShowCpModal(true); } 
@@ -924,6 +932,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const getColLetter = (colIndex: number) => { let letter = ''; while (colIndex > 0) { let remainder = (colIndex - 1) % 26; letter = String.fromCharCode(65 + remainder) + letter; colIndex = Math.floor((colIndex - 1) / 26); } return letter; };
 
   const handleExcelExport = async () => {
+    if (config.dealType === DealType.NEW_LOGO && (config.months || 0) > 0 && (!useStartDate || !startMonthYear)) {
+      alert("Start Date is mandatory for partial-year New Logo deals.");
+      return;
+    }
     if (!customerName.trim()) { alert("Please enter a Customer Name before exporting."); return; }
     setIsExcelLoading(true);
     try {
@@ -1308,7 +1320,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           <div className="pt-6 border-t border-gray-100 dark:border-gray-700 flex flex-wrap gap-4">
             <button 
               onClick={handlePDFPreview} 
-              disabled={isPdfLoading || isFontLoading || !customerName.trim() || (config.dealType !== DealType.NEW_LOGO && !useStartDate)} 
+              disabled={isPdfLoading || isFontLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (config.dealType === DealType.NEW_LOGO && (config.months || 0) > 0 && !useStartDate))} 
               className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
             >
               {isPdfLoading || isFontLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FileText className="w-5 h-5" />}
@@ -1316,7 +1328,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             </button>
             <button 
               onClick={handlePDFExport} 
-              disabled={isPdfLoading || isFontLoading || !customerName.trim() || (config.dealType !== DealType.NEW_LOGO && !useStartDate)} 
+              disabled={isPdfLoading || isFontLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (config.dealType === DealType.NEW_LOGO && (config.months || 0) > 0 && !useStartDate))} 
               className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
             >
               {isPdfLoading || isFontLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Download className="w-5 h-5" />}
@@ -1324,14 +1336,14 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             </button>
             <button 
               onClick={handleExcelExport} 
-              disabled={isExcelLoading || !customerName.trim() || (config.dealType !== DealType.NEW_LOGO && !useStartDate)} 
+              disabled={isExcelLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (config.dealType === DealType.NEW_LOGO && (config.months || 0) > 0 && !useStartDate))} 
               className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
             >
               {isExcelLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Table className="w-5 h-5" />}
               {isExcelLoading ? 'Generating Excel...' : 'Export to Excel'}
             </button>
           </div>
-          {(config.dealType !== DealType.NEW_LOGO && !useStartDate) && (
+          {((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (config.dealType === DealType.NEW_LOGO && (config.months || 0) > 0 && !useStartDate)) && (
             <div className="mt-2 text-xs text-red-500 font-medium">
               Please select "Include Start Date" to enable exporting for Renewals and Extensions.
             </div>
