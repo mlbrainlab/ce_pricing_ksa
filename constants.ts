@@ -6,11 +6,10 @@ export const APP_VERSION = '6.6.10';
 export const CHANGELOG = [
   {
     version: '6.6.10',
-    date: '2026-09-15',
+    date: '2026-09-17',
     changes: [
-      'New Logo Duration: Implemented partial year / fractional months support for New Logo deals.',
-      'Export Validation: Enforced mandatory Start Date input for partial year deals before generating PDF/Excel exports.',
-      'UI Alert: Added visible warning indicating exception form requirement for partial year New Logo deals.'
+      'Partial-Year Calculations: Restructured core engine to support end-loaded partial terms. Terms up to 15 months combine into a single term; exceeding terms split into full 12-month standard years followed by the remaining prorated months.',
+      'Export Enhancements: Updated commercial schedule arrays in UI, PDF, and Excel to bundle row labeling accurately. Tables now reflect "Term X (YY months)" language alongside specific date ranges in exports.'
     ]
   },
   {

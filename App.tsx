@@ -132,7 +132,8 @@ const App: React.FC = () => {
 
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [years, setYears] = useState<number>(3);
-  const [months, setMonths] = useState<number>(0);
+  const [isPartialYear, setIsPartialYear] = useState<boolean>(false);
+  const [partialMonths, setPartialMonths] = useState<Record<string, number>>({});
   const [method, setMethod] = useState<PricingMethod>(PricingMethod.MYFPI);
   const [productMethods, setProductMethods] = useState<
     Record<string, PricingMethod>
@@ -261,6 +262,19 @@ const App: React.FC = () => {
       },
     });
   };
+
+  const maxPartialMonths = selectedProductIds.length > 0 
+    ? Math.max(...selectedProductIds.map(id => partialMonths[id] || 0)) 
+    : 0;
+  const canYearsBeZero = isPartialYear && maxPartialMonths >= 6;
+  const minYears = canYearsBeZero ? 0 : 1;
+  const uiGlobalSafeYears = Math.max(1, Math.ceil((years * 12 + (isPartialYear && dealType === DealType.NEW_LOGO ? maxPartialMonths : 0)) / 12));
+
+  useEffect(() => {
+    if (years < minYears) {
+      setYears(minYears);
+    }
+  }, [years, minYears]);
 
   // Check if we need split rates (if both UTD and LXD are selected)
   const showSplitRates =
@@ -391,10 +405,16 @@ const App: React.FC = () => {
     const effUtd = getEffRate("utd", utdRateVal);
     const effLxd = getEffRate("lxd", lxdRateVal);
 
+    const maxPMonths = selectedProductIds.length > 0 
+      ? Math.max(...selectedProductIds.map(id => partialMonths[id] || 0)) 
+      : 0;
+    const maxTotalMonths = years * 12 + (isPartialYear && dealType === DealType.NEW_LOGO ? maxPMonths : 0);
+    const globalSafeYears = Math.max(1, Math.ceil(maxTotalMonths / 12));
+
     // Generate arrays based on effective single input values (Structure Rates)
-    const rates = generateRateArray(effGlobal, years);
-    const utdRates = generateRateArray(effUtd, years);
-    const lxdRates = generateRateArray(effLxd, years);
+    const rates = generateRateArray(effGlobal, globalSafeYears);
+    const utdRates = generateRateArray(effUtd, globalSafeYears);
+    const lxdRates = generateRateArray(effLxd, globalSafeYears);
 
     const productRates: Record<string, number[]> = {};
     if (showSplitRates) {
@@ -428,7 +448,8 @@ const App: React.FC = () => {
       selectedProducts: selectedProductIds,
       productInputs,
       years,
-      months,
+      isPartialYear,
+      partialMonths,
       method,
       productMethods,
       rates,
@@ -463,6 +484,8 @@ const App: React.FC = () => {
     selectedProductIds,
     productInputs,
     years,
+    isPartialYear,
+    partialMonths,
     method,
     productMethods,
     globalRateVal,
@@ -1840,82 +1863,40 @@ const App: React.FC = () => {
                   </div>
 
                   <div className="flex space-x-4">
-                    <div className={dealType === DealType.NEW_LOGO ? "w-1/2" : "w-1/3"}>
+                    <div className="w-1/3">
                       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
-                        Duration {dealType === DealType.NEW_LOGO ? "(Years / Months)" : "(Years)"}
+                        Duration
                       </label>
-                      <div className="mt-1 flex items-center space-x-2 h-9">
-                        <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 h-full flex-1">
-                          <button
-                            type="button"
-                            onClick={() => setYears(Math.max(dealType === DealType.NEW_LOGO && months > 0 ? 0 : 1, years - 1))}
-                            className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
-                          >
-                            -
-                          </button>
-                          <input
-                            type="number"
-                            min={dealType === DealType.NEW_LOGO && months > 0 ? 0 : 1}
-                            max="7"
-                            value={years}
-                            onChange={(e) => {
-                              const v = parseInt(e.target.value) || 0;
-                              setYears(Math.min(7, Math.max(dealType === DealType.NEW_LOGO && months > 0 ? 0 : 1, v)));
-                            }}
-                            className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
-                            style={{
-                              appearance: "textfield",
-                              MozAppearance: "textfield",
-                            }}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setYears(Math.min(7, years + 1))}
-                            className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
-                          >
-                            +
-                          </button>
-                        </div>
-                        
-                        {dealType === DealType.NEW_LOGO && (
-                          <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 h-full flex-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newM = Math.max(0, months - 1);
-                                setMonths(newM);
-                                if (newM === 0 && years === 0) setYears(1);
-                              }}
-                              className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
-                            >
-                              -
-                            </button>
-                            <input
-                              type="number"
-                              min="0"
-                              max="11"
-                              value={months}
-                              onChange={(e) => {
-                                const v = parseInt(e.target.value) || 0;
-                                const newM = Math.min(11, Math.max(0, v));
-                                setMonths(newM);
-                                if (newM === 0 && years === 0) setYears(1);
-                              }}
-                              className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
-                              style={{
-                                appearance: "textfield",
-                                MozAppearance: "textfield",
-                              }}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setMonths(Math.min(11, months + 1))}
-                              className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
-                            >
-                              +
-                            </button>
-                          </div>
-                        )}
+                      <div className="mt-1 flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 h-9">
+                        <button
+                          type="button"
+                          onClick={() => setYears(Math.max(minYears, years - 1))}
+                          className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min={minYears}
+                          max="7"
+                          value={years}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            setYears(isNaN(val) ? minYears : Math.max(minYears, val));
+                          }}
+                          className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
+                          style={{
+                            appearance: "textfield",
+                            MozAppearance: "textfield",
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setYears(Math.min(7, years + 1))}
+                          className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
+                        >
+                          +
+                        </button>
                       </div>
                     </div>
                     <div className="w-2/3">
@@ -2029,9 +2010,76 @@ const App: React.FC = () => {
                     </div>
                   </div>
                   
-                  {dealType === DealType.NEW_LOGO && months > 0 && (
-                    <div className="p-3 mb-4 text-xs text-amber-700 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-300 rounded-md flex items-center">
-                      ⚠️ Partial-year New Logo deals require an exception form.
+                  {dealType === DealType.NEW_LOGO && selectedProductIds.length > 0 && (
+                    <div className="mt-4 p-4 border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 rounded-md">
+                      <div className="flex items-center mb-3">
+                        <input
+                          id="partial-year-checkbox"
+                          type="checkbox"
+                          checked={isPartialYear}
+                          onChange={(e) => setIsPartialYear(e.target.checked)}
+                          className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                        />
+                        <label
+                          htmlFor="partial-year-checkbox"
+                          className="ml-2 text-sm font-medium text-amber-800 dark:text-amber-200 flex items-center"
+                        >
+                          Partial-year deal <span className="ml-2 text-xs font-normal opacity-80">(Requires exception form)</span>
+                        </label>
+                      </div>
+                      
+                      {isPartialYear && (
+                        <div className="flex space-x-4">
+                          {selectedProductIds.map(prodId => (
+                            <div key={prodId} className="flex-1">
+                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 uppercase mb-1">
+                                {prodId} Extra Months
+                              </label>
+                              <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 h-9">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const current = partialMonths[prodId] || 0;
+                                    setPartialMonths({ ...partialMonths, [prodId]: Math.max(0, current - 1) });
+                                  }}
+                                  className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="11"
+                                  value={partialMonths[prodId] || 0}
+                                  onChange={(e) => {
+                                    const v = parseInt(e.target.value) || 0;
+                                    setPartialMonths({ ...partialMonths, [prodId]: Math.min(11, Math.max(0, v)) });
+                                  }}
+                                  className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none tabular-nums"
+                                  style={{ appearance: "textfield", MozAppearance: "textfield" }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const current = partialMonths[prodId] || 0;
+                                    setPartialMonths({ ...partialMonths, [prodId]: Math.min(11, current + 1) });
+                                  }}
+                                  className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {years === 0 && (
+                        <div className="mt-3 p-3 text-xs text-amber-700 bg-amber-100 dark:bg-amber-900/40 dark:text-amber-200 rounded flex items-center">
+                          <span className="mr-2">⚠️</span>
+                          This quote is {maxPartialMonths} months only.
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -2288,7 +2336,7 @@ const App: React.FC = () => {
                   </div>
 
                   {/* Flat Pricing Checkbox (Moved Here) */}
-                  {years > 1 && (
+                  {uiGlobalSafeYears > 1 && (
                     <div className="mt-4">
                       <div className="flex items-center">
                         <input
@@ -2951,7 +2999,7 @@ const App: React.FC = () => {
                     <thead className="bg-gray-100 dark:bg-gray-700">
                       <tr>
                         <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">
-                          Year
+                          Term
                         </th>
 
                         {/* Dynamic Product Columns - Gross USD */}
@@ -3037,7 +3085,7 @@ const App: React.FC = () => {
                           }
                         >
                           <td className="px-4 py-4 text-center text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                            Year {r.year}
+                            Term {i + 1} ({r.termMonths} months)
                           </td>
 
                           {/* Product Columns Data Gross USD */}

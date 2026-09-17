@@ -100065,220 +100065,6 @@ import jwt from "jsonwebtoken";
 import crypto4 from "crypto";
 
 // constants.ts
-var CHANGELOG = [
-  {
-    version: "6.6.7",
-    date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
-    changes: [
-      "Added EAI Activation toggle for UTD with a 3% uplift defaults to ON for new business and 2026 renewals.",
-      "Reflected EAI inclusion silently within core FPI and List computations as per 2026 mandates."
-    ]
-  },
-  {
-    version: "6.6.6",
-    date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
-    changes: [
-      "Applying WHT on DLM and including DLM in prorated mid-cycle calculation.",
-      "Adjusted mid-cycle duration calculation to prorate annual rates including DLM additions and factoring WHT into the base calculation."
-    ]
-  },
-  {
-    version: "6.6.5",
-    date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
-    changes: [
-      "Mid-Cycle Add-on Quote functionality: Added structured workflows for UTD ADV, LXD FLINK, LXD IPE, and LXD FLINK+IPE expansions, including pro-rated monthly calculations and WHT adaptations.",
-      "Designated Sites UX enhancements: In-window site addition logic now arrays hospital name, clinicians, and bed count on simplified single rows.",
-      "Designated Sites workflow persistence: Ensures pasted text converts seamlessly to full site breakdowns dynamically without state loss when toggling.",
-      'Sites Export clarity: Export table headers now properly denote site names as "Hospital Name" and distinguish between "Clinicians" (UTD) and "Bed Count" (LXD).',
-      "Sites Export minimalism: Added functionality to omit extensive monetary distributions in exported sheets/PDFs, prioritizing clean site capability distributions."
-    ]
-  },
-  {
-    version: "6.6.4",
-    date: "2025-06-05",
-    changes: [
-      "Extension Option B Expansion: Added customizable Uplift FPI% input applying specified rate to current spend for exact fractional and integer month calculation within 100K SAR limits.",
-      'UI Refinement: Redesigned the Uplift FPI% fields with interactive "+" and "-" step buttons (incrementing/decrementing whole values) while supporting manual decimal inputs (up to one decimal place).',
-      "Rules Update: Simplified the Extension Finance approval threshold to apply selectively on any Uplift FPI% below 5% across both Option A and Option B.",
-      'UI Cleanup: Renamed "Difference to Extension (FPI %)" labels to "Uplift FPI%" for consistency with renewal uplift fields.',
-      "Loosened Variant Criteria for Rightsizing: MYPP is now fully unlocked for any UTD variant in renewal (including standard Anywhere, UTDADV, etc.)",
-      "Expiring Spend Floor Safeguard: Incorporated a strict mathematical check inside Step 3 (Multi-Year Projection) of the calculation engine.",
-      "Synchronized Real-Time Warning Alert Banner: The frontend client now dynamically extracts these reversion logs from the backend response in real-time, rendering a high-visibility red alert banner some commercial options.",
-      "Architect Notes & Build Safety Logs: These warnings are automatically archived inside the Architect Notes section and are formatted in both PDF and Excel exports."
-    ]
-  },
-  {
-    version: "6.6.3",
-    date: "2026-05-20",
-    changes: [
-      "Feature: Added UTDEE-EAI Pricing.",
-      "Pricing: Enable FPI less than standard with warning."
-    ]
-  },
-  {
-    version: "6.6.2",
-    date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
-    changes: [
-      "UI: Redesigned and streamlined Export Options section.",
-      'Feature: Restored and improved "Multiple Sites" list functionality allowing precise price breakdowns per site.',
-      'Feature: Restored "Technical Specifications" section in PDF exports.',
-      "UX: Improved Seller Information inputs alignment.",
-      "UX: Cleaned up unnecessary backend scripts."
-    ]
-  },
-  {
-    version: "6.6.1",
-    date: "2026-05-05",
-    changes: [
-      "Pricing logic update: In a renewal scenario, if the customer is renewing the same variant and changing only the statistics (bed or head), the rate used for the additional stats (aka upsell value) is now the expiring rate * FPI / existing stat.",
-      "Security: Full-stack migration of export and pricing logic.",
-      "Security: Proprietary constants removed from frontend bundle.",
-      'Feature: Default "Show Stats" for proposals.',
-      "Feature: Automated rounding for CP deals.",
-      "UI: Polish and modern icons for Export section."
-    ]
-  },
-  {
-    version: "6.6.0",
-    date: "2026-04-21",
-    changes: [
-      'Feature: Added specific "Channel Partner" (CP) export flow for Fulfillment and Partner-Sourced queries.',
-      'Feature: Intercepts PDF generation for CP deals to ask if the proposal is "Direct" or "CP".',
-      "Feature: Applies automated overriding data for Samir Group (Rep Name, Email, Phone) upon CP PDF selection.",
-      "Feature: Integrates exact Session-based CP quote counter tracking (AH/DDMMYY/XX) referencing logic in CP generated PDFs.",
-      "Feature: Injects Noto Sans Arabic fonts strictly via the PDF exporter to faithfully render localized CP footer phrasing.",
-      "Feature: Enhances dynamic PDF layout to offset CP-centric footer headers/border margins without occluding standard content like footnotes (EMR/Opt-out logic).",
-      "System: Updated PostHog analytical tracking SDK engine version for Doctor compliance (v1.369.5)."
-    ]
-  },
-  {
-    version: "6.5.6",
-    date: "2026-04-16",
-    changes: [
-      "UI: Replaced MYFPI/MYPP radio buttons with touch-friendly segmented pills.",
-      "UI: Color-coded product backgrounds (Green for UTD, Blue for LXD) to improve visual hierarchy in configuration and commercial schedules.",
-      "UI: Standardized Duration and Rate step-inputs to identical squared sizes with centered text.",
-      "UI: Replaced standard number inputs for Base Discount and Combo Discount with touch-friendly step buttons.",
-      "Feature: Fixed Android PWA top bar to dynamically inherit the application theme color (Dark/Light).",
-      "Feature: Changed the Architectural Note to use Customer ACV rather than TCV for comparing against Expiring Amount.",
-      "Feature: Appended Architectural Note directly into the PDF Export.",
-      "Export Update: Added exact product mix IDs into exported filenames."
-    ]
-  },
-  {
-    version: "6.5.5",
-    date: "2026-04-07",
-    changes: [
-      "Security: Migrated pricing engine to backend to protect proprietary algorithms.",
-      "Security: Implemented secure backend authentication and session management.",
-      "Feature: Rep details are now securely stored in local storage for convenience.",
-      "UI Update: Removed initials requirement from login screen."
-    ]
-  },
-  {
-    version: "6.5.4",
-    date: "2026-04-05",
-    changes: [
-      "Feature: Added 10-minute idle auto log-out for security.",
-      "Feature: Support for split pricing methods (e.g., UTD on MYPP, LXD on MYFPI).",
-      "Feature: Enforced $10,000 minimum Y1 value for MYPP (automatically reverts to MYFPI if not met).",
-      "Feature: Auto-switch annual increase percentages when toggling between MYPP and MYFPI.",
-      "Feature: Added Exception Form alert for out-of-bounds MYPP and MYFPI rates.",
-      "Feature: MYPP default rate automatically sets to 8%.",
-      "UI Fix: MYPP and FPI fields now accept 0 as a valid override.",
-      "UI Fix: Fixed RangeError when the number of years is left blank.",
-      "Bug Fix: Resolved PostHog client rate limiting errors by optimizing event capture.",
-      'Product Update (UTD SM): Changed product name to "UpToDate\xAE Subscriber Manager".',
-      "Product Update (UTD SM): Added specific terms to PDF and disabled irrelevant export checkboxes."
-    ]
-  },
-  {
-    version: "6.5.3",
-    date: "2026-04-03",
-    changes: [
-      "Logic Update: UTD Renewal calculations now strictly follow the new rules for Anywhere, Advanced, and EE.",
-      "Logic Update: Added EE eligibility check. Clients are ineligible for EE if their Anywhere/Advanced renewal is under $30k.",
-      "Logic Update: Added recommendation to upgrade to EE if renewal exceeds $30k."
-    ]
-  },
-  {
-    version: "6.5.2",
-    date: "2026-04-03",
-    changes: [
-      "Bug Fix: Duration field accepts clearing without RangeError.",
-      "Bug Fix: Reset Form now clears designated sites.",
-      'Bug Fix: "Include Start Date" auto-selects only for Renewal/Extension.',
-      "Feature: Customer Name is now mandatory for exports.",
-      "Feature: Added release notes alert for new version updates."
-    ]
-  },
-  {
-    version: "6.5.1",
-    date: "2026-04-01",
-    changes: [
-      "UI Refinements: Extension months navigation arrows.",
-      "UI Refinements: Numeric inputs format with comma separators.",
-      "PDF Fix: Product full names mapped correctly.",
-      "PDF Fix: Designated sites render for Extension Quotes.",
-      "PDF Fix: Font loading state clears on error.",
-      "PDF Fix: Footer alignment and table bolding adjusted."
-    ]
-  },
-  {
-    version: "6.5.0",
-    date: "2026-03-31",
-    changes: [
-      'Feature: "Use Full Extension" logic.',
-      "Feature: Auto Credential Capture.",
-      'Patch/Fix: Fixed infinite "processing..." bug in PDF export.',
-      'Patch/Fix: Added "Reset Form" button.'
-    ]
-  },
-  {
-    version: "6.4.0",
-    date: "2026-02-15",
-    changes: [
-      'Feature: Introduced "Extension" as a brand new Deal Type alongside New Logo and Renewal.',
-      "Feature: Added Option A (Pro-rated) and Option B (Flat Rate) calculation logic."
-    ]
-  },
-  {
-    version: "6.3.0",
-    date: "2026-01-10",
-    changes: [
-      'Feature: Added "Designated Sites" logic (Breakdown per site, showing sites only).',
-      "Feature: Added Start Date selection and logic.",
-      "Feature: Added WHT (Withholding Tax) toggles and Rounding options."
-    ]
-  },
-  {
-    version: "6.2.0",
-    date: "2025-11-20",
-    changes: [
-      "Feature: Implemented the Login screen with monthly passcodes and initials validation.",
-      "Feature: Added PostHog analytics to track user logins and quote generation.",
-      "Feature: Added Dark/Light mode toggling and responsive layout refinements."
-    ]
-  },
-  {
-    version: "6.1.0",
-    date: "2025-10-05",
-    changes: [
-      "Feature: Added the ability to generate and download professional PDF proposals.",
-      "Feature: Added the ability to export raw data to Excel (.xlsx) files.",
-      "Feature: Implemented dynamic tables and technical specification links in the exports."
-    ]
-  },
-  {
-    version: "6.0.0",
-    date: "2025-08-15",
-    changes: [
-      "Feature: The initial translation of the Excel pricing calculator into a React web application.",
-      "Feature: Core pricing engine (MYFPI, MYPP, Renewals, New Logo).",
-      "Feature: Product variants (UTD, LXD, Add-ons)."
-    ]
-  }
-];
 var WHT_FACTOR = 0.95;
 var EXCHANGE_RATE_SAR = 3.76;
 var STANDARD_FLOOR_RAW = 6500;
@@ -100359,7 +100145,6 @@ var calculatePricing = (config) => {
     channel,
     selectedProducts,
     productInputs,
-    years,
     method,
     productMethods,
     rates,
@@ -100666,10 +100451,45 @@ var calculatePricing = (config) => {
     }
   }
   const productSchedules = {};
-  const safeYears = Math.max(0, Math.floor(Number(years) || 0));
+  let maxTotalMonths = config.years * 12;
+  if (dealType === "New Logo" /* NEW_LOGO */ && config.isPartialYear) {
+    selectedProducts.forEach((prodId) => {
+      const pm = config.partialMonths?.[prodId] || 0;
+      if (config.years * 12 + pm > maxTotalMonths) {
+        maxTotalMonths = config.years * 12 + pm;
+      }
+    });
+  }
+  const rowLengths = [];
+  if (maxTotalMonths > 0) {
+    if (maxTotalMonths <= 15) {
+      rowLengths.push(maxTotalMonths);
+    } else {
+      let remaining = maxTotalMonths;
+      while (remaining > 0) {
+        if (remaining > 12) {
+          rowLengths.push(12);
+          remaining -= 12;
+        } else {
+          rowLengths.push(remaining);
+          remaining = 0;
+        }
+      }
+    }
+  } else {
+    rowLengths.push(12);
+  }
+  const globalRows = rowLengths.length;
+  const productTotalMonths = {};
   selectedProducts.forEach((prodId) => {
+    let prodTotalMonths = config.years * 12;
+    if (dealType === "New Logo" /* NEW_LOGO */ && config.isPartialYear) {
+      prodTotalMonths += config.partialMonths?.[prodId] || 0;
+    }
+    productTotalMonths[prodId] = prodTotalMonths;
     const y1Value = year1ProductNets[prodId];
-    const schedule = new Array(safeYears).fill(0);
+    const baseSchedule = new Array(globalRows).fill(0);
+    const schedule = new Array(globalRows).fill(0);
     const specificRates = productRates[prodId] || rates;
     let specificMethod = productMethods?.[prodId] || method;
     const y1GrossForMYPP = year1ProductGross[prodId];
@@ -100679,10 +100499,17 @@ var calculatePricing = (config) => {
         `${prodId.toUpperCase()} MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.`
       );
     }
+    const isPartialYearAgreement = prodTotalMonths > 0 && prodTotalMonths % 12 !== 0;
+    if (specificMethod === "MYPP (Price Protection)" /* MYPP */ && isPartialYearAgreement) {
+      specificMethod = "MYFPI (Inflation)" /* MYFPI */;
+      productNotes.push(
+        `${prodId.toUpperCase()} MYPP is not allowed for partial-year agreements. Reverted to MYFPI.`
+      );
+    }
     if (specificMethod === "MYPP (Price Protection)" /* MYPP */ && dealType === "Renewal" /* RENEWAL */) {
       const expiring = productInputs[prodId]?.expiringAmount || 0;
       let tempY1 = y1Value;
-      for (let i = years - 2; i >= 0; i--) {
+      for (let i = globalRows - 2; i >= 0; i--) {
         const discountRate = specificRates[i + 1] || 0;
         tempY1 = tempY1 / (1 + discountRate / 100);
       }
@@ -100694,33 +100521,48 @@ var calculatePricing = (config) => {
       }
     }
     if (specificMethod === "MYFPI (Inflation)" /* MYFPI */) {
-      schedule[0] = y1Value;
-      for (let i = 1; i < years; i++) {
+      baseSchedule[0] = y1Value;
+      for (let i = 1; i < globalRows; i++) {
         const rate = specificRates[i] || 0;
-        schedule[i] = schedule[i - 1] * (1 + rate / 100);
+        baseSchedule[i] = baseSchedule[i - 1] * (1 + rate / 100);
       }
     } else {
-      schedule[years - 1] = y1Value;
-      for (let i = years - 2; i >= 0; i--) {
+      baseSchedule[globalRows - 1] = y1Value;
+      for (let i = globalRows - 2; i >= 0; i--) {
         const discountRate = specificRates[i + 1] || 0;
-        schedule[i] = schedule[i + 1] / (1 + discountRate / 100);
+        baseSchedule[i] = baseSchedule[i + 1] / (1 + discountRate / 100);
       }
+    }
+    let cumulative = 0;
+    for (let i = 0; i < globalRows; i++) {
+      const activeMonths = Math.max(0, Math.min(rowLengths[i], prodTotalMonths - cumulative));
+      schedule[i] = baseSchedule[i] * (activeMonths / 12);
+      cumulative += rowLengths[i];
     }
     productSchedules[prodId] = schedule;
   });
-  if (flatPricing && years > 1) {
+  if (flatPricing && globalRows > 1) {
     selectedProducts.forEach((prodId) => {
       const schedule = productSchedules[prodId];
-      const totalPeriodCost = schedule.reduce((acc, val) => acc + val, 0);
-      const averageAnnual = safeYears > 0 ? totalPeriodCost / safeYears : 0;
-      productSchedules[prodId] = new Array(safeYears).fill(averageAnnual);
+      const prodTotalMonths = productTotalMonths[prodId];
+      let totalPeriodCost = 0;
+      for (let i = 0; i < globalRows; i++) totalPeriodCost += schedule[i];
+      const averageMonthly = prodTotalMonths > 0 ? totalPeriodCost / prodTotalMonths : 0;
+      let cumulative = 0;
+      for (let i = 0; i < globalRows; i++) {
+        const activeMonths = Math.max(0, Math.min(rowLengths[i], prodTotalMonths - cumulative));
+        schedule[i] = averageMonthly * activeMonths;
+        cumulative += rowLengths[i];
+      }
+      productSchedules[prodId] = schedule;
     });
   }
   if (rounding) {
     selectedProducts.forEach((prodId) => {
       const schedule = productSchedules[prodId];
-      for (let i = 0; i < years; i++) {
+      for (let i = 0; i < globalRows; i++) {
         const val = schedule[i];
+        if (val === 0) continue;
         if (channel === "Direct" /* DIRECT */) {
           schedule[i] = Math.ceil(val / 100) * 100;
         } else {
@@ -100735,12 +100577,12 @@ var calculatePricing = (config) => {
   let totalTCV = 0, totalGrossUSD = 0, totalGrossSAR = 0, totalVatSAR = 0, totalGrandTotalSAR = 0, totalNetUSD = 0, totalNetSAR = 0;
   const productNetTotals = {};
   selectedProducts.forEach((p) => productNetTotals[p] = 0);
-  for (let i = 0; i < years; i++) {
+  for (let i = 0; i < globalRows; i++) {
     const breakdown = [];
     let yearSum = 0;
     const netFactor = getNetFactor(dealType, channel, i);
     selectedProducts.forEach((prodId) => {
-      const val = productSchedules[prodId][i];
+      const val = productSchedules[prodId][i] || 0;
       yearSum += val;
       const netVal = val * netFactor;
       breakdown.push({
@@ -100758,6 +100600,7 @@ var calculatePricing = (config) => {
     const recognizedSAR = recognizedUSD * EXCHANGE_RATE_SAR;
     yearlyResults.push({
       year: i + 1,
+      termMonths: rowLengths[i],
       breakdown,
       grossUSD: yearSum,
       grossSAR: yearGrossSAR,
@@ -100777,8 +100620,21 @@ var calculatePricing = (config) => {
     totalNetUSD += recognizedUSD;
     totalNetSAR += recognizedSAR;
   }
-  const acvUSD = totalTCV / years;
-  const netACV = totalNetUSD / years;
+  let acvUSD = 0;
+  let netACV = 0;
+  selectedProducts.forEach((prodId) => {
+    const prodTotalMonths = productTotalMonths[prodId];
+    const prodDivisor = Math.max(0.01, prodTotalMonths / 12);
+    let prodGross = 0;
+    let prodNet = 0;
+    for (let i = 0; i < globalRows; i++) {
+      const val = productSchedules[prodId][i] || 0;
+      prodGross += val;
+      prodNet += val * getNetFactor(dealType, channel, i);
+    }
+    acvUSD += prodGross / prodDivisor;
+    netACV += prodNet / prodDivisor;
+  });
   let upsellACV = 0;
   if (dealType === "Renewal" /* RENEWAL */)
     upsellACV = Math.max(0, acvUSD - totalRenewalBaseForACV);
@@ -100841,13 +100697,25 @@ var calculatePricing = (config) => {
       }
     } else {
       const maxSARExVAT = 1e5 / 1.15;
-      const fpiPercentage = config.extensionFPI ?? 0;
+      const isUtdVar = ["ANYWHERE", "UTDADV", "UTDEE", "UTDEE-EAI", "SM"].includes((config.extensionVariant || "").toUpperCase()) || (config.extensionVariant || "").toUpperCase().startsWith("UTD");
+      const defaultFpi = isUtdVar ? 8 : 5;
+      const fpiPercentage = config.extensionFPI !== void 0 && config.extensionFPI !== null ? config.extensionFPI : defaultFpi;
       const effectiveSpend = (config.currentSpend || 0) * (1 + fpiPercentage / 100);
       const monthlyCost2 = effectiveSpend / 12;
       const monthlyCostSAR = monthlyCost2 * EXCHANGE_RATE_SAR;
       const monthsAvailable = monthlyCostSAR > 0 ? maxSARExVAT / monthlyCostSAR : 0;
-      const monthsCovered = Math.floor(monthsAvailable);
-      const endUserPrice = monthsCovered * monthlyCost2;
+      const maxIntegerMonths = Math.floor(monthsAvailable);
+      const monthsCovered = config.optionBMonths !== void 0 && config.optionBMonths !== null && config.optionBMonths > 0 ? config.optionBMonths : maxIntegerMonths;
+      let endUserPrice = monthsCovered * monthlyCost2;
+      if (config.roundUpOptionB) {
+        if (channel !== "Direct" /* DIRECT */) {
+          const rawSAR = endUserPrice * EXCHANGE_RATE_SAR;
+          const roundedSAR = Math.ceil(rawSAR / 1e3) * 1e3;
+          endUserPrice = roundedSAR / EXCHANGE_RATE_SAR;
+        } else {
+          endUserPrice = Math.ceil(endUserPrice / 1e3) * 1e3;
+        }
+      }
       results.extensionResults = {
         type: "B",
         variant: config.extensionVariant,
@@ -100858,10 +100726,12 @@ var calculatePricing = (config) => {
         monthlyCostSAR,
         monthsAvailable,
         monthsCovered,
+        optionBMonthsCustom: config.optionBMonths || null,
         maxSARExVAT,
         endUserPrice,
         commission: endUserPrice * (1 - netFactor),
-        netPrice: endUserPrice * netFactor
+        netPrice: endUserPrice * netFactor,
+        roundUpOptionB: config.roundUpOptionB
       };
     }
   }
@@ -101051,27 +100921,45 @@ async function generateQuotePDF(config, data, options) {
     if (config.useStartDate && config.startMonthYear) {
       extRows.push(["Dates", config.startMonthYear]);
     }
+    const availMonthsVal = extResults.monthsAvailable !== void 0 && extResults.monthsAvailable !== null ? extResults.monthsAvailable : extResults.monthsCovered;
     if (extResults.type === "A") {
-      const durationText = extResults.useFullExtension ? `${extResults.days} days (${extResults.integerMonths} months${extResults.extraDays > 0 ? ` and ${extResults.extraDays} days` : ""})` : `${Math.round(extResults.monthsAvailable * 30)} days (${extResults.monthsAvailable.toFixed(2)} months)`;
+      const availTextA = `${availMonthsVal?.toFixed(2)} months (${Math.round((availMonthsVal || 0) * 30)} days)`;
+      let durationText = extResults.useFullExtension ? `${extResults.days} days (${extResults.integerMonths} months${extResults.extraDays > 0 ? ` and ${extResults.extraDays} days` : ""})` : `${Math.round(extResults.monthsAvailable * 30)} days (${extResults.monthsAvailable.toFixed(2)} months)`;
+      if (options.showAvailableMonths) {
+        durationText += ` (Exact Available: ${availTextA})`;
+      }
       extRows.push(["Extension Duration", durationText]);
+      if (options.showAvailableMonths) {
+        extRows.push(["Available Duration", availTextA]);
+      }
     } else {
-      extRows.push(["Extension Duration", `${Math.round(extResults.monthsCovered * 30)} days (${extResults.monthsCovered} months)`]);
-    }
-    if (options.showAvailableMonths) {
-      const availMonthsVal = extResults.monthsAvailable !== void 0 && extResults.monthsAvailable !== null ? extResults.monthsAvailable : extResults.monthsCovered;
-      const availText = `${availMonthsVal?.toFixed(2)} months (${Math.round((availMonthsVal || 0) * 30)} days)`;
-      extRows.push(["Available Duration", availText]);
+      const availTextB = `${availMonthsVal?.toFixed(2)} months`;
+      let durationText = `${extResults.monthsCovered} months`;
+      if (options.showAvailableMonths) {
+        durationText += ` (Exact Available: ${availTextB})`;
+      }
+      extRows.push(["Extension Duration", durationText]);
+      if (options.showAvailableMonths) {
+        extRows.push(["Available Duration", availTextB]);
+      }
     }
     if (isIndirect) {
-      const euPriceSAR = extResults.endUserPrice * EXCHANGE_RATE_SAR;
+      let euPriceSAR = extResults.endUserPrice * EXCHANGE_RATE_SAR;
+      if (extResults.roundUpOptionB) {
+        euPriceSAR = Math.ceil(euPriceSAR / 1e3) * 1e3;
+      }
       extRows.push(
         ["End-User Price (SAR)", `SAR ${euPriceSAR.toLocaleString(void 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
         ["VAT (15%) (SAR)", `SAR ${(euPriceSAR * 0.15).toLocaleString(void 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
         ["Total (SAR)", `SAR ${(euPriceSAR * 1.15).toLocaleString(void 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]
       );
     } else {
+      let euPriceUSD = extResults.endUserPrice;
+      if (extResults.roundUpOptionB) {
+        euPriceUSD = Math.ceil(euPriceUSD / 1e3) * 1e3;
+      }
       extRows.push(
-        ["End-User Price (USD)", `$${extResults.endUserPrice.toLocaleString(void 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]
+        ["End-User Price (USD)", `$${euPriceUSD.toLocaleString(void 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]
       );
     }
     applyAutoTable(doc, {
