@@ -3,7 +3,9 @@ import posthog from "posthog-js";
 import Login from "./components/Login";
 import { Layout } from "./components/Layout";
 import { ExportSection } from "./components/ExportSection";
-import { logout } from "./components/auth";
+import { QuotesManager } from "./components/QuotesManager";
+import { ProfileModal } from "./components/ProfileModal";
+import { logout, supabase } from "./components/auth";
 import { FormattedNumberInput } from "./components/FormattedNumberInput";
 import { UpliftFpiInput } from "./components/UpliftFpiInput";
 import {
@@ -43,6 +45,9 @@ const App: React.FC = () => {
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthChecked, setIsAuthChecked] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [customerName, setCustomerName] = useState("");
   const [metadata, setMetadata] = useState<{
     availableProducts: ProductDefinition[];
     utdVariants: Record<string, number>;
@@ -54,15 +59,37 @@ const App: React.FC = () => {
   const sarRate = metadata?.exchangeRateSAR || 3.75;
 
   useEffect(() => {
-    // Check if user is already authenticated via backend cookie
-    fetch("/api/verify", { credentials: "include" })
-      .then((res) => {
-        if (res.ok) {
-          setIsAuthenticated(true);
+    // Check if user is already authenticated via Supabase
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setIsAuthenticated(true);
+        setUserProfile(session.user.user_metadata);
+        if (session.user.user_metadata) {
+          const { first_name, last_name, quote_email, phone } = session.user.user_metadata;
+          const fullName = [first_name, last_name].filter(Boolean).join(' ');
+          if (fullName) localStorage.setItem('wk_rep_name', fullName);
+          if (quote_email) localStorage.setItem('wk_rep_email', quote_email);
+          if (phone) localStorage.setItem('wk_rep_phone', phone);
         }
-      })
-      .catch((err) => console.error("Auth verification failed:", err))
-      .finally(() => setIsAuthChecked(true));
+      }
+      setIsAuthChecked(true);
+    });
+
+    supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+      if (session) {
+        setUserProfile(session.user.user_metadata);
+        const { first_name, last_name, quote_email, phone } = session.user.user_metadata || {};
+        const fullName = [first_name, last_name].filter(Boolean).join(' ');
+        if (fullName) localStorage.setItem('wk_rep_name', fullName);
+        if (quote_email) localStorage.setItem('wk_rep_email', quote_email);
+        if (phone) localStorage.setItem('wk_rep_phone', phone);
+      } else {
+        setUserProfile(null);
+      }
+    });
+
+    // We don't cleanup the subscription in this simple effect to keep it alive
 
     // Fetch metadata immediately on mount (not sensitive)
     fetch("/api/metadata")
@@ -391,6 +418,37 @@ const App: React.FC = () => {
   };
 
   // Derived Config
+
+  const loadConfig = (loadedConfig: any) => {
+    if (loadedConfig.dealType !== undefined) setDealType(loadedConfig.dealType);
+    if (loadedConfig.channel !== undefined) setChannel(loadedConfig.channel);
+    if (loadedConfig.selectedProducts !== undefined) setSelectedProductIds(loadedConfig.selectedProducts);
+    if (loadedConfig.productInputs !== undefined) setProductInputs(loadedConfig.productInputs);
+    if (loadedConfig.years !== undefined) setYears(loadedConfig.years);
+    if (loadedConfig.isPartialYear !== undefined) setIsPartialYear(loadedConfig.isPartialYear);
+    if (loadedConfig.partialMonths !== undefined) setPartialMonths(loadedConfig.partialMonths);
+    if (loadedConfig.method !== undefined) setMethod(loadedConfig.method);
+    if (loadedConfig.productMethods !== undefined) setProductMethods(loadedConfig.productMethods);
+    if (loadedConfig.applyWHT !== undefined) setApplyWHT(loadedConfig.applyWHT);
+    if (loadedConfig.flatPricing !== undefined) setFlatPricing(loadedConfig.flatPricing);
+    if (loadedConfig.rounding !== undefined) setRounding(loadedConfig.rounding);
+    if (loadedConfig.useStartDate !== undefined) setUseStartDate(loadedConfig.useStartDate);
+    if (loadedConfig.startMonthYear !== undefined) setStartMonthYear(loadedConfig.startMonthYear);
+    if (loadedConfig.extensionOption !== undefined) setExtensionOption(loadedConfig.extensionOption);
+    if (loadedConfig.expiringTerm !== undefined) setExpiringTerm(loadedConfig.expiringTerm);
+    if (loadedConfig.expiringTCV !== undefined) setExpiringTCV(loadedConfig.expiringTCV);
+    if (loadedConfig.currentSpend !== undefined) setCurrentSpend(loadedConfig.currentSpend);
+    if (loadedConfig.extensionPercentage !== undefined) setExtensionPercentage(loadedConfig.extensionPercentage);
+    if (loadedConfig.extensionFPI !== undefined) setExtensionFPI(loadedConfig.extensionFPI);
+    if (loadedConfig.extensionVariant !== undefined) setExtensionVariant(loadedConfig.extensionVariant);
+    if (loadedConfig.useFullExtension !== undefined) setUseFullExtension(loadedConfig.useFullExtension);
+    if (loadedConfig.roundUpOptionB !== undefined) setRoundUpOptionB(loadedConfig.roundUpOptionB);
+    if (loadedConfig.optionBMonths !== undefined) setOptionBMonths(loadedConfig.optionBMonths);
+    if (loadedConfig.applyAnnualRate !== undefined) setApplyAnnualRate(loadedConfig.applyAnnualRate);
+    
+    // Reset key to force child components to update
+    setResetKey(prev => prev + 1);
+  };
   const config: DealConfiguration = useMemo(() => {
     // Determine effective structure rates based on toggle
     // For MYFPI in Renewal, we check applyAnnualRate. For MYPP, we always apply the rate.
@@ -528,10 +586,13 @@ const App: React.FC = () => {
 
     const fetchPricing = async () => {
       try {
+        const { data: { session } } = await supabase.auth.getSession();
         const res = await fetch("/api/calculate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session?.access_token}`
+          },
           body: JSON.stringify(config),
         });
         if (res.ok) {
@@ -936,14 +997,33 @@ const App: React.FC = () => {
   }
 
   return (
-    <Layout onLogout={handleLogout}>
+    <Layout onLogout={handleLogout} userName={userProfile ? `${userProfile.first_name || ""} ${userProfile.last_name || ""}`.trim() : ""} onProfileClick={() => setIsProfileModalOpen(true)}>
+      <ProfileModal 
+        isOpen={isProfileModalOpen} 
+        onClose={() => setIsProfileModalOpen(false)} 
+        userProfile={userProfile} 
+        onSave={(newProfile) => {
+          setUserProfile(newProfile);
+          const fullName = [newProfile.first_name, newProfile.last_name].filter(Boolean).join(' ');
+          if (fullName) localStorage.setItem('wk_rep_name', fullName);
+          if (newProfile.quote_email) localStorage.setItem('wk_rep_email', newProfile.quote_email);
+          if (newProfile.phone) localStorage.setItem('wk_rep_phone', newProfile.phone);
+        }} 
+      />
       {notification && (
         <div className="fixed top-4 right-4 z-50 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded shadow-lg animate-fade-in-down">
           <p className="font-bold">Notice</p>
           <p>{notification}</p>
         </div>
       )}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
+      
+        <QuotesManager 
+          currentConfig={config} 
+          currentResults={results} 
+          customerName={customerName}
+          onLoadQuote={loadConfig} 
+        />
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
         {/* Left Column: Configuration */}
         <div className="xl:col-span-1 space-y-6">
           {/* Section 1: Deal Basics */}
@@ -3361,6 +3441,8 @@ const App: React.FC = () => {
             setUseStartDate={setUseStartDate}
             startMonthYear={startMonthYear}
             setStartMonthYear={setStartMonthYear}
+            customerName={customerName}
+            setCustomerName={setCustomerName}
             isExtensionQuote={isExtensionQuote}
             extensionResults={extensionResults}
             isMidCycleQuote={isMidCycleQuote}

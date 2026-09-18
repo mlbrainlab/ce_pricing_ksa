@@ -12,6 +12,8 @@ import { WK_LOGO_BASE64 } from '../wkLogo';
 import { EAI_LOGO_BASE64 } from '../eaiLogo';
 
 interface ExportSectionProps {
+  customerName: string;
+  setCustomerName: (val: string) => void;
   data: CalculationOutput;
   config: DealConfiguration;
   useStartDate: boolean;
@@ -68,10 +70,9 @@ const formatMoney = (amount: number, currency: string) => {
 
 export const ExportSection: React.FC<ExportSectionProps> = ({ 
   data, config, useStartDate, setUseStartDate, startMonthYear, setStartMonthYear,
-  isExtensionQuote, extensionResults, isMidCycleQuote, renewalNotes = []
+  isExtensionQuote, extensionResults, isMidCycleQuote, renewalNotes = [], customerName, setCustomerName
 }) => {
-  const [customerName, setCustomerName] = useState('');
-  const [repName, setRepName] = useState(() => localStorage.getItem('wk_rep_name') || '');
+    const [repName, setRepName] = useState(() => localStorage.getItem('wk_rep_name') || '');
   const [repPhone, setRepPhone] = useState(() => localStorage.getItem('wk_rep_phone') || '');
   const [repEmail, setRepEmail] = useState(() => localStorage.getItem('wk_rep_email') || '');
   const [isPdfLoading, setIsPdfLoading] = useState(false);

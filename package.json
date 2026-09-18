@@ -4,13 +4,14 @@
   "version": "6.6.10",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "tsx --env-file=.env --experimental-websocket server.ts",
     "build": "tsc && vite build && esbuild server.ts app.ts --bundle --platform=node --format=esm --external:express --external:cookie-parser --external:jsonwebtoken --external:lightningcss --external:vite --outdir=dist-server",
-    "start": "node dist-server/server.js",
+    "start": "node --experimental-websocket dist-server/server.js",
     "preview": "vite preview",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
     "@types/cors": "^2.8.19",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",

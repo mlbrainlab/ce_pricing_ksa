@@ -1,9 +1,19 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.6.10';
+export const APP_VERSION = '6.7.0';
 
 export const CHANGELOG = [
+  {
+    version: '6.7.0',
+    date: '2026-09-18',
+    changes: [
+      'Authentication Migration: Migrated away from static shared passcodes to dedicated user accounts using Supabase Auth (Email & Password).',
+      'Row-Level Security (RLS): Implemented database Row-Level Security ensuring strict isolation of user profiles and quote history.',
+      'Quotes Manager: Added Quotes Manager dashboard allowing users to save and resume drafts and finalized quotes securely to their accounts.',
+      'Profile Auto-fill: Integrated First Name, Last Name, Email, and Phone fields directly into User Profiles for automatic rendering in the Export views.'
+    ]
+  },
   {
     version: '6.6.10',
     date: '2026-09-17',

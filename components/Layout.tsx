@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { APP_VERSION, CHANGELOG } from '../constants';
 
-export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void }> = ({ children, onLogout }) => {
+export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void; userName?: string; onProfileClick?: () => void; }> = ({ children, onLogout, userName, onProfileClick }) => {
   const [themePref, setThemePref] = useState<'light' | 'dark' | 'system'>('system');
   const [mounted, setMounted] = useState(false);
   const [showReleaseAlert, setShowReleaseAlert] = useState(false);
@@ -145,8 +145,11 @@ export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void
                 )}
               </button>
             </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 font-medium hidden sm:block">
-              CE Pricing Architect
+            <div 
+              className="text-sm text-blue-600 dark:text-blue-400 font-medium hidden sm:block hover:underline cursor-pointer"
+              onClick={onProfileClick}
+            >
+              {userName || "CE Pricing Architect"}
             </div>
           </div>
         </div>
