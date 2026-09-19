@@ -3,7 +3,9 @@ import posthog from "posthog-js";
 import Login from "./components/Login";
 import { Layout } from "./components/Layout";
 import { ExportSection } from "./components/ExportSection";
-import { logout } from "./components/auth";
+import { QuotesManager } from "./components/QuotesManager";
+import { ProfileModal } from "./components/ProfileModal";
+import { logout, supabase } from "./components/auth";
 import { FormattedNumberInput } from "./components/FormattedNumberInput";
 import { UpliftFpiInput } from "./components/UpliftFpiInput";
 import {
@@ -43,6 +45,9 @@ const App: React.FC = () => {
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthChecked, setIsAuthChecked] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [customerName, setCustomerName] = useState("");
   const [metadata, setMetadata] = useState<{
     availableProducts: ProductDefinition[];
     utdVariants: Record<string, number>;
@@ -54,15 +59,37 @@ const App: React.FC = () => {
   const sarRate = metadata?.exchangeRateSAR || 3.75;
 
   useEffect(() => {
-    // Check if user is already authenticated via backend cookie
-    fetch("/api/verify", { credentials: "include" })
-      .then((res) => {
-        if (res.ok) {
-          setIsAuthenticated(true);
+    // Check if user is already authenticated via Supabase
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setIsAuthenticated(true);
+        setUserProfile(session.user.user_metadata);
+        if (session.user.user_metadata) {
+          const { first_name, last_name, quote_email, phone } = session.user.user_metadata;
+          const fullName = [first_name, last_name].filter(Boolean).join(' ');
+          if (fullName) localStorage.setItem('wk_rep_name', fullName);
+          if (quote_email) localStorage.setItem('wk_rep_email', quote_email);
+          if (phone) localStorage.setItem('wk_rep_phone', phone);
         }
-      })
-      .catch((err) => console.error("Auth verification failed:", err))
-      .finally(() => setIsAuthChecked(true));
+      }
+      setIsAuthChecked(true);
+    });
+
+    supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+      if (session) {
+        setUserProfile(session.user.user_metadata);
+        const { first_name, last_name, quote_email, phone } = session.user.user_metadata || {};
+        const fullName = [first_name, last_name].filter(Boolean).join(' ');
+        if (fullName) localStorage.setItem('wk_rep_name', fullName);
+        if (quote_email) localStorage.setItem('wk_rep_email', quote_email);
+        if (phone) localStorage.setItem('wk_rep_phone', phone);
+      } else {
+        setUserProfile(null);
+      }
+    });
+
+    // We don't cleanup the subscription in this simple effect to keep it alive
 
     // Fetch metadata immediately on mount (not sensitive)
     fetch("/api/metadata")
@@ -132,6 +159,8 @@ const App: React.FC = () => {
 
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [years, setYears] = useState<number>(3);
+  const [isPartialYear, setIsPartialYear] = useState<boolean>(false);
+  const [partialMonths, setPartialMonths] = useState<Record<string, number>>({});
   const [method, setMethod] = useState<PricingMethod>(PricingMethod.MYFPI);
   const [productMethods, setProductMethods] = useState<
     Record<string, PricingMethod>
@@ -155,6 +184,8 @@ const App: React.FC = () => {
   const [extensionFPI, setExtensionFPI] = useState<number | null>(null);
   const [extensionVariant, setExtensionVariant] = useState<string>("ANYWHERE");
   const [useFullExtension, setUseFullExtension] = useState<boolean>(false);
+  const [roundUpOptionB, setRoundUpOptionB] = useState<boolean>(false);
+  const [optionBMonths, setOptionBMonths] = useState<number | null>(null);
 
   // Start Date State
   const [useStartDate, setUseStartDate] = useState<boolean>(false);
@@ -220,6 +251,8 @@ const App: React.FC = () => {
     setExtensionFPI(null);
     setExtensionVariant("ANYWHERE");
     setUseFullExtension(false);
+    setRoundUpOptionB(false);
+    setOptionBMonths(null);
     setResetKey((prev) => prev + 1);
 
     setStartMonthYear(new Date().toISOString().slice(0, 7));
@@ -257,6 +290,19 @@ const App: React.FC = () => {
     });
   };
 
+  const maxPartialMonths = selectedProductIds.length > 0 
+    ? Math.max(...selectedProductIds.map(id => partialMonths[id] || 0)) 
+    : 0;
+  const canYearsBeZero = isPartialYear && maxPartialMonths >= 6;
+  const minYears = canYearsBeZero ? 0 : 1;
+  const uiGlobalSafeYears = Math.max(1, Math.ceil((years * 12 + (isPartialYear && dealType === DealType.NEW_LOGO ? maxPartialMonths : 0)) / 12));
+
+  useEffect(() => {
+    if (years < minYears) {
+      setYears(minYears);
+    }
+  }, [years, minYears]);
+
   // Check if we need split rates (if both UTD and LXD are selected)
   const showSplitRates =
     selectedProductIds.includes("utd") && selectedProductIds.includes("lxd");
@@ -293,9 +339,12 @@ const App: React.FC = () => {
     }
   }, [dealType, midCycleStartDate]);
 
-  // EFFECT: Auto-enable rounding when Fulfillment or Partner Sourced
+  // EFFECT: Auto-enable rounding when Fulfillment or Partner Sourced, disable when Direct
   useEffect(() => {
-    if (
+    if (channel === ChannelType.DIRECT) {
+      setRounding(false);
+      setRoundUpOptionB(false);
+    } else if (
       channel === ChannelType.FULFILMENT ||
       channel === ChannelType.PARTNER_SOURCED
     ) {
@@ -369,6 +418,37 @@ const App: React.FC = () => {
   };
 
   // Derived Config
+
+  const loadConfig = (loadedConfig: any) => {
+    if (loadedConfig.dealType !== undefined) setDealType(loadedConfig.dealType);
+    if (loadedConfig.channel !== undefined) setChannel(loadedConfig.channel);
+    if (loadedConfig.selectedProducts !== undefined) setSelectedProductIds(loadedConfig.selectedProducts);
+    if (loadedConfig.productInputs !== undefined) setProductInputs(loadedConfig.productInputs);
+    if (loadedConfig.years !== undefined) setYears(loadedConfig.years);
+    if (loadedConfig.isPartialYear !== undefined) setIsPartialYear(loadedConfig.isPartialYear);
+    if (loadedConfig.partialMonths !== undefined) setPartialMonths(loadedConfig.partialMonths);
+    if (loadedConfig.method !== undefined) setMethod(loadedConfig.method);
+    if (loadedConfig.productMethods !== undefined) setProductMethods(loadedConfig.productMethods);
+    if (loadedConfig.applyWHT !== undefined) setApplyWHT(loadedConfig.applyWHT);
+    if (loadedConfig.flatPricing !== undefined) setFlatPricing(loadedConfig.flatPricing);
+    if (loadedConfig.rounding !== undefined) setRounding(loadedConfig.rounding);
+    if (loadedConfig.useStartDate !== undefined) setUseStartDate(loadedConfig.useStartDate);
+    if (loadedConfig.startMonthYear !== undefined) setStartMonthYear(loadedConfig.startMonthYear);
+    if (loadedConfig.extensionOption !== undefined) setExtensionOption(loadedConfig.extensionOption);
+    if (loadedConfig.expiringTerm !== undefined) setExpiringTerm(loadedConfig.expiringTerm);
+    if (loadedConfig.expiringTCV !== undefined) setExpiringTCV(loadedConfig.expiringTCV);
+    if (loadedConfig.currentSpend !== undefined) setCurrentSpend(loadedConfig.currentSpend);
+    if (loadedConfig.extensionPercentage !== undefined) setExtensionPercentage(loadedConfig.extensionPercentage);
+    if (loadedConfig.extensionFPI !== undefined) setExtensionFPI(loadedConfig.extensionFPI);
+    if (loadedConfig.extensionVariant !== undefined) setExtensionVariant(loadedConfig.extensionVariant);
+    if (loadedConfig.useFullExtension !== undefined) setUseFullExtension(loadedConfig.useFullExtension);
+    if (loadedConfig.roundUpOptionB !== undefined) setRoundUpOptionB(loadedConfig.roundUpOptionB);
+    if (loadedConfig.optionBMonths !== undefined) setOptionBMonths(loadedConfig.optionBMonths);
+    if (loadedConfig.applyAnnualRate !== undefined) setApplyAnnualRate(loadedConfig.applyAnnualRate);
+    
+    // Reset key to force child components to update
+    setResetKey(prev => prev + 1);
+  };
   const config: DealConfiguration = useMemo(() => {
     // Determine effective structure rates based on toggle
     // For MYFPI in Renewal, we check applyAnnualRate. For MYPP, we always apply the rate.
@@ -383,10 +463,16 @@ const App: React.FC = () => {
     const effUtd = getEffRate("utd", utdRateVal);
     const effLxd = getEffRate("lxd", lxdRateVal);
 
+    const maxPMonths = selectedProductIds.length > 0 
+      ? Math.max(...selectedProductIds.map(id => partialMonths[id] || 0)) 
+      : 0;
+    const maxTotalMonths = years * 12 + (isPartialYear && dealType === DealType.NEW_LOGO ? maxPMonths : 0);
+    const globalSafeYears = Math.max(1, Math.ceil(maxTotalMonths / 12));
+
     // Generate arrays based on effective single input values (Structure Rates)
-    const rates = generateRateArray(effGlobal, years);
-    const utdRates = generateRateArray(effUtd, years);
-    const lxdRates = generateRateArray(effLxd, years);
+    const rates = generateRateArray(effGlobal, globalSafeYears);
+    const utdRates = generateRateArray(effUtd, globalSafeYears);
+    const lxdRates = generateRateArray(effLxd, globalSafeYears);
 
     const productRates: Record<string, number[]> = {};
     if (showSplitRates) {
@@ -420,6 +506,8 @@ const App: React.FC = () => {
       selectedProducts: selectedProductIds,
       productInputs,
       years,
+      isPartialYear,
+      partialMonths,
       method,
       productMethods,
       rates,
@@ -438,6 +526,8 @@ const App: React.FC = () => {
       extensionFPI,
       extensionVariant,
       useFullExtension,
+      roundUpOptionB,
+      optionBMonths,
       midCycleExpiryDate,
       midCycleStartDate,
       midCycleWHT,
@@ -452,6 +542,8 @@ const App: React.FC = () => {
     selectedProductIds,
     productInputs,
     years,
+    isPartialYear,
+    partialMonths,
     method,
     productMethods,
     globalRateVal,
@@ -475,6 +567,8 @@ const App: React.FC = () => {
     extensionFPI,
     extensionVariant,
     useFullExtension,
+    roundUpOptionB,
+    optionBMonths,
     midCycleExpiryDate,
     midCycleStartDate,
     midCycleWHT,
@@ -492,10 +586,13 @@ const App: React.FC = () => {
 
     const fetchPricing = async () => {
       try {
+        const { data: { session } } = await supabase.auth.getSession();
         const res = await fetch("/api/calculate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session?.access_token}`
+          },
           body: JSON.stringify(config),
         });
         if (res.ok) {
@@ -518,15 +615,23 @@ const App: React.FC = () => {
   // Extension Quote Logic
   const extensionResults = results?.extensionResults;
 
+  const isUtdExtensionVariant = useMemo(() => {
+    if (!extensionVariant) return true;
+    const v = extensionVariant.toUpperCase();
+    return ['ANYWHERE', 'UTDADV', 'UTDEE', 'UTDEE-EAI', 'SM'].includes(v) || v.startsWith('UTD');
+  }, [extensionVariant]);
+
+  const defaultOptionBFPI = isUtdExtensionVariant ? 8.0 : 5.0;
+
   const currentFpiVal = useMemo(() => {
     if (extensionOption === "A") {
       return extensionFPI !== null
         ? extensionFPI
         : extensionResults?.fpiPercentage ?? 0;
     } else {
-      return extensionFPI !== null ? extensionFPI : 0;
+      return extensionFPI !== null ? extensionFPI : defaultOptionBFPI;
     }
-  }, [extensionOption, extensionFPI, extensionResults]);
+  }, [extensionOption, extensionFPI, extensionResults, defaultOptionBFPI]);
 
   const extensionRequiresFinanceApproval = useMemo(() => {
     if (!isExtensionQuote) return false;
@@ -537,7 +642,7 @@ const App: React.FC = () => {
   const utdEeWarning = useMemo(() => {
     if (selectedProductIds.includes("utd")) {
       const inputs = productInputs["utd"];
-      if (inputs.variant === "UTDEE") {
+      if (inputs.variant?.includes("UTDEE")) {
         // Check Year 1 Gross USD for UTD
         // We can find it in yearlyResults[0].breakdown
         const utdY1 = results?.yearlyResults?.[0]?.breakdown.find(
@@ -668,11 +773,11 @@ const App: React.FC = () => {
         },
       };
 
-      // Specific Logic: If UTD Variant becomes UTDEE or UTDEE-EAI, enforce min count 90
+      // Specific Logic: If UTD Variant becomes UTDEE or UTDEE (265), enforce min count 90
       if (
         id === "utd" &&
         field === "variant" &&
-        (value === "UTDEE" || value === "UTDEE-EAI")
+        (value === "UTDEE" || value === "UTDEE (265)")
       ) {
         if (newState["utd"].count < 90) {
           newState["utd"].count = 90;
@@ -701,8 +806,8 @@ const App: React.FC = () => {
         // If existing changes, reset target variant to match existing initially
         // to avoid invalid combinations.
         // EXCEPTION: If Existing is UTDEE, Target must be UTDEE
-        if (value === "UTDEE") {
-          newState[id].variant = "UTDEE";
+        if (typeof value === "string" && value.includes("UTDEE")) {
+          newState[id].variant = value as string;
           if (id === "utd") {
             setUtdRateVal(8);
             if (newState[id].eaiActivation === true || newState[id].eaiActivation === undefined) {
@@ -734,7 +839,7 @@ const App: React.FC = () => {
 
       if (id === "utd" && field === "count") {
         const currentCount = prevInput.count;
-        if (prevInput.variant === "UTDEE" && currentCount < 90) {
+        if (prevInput.variant?.includes("UTDEE") && currentCount < 90) {
           newState["utd"].variant = "UTDADV";
           setNotification(
             "Variant switched to UTD Advanced (UTD EE requires 90+ HC)",
@@ -759,14 +864,14 @@ const App: React.FC = () => {
     existingVariant: string,
   ) => {
     if (productId === "utd") {
-      if (existingVariant === "UTDEE-EAI") return ["UTDEE-EAI"];
-      if (existingVariant === "UTDEE") return ["UTDEE", "UTDEE-EAI"];
+      if (existingVariant === "UTDEE (265)") return ["UTDEE (265)"];
+      if (existingVariant === "UTDEE") return ["UTDEE", "UTDEE (265)"];
 
       // Anywhere -> Anywhere, Adv, EE, EE-EAI
       if (existingVariant === "ANYWHERE")
-        return ["ANYWHERE", "UTDADV", "UTDEE", "UTDEE-EAI"];
+        return ["ANYWHERE", "UTDADV", "UTDEE", "UTDEE (265)"];
       // Adv -> Adv, EE, EE-EAI
-      if (existingVariant === "UTDADV") return ["UTDADV", "UTDEE", "UTDEE-EAI"];
+      if (existingVariant === "UTDADV") return ["UTDADV", "UTDEE", "UTDEE (265)"];
     }
     if (productId === "lxd") {
       if (existingVariant === "BASE PKG")
@@ -813,26 +918,36 @@ const App: React.FC = () => {
       </label>
       <div className="flex items-center">
         <div
-          className={`flex items-center border ${colorClass} dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 w-32 h-9`}
+          className={`flex items-center border ${colorClass} dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 w-36 h-9`}
         >
           <button
             type="button"
-            onClick={() => onChange(value - 1)}
+            onClick={() => onChange(parseFloat(Math.max(0, value - 1).toFixed(1)))}
             className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
           >
             -
           </button>
           <input
             type="number"
-            step="1"
+            step="0.1"
             value={value}
-            onChange={(e) => onChange(parseInt(e.target.value) || 0)}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === '') {
+                onChange(0);
+              } else {
+                const parsed = parseFloat(val);
+                if (!isNaN(parsed)) {
+                  onChange(parsed);
+                }
+              }
+            }}
             className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
             style={{ appearance: "textfield", MozAppearance: "textfield" }}
           />
           <button
             type="button"
-            onClick={() => onChange(value + 1)}
+            onClick={() => onChange(parseFloat((value + 1).toFixed(1)))}
             className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
           >
             +
@@ -882,14 +997,33 @@ const App: React.FC = () => {
   }
 
   return (
-    <Layout>
+    <Layout onLogout={handleLogout} userName={userProfile ? `${userProfile.first_name || ""} ${userProfile.last_name || ""}`.trim() : ""} onProfileClick={() => setIsProfileModalOpen(true)}>
+      <ProfileModal 
+        isOpen={isProfileModalOpen} 
+        onClose={() => setIsProfileModalOpen(false)} 
+        userProfile={userProfile} 
+        onSave={(newProfile) => {
+          setUserProfile(newProfile);
+          const fullName = [newProfile.first_name, newProfile.last_name].filter(Boolean).join(' ');
+          if (fullName) localStorage.setItem('wk_rep_name', fullName);
+          if (newProfile.quote_email) localStorage.setItem('wk_rep_email', newProfile.quote_email);
+          if (newProfile.phone) localStorage.setItem('wk_rep_phone', newProfile.phone);
+        }} 
+      />
       {notification && (
         <div className="fixed top-4 right-4 z-50 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded shadow-lg animate-fade-in-down">
           <p className="font-bold">Notice</p>
           <p>{notification}</p>
         </div>
       )}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
+      
+        <QuotesManager 
+          currentConfig={config} 
+          currentResults={results} 
+          customerName={customerName}
+          onLoadQuote={loadConfig} 
+        />
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
         {/* Left Column: Configuration */}
         <div className="xl:col-span-1 space-y-6">
           {/* Section 1: Deal Basics */}
@@ -1084,19 +1218,98 @@ const App: React.FC = () => {
                 )}
 
                 {extensionOption === "B" && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                      Uplift FPI%
-                    </label>
-                    <UpliftFpiInput
-                      value={extensionFPI !== null ? extensionFPI : 0}
-                      onChange={setExtensionFPI}
-                    />
-                    {extensionRequiresFinanceApproval && (
-                      <div className="mt-1 text-[10px] font-bold text-red-600 dark:text-red-400 animate-pulse">
-                        Requires Finance approval
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Uplift FPI%
+                      </label>
+                      <UpliftFpiInput
+                        value={extensionFPI !== null ? extensionFPI : defaultOptionBFPI}
+                        onChange={setExtensionFPI}
+                      />
+                      {extensionRequiresFinanceApproval && (
+                        <div className="mt-1 text-[10px] font-bold text-red-600 dark:text-red-400 animate-pulse">
+                          Requires Finance approval
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Extension Duration (Months)
+                      </label>
+                      <div className="flex items-center space-x-2 select-none">
+                        <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 overflow-hidden w-36 h-9">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = optionBMonths !== null ? optionBMonths : (extensionResults?.monthsCovered || 1);
+                              setOptionBMonths(Math.max(1, current - 1));
+                            }}
+                            className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 font-bold text-lg cursor-pointer"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="1"
+                            value={optionBMonths !== null ? optionBMonths : (extensionResults?.monthsCovered || '')}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '') {
+                                setOptionBMonths(null);
+                              } else {
+                                const parsed = parseInt(val, 10);
+                                if (!isNaN(parsed) && parsed >= 1) {
+                                  setOptionBMonths(parsed);
+                                }
+                              }
+                            }}
+                            placeholder={String(extensionResults?.monthsCovered || 'Auto')}
+                            className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
+                            style={{ appearance: "textfield", MozAppearance: "textfield" }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = optionBMonths !== null ? optionBMonths : (extensionResults?.monthsCovered || 1);
+                              setOptionBMonths(current + 1);
+                            }}
+                            className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 font-bold text-lg cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setOptionBMonths(null)}
+                          className="text-xs text-blue-600 dark:text-blue-400 hover:underline hover:text-blue-800 font-medium select-none"
+                        >
+                          Auto
+                        </button>
                       </div>
-                    )}
+                      <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                        Max threshold: {extensionResults?.monthsAvailable ? extensionResults.monthsAvailable.toFixed(2) : 'N/A'} months
+                        {optionBMonths !== null && optionBMonths > (extensionResults?.monthsAvailable || 0) && (
+                          <span className="text-red-500 font-bold ml-1">(&gt; 100K SAR threshold)</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className={`flex items-center pt-2 border-t border-gray-100 dark:border-gray-700 ${!isIndirect ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                      <input
+                        id="round-up-option-b-checkbox"
+                        type="checkbox"
+                        disabled={!isIndirect}
+                        checked={isIndirect ? roundUpOptionB : false}
+                        onChange={(e) => setRoundUpOptionB(e.target.checked)}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600 cursor-pointer disabled:cursor-not-allowed"
+                      />
+                      <label
+                        htmlFor="round-up-option-b-checkbox"
+                        className={`ml-2 text-xs font-semibold select-none ${!isIndirect ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}
+                      >
+                        Round up value (Option B) {!isIndirect && "(Disabled for Direct)"}
+                      </label>
+                    </div>
                   </div>
                 )}
 
@@ -1269,7 +1482,7 @@ const App: React.FC = () => {
                       const isUTDEE =
                         isUTDSelected &&
                         (currentUTDVariant === "UTDEE" ||
-                          currentUTDVariant === "UTDEE-EAI");
+                          currentUTDVariant === "UTDEE (265)");
                       const isLXDComboVariant =
                         product.id === "lxd" &&
                         input.variant.includes("EE-Combo");
@@ -1737,19 +1950,20 @@ const App: React.FC = () => {
                       <div className="mt-1 flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 h-9">
                         <button
                           type="button"
-                          onClick={() => setYears(Math.max(1, years - 1))}
+                          onClick={() => setYears(Math.max(minYears, years - 1))}
                           className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none"
                         >
                           -
                         </button>
                         <input
                           type="number"
-                          min="1"
+                          min={minYears}
                           max="7"
                           value={years}
-                          onChange={(e) =>
-                            setYears(parseInt(e.target.value) || 1)
-                          }
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            setYears(isNaN(val) ? minYears : Math.max(minYears, val));
+                          }}
                           className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
                           style={{
                             appearance: "textfield",
@@ -1875,6 +2089,79 @@ const App: React.FC = () => {
                       )}
                     </div>
                   </div>
+                  
+                  {dealType === DealType.NEW_LOGO && selectedProductIds.length > 0 && (
+                    <div className="mt-4 p-4 border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 rounded-md">
+                      <div className="flex items-center mb-3">
+                        <input
+                          id="partial-year-checkbox"
+                          type="checkbox"
+                          checked={isPartialYear}
+                          onChange={(e) => setIsPartialYear(e.target.checked)}
+                          className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                        />
+                        <label
+                          htmlFor="partial-year-checkbox"
+                          className="ml-2 text-sm font-medium text-amber-800 dark:text-amber-200 flex items-center"
+                        >
+                          Partial-year deal <span className="ml-2 text-xs font-normal opacity-80">(Requires exception form)</span>
+                        </label>
+                      </div>
+                      
+                      {isPartialYear && (
+                        <div className="flex space-x-4">
+                          {selectedProductIds.map(prodId => (
+                            <div key={prodId} className="flex-1">
+                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 uppercase mb-1">
+                                {prodId} Extra Months
+                              </label>
+                              <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 h-9">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const current = partialMonths[prodId] || 0;
+                                    setPartialMonths({ ...partialMonths, [prodId]: Math.max(0, current - 1) });
+                                  }}
+                                  className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="11"
+                                  value={partialMonths[prodId] || 0}
+                                  onChange={(e) => {
+                                    const v = parseInt(e.target.value) || 0;
+                                    setPartialMonths({ ...partialMonths, [prodId]: Math.min(11, Math.max(0, v)) });
+                                  }}
+                                  className="w-full h-full text-center text-sm p-0 bg-transparent text-gray-900 dark:text-white outline-none tabular-nums"
+                                  style={{ appearance: "textfield", MozAppearance: "textfield" }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const current = partialMonths[prodId] || 0;
+                                    setPartialMonths({ ...partialMonths, [prodId]: Math.min(11, current + 1) });
+                                  }}
+                                  className="w-9 h-full flex-shrink-0 flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {years === 0 && (
+                        <div className="mt-3 p-3 text-xs text-amber-700 bg-amber-100 dark:bg-amber-900/40 dark:text-amber-200 rounded flex items-center">
+                          <span className="mr-2">⚠️</span>
+                          This quote is {maxPartialMonths} months only.
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Renewal Uplift Rate (Specific for Renewal Base) - Show for ALL Renewals */}
                   {dealType === DealType.RENEWAL && (
@@ -2066,7 +2353,7 @@ const App: React.FC = () => {
                             if (productMethods.utd === PricingMethod.MYPP) {
                               const utdY1 =
                                 y1Breakdown.find((p: any) => p.id === "utd")
-                                  ?.net || 0;
+                                  ?.gross || 0;
                               if (utdY1 < 10000)
                                 alerts.push(
                                   "UTD MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.",
@@ -2075,7 +2362,7 @@ const App: React.FC = () => {
                             if (productMethods.lxd === PricingMethod.MYPP) {
                               const lxdY1 =
                                 y1Breakdown.find((p: any) => p.id === "lxd")
-                                  ?.net || 0;
+                                  ?.gross || 0;
                               if (lxdY1 < 10000)
                                 alerts.push(
                                   "LXD MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.",
@@ -2086,7 +2373,7 @@ const App: React.FC = () => {
                               selectedProductIds.forEach((pid) => {
                                 const y1 =
                                   y1Breakdown.find((p: any) => p.id === pid)
-                                    ?.net || 0;
+                                    ?.gross || 0;
                                 if (y1 < 10000) {
                                   const name =
                                     (metadata?.availableProducts || []).find(
@@ -2129,7 +2416,7 @@ const App: React.FC = () => {
                   </div>
 
                   {/* Flat Pricing Checkbox (Moved Here) */}
-                  {years > 1 && (
+                  {uiGlobalSafeYears > 1 && (
                     <div className="mt-4">
                       <div className="flex items-center">
                         <input
@@ -2155,19 +2442,20 @@ const App: React.FC = () => {
                   )}
 
                   {/* Rounding Checkbox */}
-                  <div className="flex items-center mt-2">
+                  <div className={`flex items-center mt-2 ${!isIndirect ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <input
                       id="rounding-checkbox"
                       type="checkbox"
-                      checked={rounding}
+                      disabled={!isIndirect}
+                      checked={isIndirect ? rounding : false}
                       onChange={(e) => setRounding(e.target.checked)}
-                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600 disabled:cursor-not-allowed"
                     />
                     <label
                       htmlFor="rounding-checkbox"
-                      className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+                      className={`ml-2 text-sm font-medium ${!isIndirect ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}
                     >
-                      Round up prices?
+                      Round up prices? {!isIndirect && "(Disabled for Direct)"}
                     </label>
                   </div>
                 </div>
@@ -2496,14 +2784,19 @@ const App: React.FC = () => {
                         </div>
                       </div>
                       <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800 animate-fade-in">
-                        <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">
-                          Eligible Months (&lt;100k SAR)
+                        <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans flex items-center justify-between">
+                          <span>Extension Duration</span>
+                          {optionBMonths !== null && (
+                            <span className="text-[10px] bg-blue-200 text-blue-900 dark:bg-blue-800 dark:text-blue-100 px-1.5 py-0.5 rounded font-bold">
+                              Custom
+                            </span>
+                          )}
                         </div>
                         <div className="text-xl font-bold text-blue-700 dark:text-blue-300 font-sans">
-                          {extensionResults.monthsCovered}
+                          {extensionResults.monthsCovered} months
                         </div>
                         <div className="text-[10px] text-blue-500/80 mt-1 dark:text-blue-400/80 font-mono">
-                          Exact fraction: {extensionResults.monthsAvailable?.toFixed(2)} months
+                          Exact max threshold: {extensionResults.monthsAvailable?.toFixed(2)} months
                         </div>
                       </div>
                       <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800 animate-fade-in">
@@ -2523,8 +2816,15 @@ const App: React.FC = () => {
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-blue-500 dark:border-blue-400">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
-                            End-User Price
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                              End-User Price
+                            </div>
+                            {extensionResults.roundUpOptionB && (
+                              <span className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 px-1.5 py-0.5 rounded font-semibold">
+                                Rounded Up (Nearest 1,000)
+                              </span>
+                            )}
                           </div>
                           <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
                             {formatCurrency(
@@ -2537,25 +2837,27 @@ const App: React.FC = () => {
                               <div>
                                 SAR:{" "}
                                 {formatCurrency(
-                                  extensionResults.endUserPrice * sarRate,
+                                  extensionResults.roundUpOptionB
+                                    ? Math.ceil((extensionResults.endUserPrice * sarRate) / 1000) * 1000
+                                    : extensionResults.endUserPrice * sarRate,
                                   "SAR",
                                 )}
                               </div>
                               <div>
                                 VAT (15%):{" "}
                                 {formatCurrency(
-                                  extensionResults.endUserPrice *
-                                    sarRate *
-                                    0.15,
+                                  (extensionResults.roundUpOptionB
+                                    ? Math.ceil((extensionResults.endUserPrice * sarRate) / 1000) * 1000
+                                    : extensionResults.endUserPrice * sarRate) * 0.15,
                                   "SAR",
                                 )}
                               </div>
                               <div className="font-bold text-gray-700 dark:text-gray-300">
                                 Total:{" "}
                                 {formatCurrency(
-                                  extensionResults.endUserPrice *
-                                    sarRate *
-                                    1.15,
+                                  (extensionResults.roundUpOptionB
+                                    ? Math.ceil((extensionResults.endUserPrice * sarRate) / 1000) * 1000
+                                    : extensionResults.endUserPrice * sarRate) * 1.15,
                                   "SAR",
                                 )}
                               </div>
@@ -2777,7 +3079,7 @@ const App: React.FC = () => {
                     <thead className="bg-gray-100 dark:bg-gray-700">
                       <tr>
                         <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">
-                          Year
+                          Term
                         </th>
 
                         {/* Dynamic Product Columns - Gross USD */}
@@ -2863,7 +3165,7 @@ const App: React.FC = () => {
                           }
                         >
                           <td className="px-4 py-4 text-center text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                            Year {r.year}
+                            Term {i + 1} ({r.termMonths} months)
                           </td>
 
                           {/* Product Columns Data Gross USD */}
@@ -3139,6 +3441,8 @@ const App: React.FC = () => {
             setUseStartDate={setUseStartDate}
             startMonthYear={startMonthYear}
             setStartMonthYear={setStartMonthYear}
+            customerName={customerName}
+            setCustomerName={setCustomerName}
             isExtensionQuote={isExtensionQuote}
             extensionResults={extensionResults}
             isMidCycleQuote={isMidCycleQuote}

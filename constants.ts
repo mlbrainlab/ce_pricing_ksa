@@ -1,12 +1,49 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.6.7';
+export const APP_VERSION = '6.7.0';
 
 export const CHANGELOG = [
   {
+    version: '6.7.0',
+    date: '2026-09-18',
+    changes: [
+      'Authentication Migration: Migrated away from static shared passcodes to dedicated user accounts using Supabase Auth (Email & Password).',
+      'Row-Level Security (RLS): Implemented database Row-Level Security ensuring strict isolation of user profiles and quote history.',
+      'Quotes Manager: Added Quotes Manager dashboard allowing users to save and resume drafts and finalized quotes securely to their accounts.',
+      'Profile Auto-fill: Integrated First Name, Last Name, Email, and Phone fields directly into User Profiles for automatic rendering in the Export views.'
+    ]
+  },
+  {
+    version: '6.6.10',
+    date: '2026-09-17',
+    changes: [
+      'Partial-Year Calculations: Restructured core engine to support end-loaded partial terms. Terms up to 15 months combine into a single term; exceeding terms split into full 12-month standard years followed by the remaining prorated months.',
+      'Export Enhancements: Updated commercial schedule arrays in UI, PDF, and Excel to bundle row labeling accurately. Tables now reflect "Term X (YY months)" language alongside specific date ranges in exports.'
+    ]
+  },
+  {
+    version: '6.6.9',
+    date: '2026-09-02',
+    changes: [
+      'Extension Option B: Enabled customizable Extension Duration (Months) input, allowing users to specify custom extension months below or up to the 100K SAR ex-VAT threshold.',
+      'UI & PDF Fixes: Captured selected Extension Variant titles accurately in PDF cover pages, export filenames, and PDF/Excel previews.',
+      'Annual Increase (FPI) Input: Decimal FPI rates (e.g. 5.5%, 8.2%) unlocked across all multi-year structure inputs.',
+      'Session Lock: Added header Lock button for quick one-click return to login screen.'
+    ]
+  },
+  {
+    version: '6.6.8',
+    date: '2026-07-28',
+    changes: [
+      'Extension PDF Export: Internal calculations omitted to show client values only (Product, Dates, Duration, End-User Price, VAT, Total), with optional Show Available Months/Days toggle.',
+      'Extension Option B Updates: Default Uplift FPI% set to 8.0% for UTD variants and 5.0% for LXD variants (editable), months-only Extension Duration display, and nearest-thousand value rounding (ROUNDUP to nearest 1,000).',
+      'Direct Context Safeguards: Automatically disables and greys out Round Up checkboxes for Direct channel context.'
+    ]
+  },
+  {
     version: '6.6.7',
-    date: new Date().toISOString().split('T')[0],
+    date: '2026-07-15',
     changes: [
       'Added EAI Activation toggle for UTD with a 3% uplift defaults to ON for new business and 2026 renewals.',
       'Reflected EAI inclusion silently within core FPI and List computations as per 2026 mandates.'
@@ -14,7 +51,7 @@ export const CHANGELOG = [
   },
   {
     version: '6.6.6',
-    date: new Date().toISOString().split('T')[0],
+    date: '2026-07-02',
     changes: [
       'Applying WHT on DLM and including DLM in prorated mid-cycle calculation.',
       'Adjusted mid-cycle duration calculation to prorate annual rates including DLM additions and factoring WHT into the base calculation.'
@@ -22,7 +59,7 @@ export const CHANGELOG = [
   },
   {
     version: '6.6.5',
-    date: new Date().toISOString().split('T')[0],
+    date: '2026-06-25',
     changes: [
       'Mid-Cycle Add-on Quote functionality: Added structured workflows for UTD ADV, LXD FLINK, LXD IPE, and LXD FLINK+IPE expansions, including pro-rated monthly calculations and WHT adaptations.',
       'Designated Sites UX enhancements: In-window site addition logic now arrays hospital name, clinicians, and bed count on simplified single rows.',
@@ -55,7 +92,7 @@ export const CHANGELOG = [
   },
   {
     version: '6.6.2',
-    date: new Date().toISOString().split('T')[0],
+    date: '2026-05-12',
     changes: [
       'UI: Redesigned and streamlined Export Options section.',
       'Feature: Restored and improved "Multiple Sites" list functionality allowing precise price breakdowns per site.',
@@ -247,8 +284,8 @@ export const AVAILABLE_PRODUCTS: ProductDefinition[] = [
 export const UTD_VARIANTS: Record<string, number> = {
   "ANYWHERE": 259,
   "UTDADV": 259 * 1.08,
-  "UTDEE": 265,
-  "UTDEE-EAI": 278.25,
+  "UTDEE": 210,
+  "UTDEE (265)": 265,
   "SM": 0, // Special bucket pricing
 };
 
@@ -264,9 +301,9 @@ export const LXD_VARIANTS: Record<string, number> = {
   "BASE PKG": 80,
   "BASE PKG+FLINK": 92,
   "BASE PKG+FLINK+IPE": 108,
-  "EE-Combo": 66.25, // 0.25 * 265
-  "EE-Combo+FLINK": 78.25,
-  "EE-Combo+FLINK+IPE": 94.25,
+  "EE-Combo": 52.5, // 0.25 * 210
+  "EE-Combo+FLINK": 64.5,
+  "EE-Combo+FLINK+IPE": 80.5,
   "Seats": 350,
   "Seats+FLINK": 385, // 300 + 10%
   "Seats+IPE": 420,   // 300 + 20%

@@ -67,7 +67,7 @@ export const calculatePricing = (
     channel,
     selectedProducts,
     productInputs,
-    years,
+
     method,
     productMethods,
     rates,
@@ -92,6 +92,7 @@ export const calculatePricing = (
   // --- Step 1: Calculate Year 1 Items (Base Calculation) ---
 
   const year1ProductNets: Record<string, number> = {};
+  const year1ProductGross: Record<string, number> = {};
 
   let totalRenewalBaseForACV = 0;
 
@@ -144,6 +145,8 @@ export const calculatePricing = (
           ? count * listRate
           : definition?.defaultBasePrice || 0;
     }
+
+    year1ProductGross[prodId] = baseGross;
 
     const effectiveDiscount = parseFloat(inputs.baseDiscount as any) || 0;
     let baseNet = baseGross * (1 - effectiveDiscount / 100);
@@ -224,12 +227,12 @@ export const calculatePricing = (
                 return effectiveStats * expiringRate * 1.11;
               } else if (
                 (existing === "ANYWHERE" || existing === "UTDADV") &&
-                currentTarget === "UTDEE-EAI"
+                currentTarget === "UTDEE (265)"
               ) {
                 return effectiveStats * expiringRate * 1.14;
               } else if (
                 existing === "UTDEE" &&
-                currentTarget === "UTDEE-EAI"
+                currentTarget === "UTDEE (265)"
               ) {
                 return effectiveStats * expiringRate * 1.11;
               } else {
@@ -243,14 +246,14 @@ export const calculatePricing = (
 
         // Check EE Eligibility
         let isEligibleForEE = false;
-        if (existing === "UTDEE" || existing === "UTDEE-EAI") {
+        if (existing === "UTDEE" || existing === "UTDEE (265)") {
           isEligibleForEE = true;
         } else if (pathBasedPrice > 30000) {
           isEligibleForEE = true;
         }
 
         if (
-          (target === "UTDEE" || target === "UTDEE-EAI") &&
+          (target === "UTDEE" || target === "UTDEE (265)") &&
           !isEligibleForEE
         ) {
           productNotes.push(
@@ -260,7 +263,7 @@ export const calculatePricing = (
           pathBasedPrice = calculatePriceForTarget(finalTarget);
         } else if (
           finalTarget !== "UTDEE" &&
-          finalTarget !== "UTDEE-EAI" &&
+          finalTarget !== "UTDEE (265)" &&
           isEligibleForEE
         ) {
           productNotes.push(
@@ -286,7 +289,7 @@ export const calculatePricing = (
             productNotes.push(
               `UTD: Upsell to EE (${upliftVal < 8 ? "Exception: " : ""}11% uplift recommendation applies)`,
             );
-          } else if (finalTarget === "UTDEE-EAI") {
+          } else if (finalTarget === "UTDEE (265)") {
             productNotes.push(
               `UTD: Upsell to EE-EAI (${upliftVal < 8 ? "Exception: " : ""}${existing === "UTDEE" ? "11%" : "14%"} uplift recommendation applies)`,
             );
@@ -487,25 +490,77 @@ export const calculatePricing = (
 
   // --- Step 3: Multi-Year Projection (Per Product) ---
   const productSchedules: Record<string, number[]> = {};
-  const safeYears = Math.max(0, Math.floor(Number(years) || 0));
+  
+  // Calculate global max
+  let maxTotalMonths = config.years * 12;
+  if (dealType === DealType.NEW_LOGO && config.isPartialYear) {
+    selectedProducts.forEach(prodId => {
+      const pm = config.partialMonths?.[prodId] || 0;
+      if (config.years * 12 + pm > maxTotalMonths) {
+        maxTotalMonths = config.years * 12 + pm;
+      }
+    });
+  }
+
+  // Determine row/term lengths
+  const rowLengths: number[] = [];
+  if (maxTotalMonths > 0) {
+    if (maxTotalMonths <= 15) {
+      rowLengths.push(maxTotalMonths);
+    } else {
+      let remaining = maxTotalMonths;
+      while (remaining > 0) {
+        if (remaining > 12) {
+          rowLengths.push(12);
+          remaining -= 12;
+        } else {
+          rowLengths.push(remaining);
+          remaining = 0;
+        }
+      }
+    }
+  } else {
+     rowLengths.push(12);
+  }
+  const globalRows = rowLengths.length;
+
+  // Track each product's schedule and its actual months
+  const productTotalMonths: Record<string, number> = {};
 
   selectedProducts.forEach((prodId) => {
+    let prodTotalMonths = config.years * 12;
+    if (dealType === DealType.NEW_LOGO && config.isPartialYear) {
+      prodTotalMonths += (config.partialMonths?.[prodId] || 0);
+    }
+    productTotalMonths[prodId] = prodTotalMonths;
+
     const y1Value = year1ProductNets[prodId];
-    const schedule = new Array(safeYears).fill(0);
+    const baseSchedule = new Array(globalRows).fill(0);
+    const schedule = new Array(globalRows).fill(0);
     const specificRates = productRates[prodId] || rates;
     let specificMethod = productMethods?.[prodId] || method;
 
-    if (specificMethod === PricingMethod.MYPP && y1Value < 10000) {
+    const y1GrossForMYPP = year1ProductGross[prodId];
+
+    if (specificMethod === PricingMethod.MYPP && y1GrossForMYPP < 10000) {
       specificMethod = PricingMethod.MYFPI;
       productNotes.push(
         `${prodId.toUpperCase()} MYPP requires $10,000 minimum Y1 value. Reverted to MYFPI.`,
       );
     }
 
+    const isPartialYearAgreement = prodTotalMonths > 0 && prodTotalMonths % 12 !== 0;
+    if (specificMethod === PricingMethod.MYPP && isPartialYearAgreement) {
+      specificMethod = PricingMethod.MYFPI;
+      productNotes.push(
+        `${prodId.toUpperCase()} MYPP is not allowed for partial-year agreements. Reverted to MYFPI.`,
+      );
+    }
+
     if (specificMethod === PricingMethod.MYPP && dealType === DealType.RENEWAL) {
       const expiring = productInputs[prodId]?.expiringAmount || 0;
       let tempY1 = y1Value;
-      for (let i = years - 2; i >= 0; i--) {
+      for (let i = globalRows - 2; i >= 0; i--) {
         const discountRate = specificRates[i + 1] || 0;
         tempY1 = tempY1 / (1 + discountRate / 100);
       }
@@ -518,35 +573,56 @@ export const calculatePricing = (
     }
 
     if (specificMethod === PricingMethod.MYFPI) {
-      schedule[0] = y1Value;
-      for (let i = 1; i < years; i++) {
+      baseSchedule[0] = y1Value;
+      for (let i = 1; i < globalRows; i++) {
         const rate = specificRates[i] || 0;
-        schedule[i] = schedule[i - 1] * (1 + rate / 100);
+        baseSchedule[i] = baseSchedule[i - 1] * (1 + rate / 100);
       }
     } else {
-      schedule[years - 1] = y1Value;
-      for (let i = years - 2; i >= 0; i--) {
+      baseSchedule[globalRows - 1] = y1Value;
+      for (let i = globalRows - 2; i >= 0; i--) {
         const discountRate = specificRates[i + 1] || 0;
-        schedule[i] = schedule[i + 1] / (1 + discountRate / 100);
+        baseSchedule[i] = baseSchedule[i + 1] / (1 + discountRate / 100);
       }
     }
+
+    // Allocate base schedule to rows proportionally
+    let cumulative = 0;
+    for (let i = 0; i < globalRows; i++) {
+      const activeMonths = Math.max(0, Math.min(rowLengths[i], prodTotalMonths - cumulative));
+      schedule[i] = baseSchedule[i] * (activeMonths / 12);
+      cumulative += rowLengths[i];
+    }
+
     productSchedules[prodId] = schedule;
   });
 
-  if (flatPricing && years > 1) {
+  if (flatPricing && globalRows > 1) {
     selectedProducts.forEach((prodId) => {
       const schedule = productSchedules[prodId];
-      const totalPeriodCost = schedule.reduce((acc, val) => acc + val, 0);
-      const averageAnnual = safeYears > 0 ? totalPeriodCost / safeYears : 0;
-      productSchedules[prodId] = new Array(safeYears).fill(averageAnnual);
+      const prodTotalMonths = productTotalMonths[prodId];
+      
+      let totalPeriodCost = 0;
+      for (let i = 0; i < globalRows; i++) totalPeriodCost += schedule[i];
+
+      const averageMonthly = prodTotalMonths > 0 ? totalPeriodCost / prodTotalMonths : 0;
+      
+      let cumulative = 0;
+      for (let i = 0; i < globalRows; i++) {
+        const activeMonths = Math.max(0, Math.min(rowLengths[i], prodTotalMonths - cumulative));
+        schedule[i] = averageMonthly * activeMonths;
+        cumulative += rowLengths[i];
+      }
+      productSchedules[prodId] = schedule;
     });
   }
 
   if (rounding) {
     selectedProducts.forEach((prodId) => {
       const schedule = productSchedules[prodId];
-      for (let i = 0; i < years; i++) {
+      for (let i = 0; i < globalRows; i++) {
         const val = schedule[i];
+        if (val === 0) continue;
         if (channel === ChannelType.DIRECT) {
           schedule[i] = Math.ceil(val / 100) * 100;
         } else {
@@ -570,13 +646,13 @@ export const calculatePricing = (
   const productNetTotals: Record<string, number> = {};
   selectedProducts.forEach((p) => (productNetTotals[p] = 0));
 
-  for (let i = 0; i < years; i++) {
+  for (let i = 0; i < globalRows; i++) {
     const breakdown: ProductYearlyData[] = [];
     let yearSum = 0;
     const netFactor = getNetFactor(dealType, channel, i);
 
     selectedProducts.forEach((prodId) => {
-      const val = productSchedules[prodId][i];
+      const val = productSchedules[prodId][i] || 0; // fallback to 0 if out of bounds
       yearSum += val;
       const netVal = val * netFactor;
       breakdown.push({
@@ -596,6 +672,7 @@ export const calculatePricing = (
 
     yearlyResults.push({
       year: i + 1,
+      termMonths: rowLengths[i],
       breakdown,
       grossUSD: yearSum,
       grossSAR: yearGrossSAR,
@@ -617,8 +694,25 @@ export const calculatePricing = (
     totalNetSAR += recognizedSAR;
   }
 
-  const acvUSD = totalTCV / years;
-  const netACV = totalNetUSD / years;
+  // Calculate ACV by summing up each product's ACV independently
+  let acvUSD = 0;
+  let netACV = 0;
+  selectedProducts.forEach(prodId => {
+    const prodTotalMonths = productTotalMonths[prodId];
+    const prodDivisor = Math.max(0.01, prodTotalMonths / 12);
+    
+    let prodGross = 0;
+    let prodNet = 0;
+    for (let i = 0; i < globalRows; i++) {
+       const val = productSchedules[prodId][i] || 0;
+       prodGross += val;
+       prodNet += val * getNetFactor(dealType, channel, i);
+    }
+    
+    acvUSD += prodGross / prodDivisor;
+    netACV += prodNet / prodDivisor;
+  });
+
   let upsellACV = 0;
   if (dealType === DealType.RENEWAL)
     upsellACV = Math.max(0, acvUSD - totalRenewalBaseForACV);
@@ -697,13 +791,27 @@ export const calculatePricing = (
       }
     } else {
       const maxSARExVAT = 100000 / 1.15;
-      const fpiPercentage = config.extensionFPI ?? 0;
+      const isUtdVar = ['ANYWHERE', 'UTDADV', 'UTDEE', 'UTDEE-EAI', 'SM'].includes((config.extensionVariant || '').toUpperCase()) || (config.extensionVariant || '').toUpperCase().startsWith('UTD');
+      const defaultFpi = isUtdVar ? 8.0 : 5.0;
+      const fpiPercentage = (config.extensionFPI !== undefined && config.extensionFPI !== null) ? config.extensionFPI : defaultFpi;
       const effectiveSpend = (config.currentSpend || 0) * (1 + (fpiPercentage / 100));
       const monthlyCost = effectiveSpend / 12;
       const monthlyCostSAR = monthlyCost * EXCHANGE_RATE_SAR;
       const monthsAvailable = monthlyCostSAR > 0 ? (maxSARExVAT / monthlyCostSAR) : 0;
-      const monthsCovered = Math.floor(monthsAvailable);
-      const endUserPrice = monthsCovered * monthlyCost;
+      const maxIntegerMonths = Math.floor(monthsAvailable);
+      const monthsCovered = (config.optionBMonths !== undefined && config.optionBMonths !== null && config.optionBMonths > 0)
+        ? config.optionBMonths
+        : maxIntegerMonths;
+      let endUserPrice = monthsCovered * monthlyCost;
+      if (config.roundUpOptionB) {
+        if (channel !== ChannelType.DIRECT) {
+          const rawSAR = endUserPrice * EXCHANGE_RATE_SAR;
+          const roundedSAR = Math.ceil(rawSAR / 1000) * 1000;
+          endUserPrice = roundedSAR / EXCHANGE_RATE_SAR;
+        } else {
+          endUserPrice = Math.ceil(endUserPrice / 1000) * 1000;
+        }
+      }
       results.extensionResults = {
         type: "B",
         variant: config.extensionVariant,
@@ -714,10 +822,12 @@ export const calculatePricing = (
         monthlyCostSAR,
         monthsAvailable,
         monthsCovered,
+        optionBMonthsCustom: config.optionBMonths || null,
         maxSARExVAT,
         endUserPrice,
         commission: endUserPrice * (1 - netFactor),
         netPrice: endUserPrice * netFactor,
+        roundUpOptionB: config.roundUpOptionB,
       };
     }
   }

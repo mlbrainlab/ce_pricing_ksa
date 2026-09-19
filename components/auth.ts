@@ -1,21 +1,13 @@
-export async function verifyPasscode(passcode: string): Promise<boolean> {
-  try {
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ passcode })
-    });
-    return res.ok;
-  } catch (error) {
-    console.error('Login error:', error);
-    return false;
-  }
-}
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY || '';
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function logout(): Promise<void> {
   try {
-    await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+    await supabase.auth.signOut();
   } catch (error) {
     console.error('Logout error:', error);
   }

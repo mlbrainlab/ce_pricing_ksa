@@ -20,7 +20,7 @@ async function startServer() {
     }
 
     if (!process.env.VERCEL) {
-        const PORT = 3000;
+        const PORT = 7010;
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`Server running on port ${PORT}`);
         });

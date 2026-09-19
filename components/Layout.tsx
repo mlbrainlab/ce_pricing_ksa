@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { APP_VERSION, CHANGELOG } from '../constants';
 
-export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void; userName?: string; onProfileClick?: () => void; }> = ({ children, onLogout, userName, onProfileClick }) => {
   const [themePref, setThemePref] = useState<'light' | 'dark' | 'system'>('system');
   const [mounted, setMounted] = useState(false);
   const [showReleaseAlert, setShowReleaseAlert] = useState(false);
@@ -100,6 +100,18 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  aria-label="Lock Session (Return to Login)"
+                  title="Lock Session / Return to Login"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </button>
+              )}
               <button
                 onClick={openReleaseModal}
                 className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
@@ -133,8 +145,11 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 )}
               </button>
             </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 font-medium hidden sm:block">
-              CE Pricing Architect
+            <div 
+              className="text-sm text-blue-600 dark:text-blue-400 font-medium hidden sm:block hover:underline cursor-pointer"
+              onClick={onProfileClick}
+            >
+              {userName || "CE Pricing Architect"}
             </div>
           </div>
         </div>

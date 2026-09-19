@@ -12,6 +12,8 @@ import { WK_LOGO_BASE64 } from '../wkLogo';
 import { EAI_LOGO_BASE64 } from '../eaiLogo';
 
 interface ExportSectionProps {
+  customerName: string;
+  setCustomerName: (val: string) => void;
   data: CalculationOutput;
   config: DealConfiguration;
   useStartDate: boolean;
@@ -68,10 +70,9 @@ const formatMoney = (amount: number, currency: string) => {
 
 export const ExportSection: React.FC<ExportSectionProps> = ({ 
   data, config, useStartDate, setUseStartDate, startMonthYear, setStartMonthYear,
-  isExtensionQuote, extensionResults, isMidCycleQuote, renewalNotes = []
+  isExtensionQuote, extensionResults, isMidCycleQuote, renewalNotes = [], customerName, setCustomerName
 }) => {
-  const [customerName, setCustomerName] = useState('');
-  const [repName, setRepName] = useState(() => localStorage.getItem('wk_rep_name') || '');
+    const [repName, setRepName] = useState(() => localStorage.getItem('wk_rep_name') || '');
   const [repPhone, setRepPhone] = useState(() => localStorage.getItem('wk_rep_phone') || '');
   const [repEmail, setRepEmail] = useState(() => localStorage.getItem('wk_rep_email') || '');
   const [isPdfLoading, setIsPdfLoading] = useState(false);
@@ -105,6 +106,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   
   const canShowFLinkIntegration = config.selectedProducts.includes('utd') && config.selectedProducts.includes('lxd') && (config.productInputs['lxd']?.variant || '').includes('FLINK');
   const [showFLinkIntegration, setShowFLinkIntegration] = useState(false);
+  const [showAvailableMonths, setShowAvailableMonths] = useState(false);
 
   const [hasDesignatedSites, setHasDesignatedSites] = useState(false);
   const [designatedSites, setDesignatedSites] = useState('');
@@ -135,11 +137,17 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     setBulkPasteText('');
   };
 
+  const hasPartialMonths = config.dealType === DealType.NEW_LOGO && config.isPartialYear && Object.values(config.partialMonths || {}).some(v => v > 0);
+
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
   const [previewFilename, setPreviewFilename] = useState<string>('');
 
   const handlePDFPreview = async () => {
+    if (hasPartialMonths && (!useStartDate || !startMonthYear)) {
+      alert("Start Date is mandatory for partial-year New Logo deals.");
+      return;
+    }
     if (!customerName.trim()) { alert("Please enter a Customer Name before previewing."); return; }
     setIsPreviewModalOpen(true);
     await refreshPreview();
@@ -162,9 +170,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     if (isPreviewModalOpen) {
         refreshPreview();
     }
-  }, [showStats, showMonthlyCost, showTotals, showEmrIntegration, hasOptOutClause, showFLinkIntegration, hasDesignatedSites, useStartDate, includeRenewalIncreaseInfo, designatedSites, siteBreakdown, isBreakdownPerSite, showSitesOnly, customerName, repName, repEmail, repPhone]);
+  }, [showStats, showMonthlyCost, showTotals, showEmrIntegration, hasOptOutClause, showFLinkIntegration, showAvailableMonths, hasDesignatedSites, useStartDate, includeRenewalIncreaseInfo, designatedSites, siteBreakdown, isBreakdownPerSite, showSitesOnly, customerName, repName, repEmail, repPhone]);
 
   const handlePDFExport = () => {
+    if (hasPartialMonths && (!useStartDate || !startMonthYear)) {
+      alert("Start Date is mandatory for partial-year New Logo deals.");
+      return;
+    }
     if (!customerName.trim()) { alert("Please enter a Customer Name before exporting."); return; }
     if (config.channel === ChannelType.PARTNER_SOURCED) { executePDFExport(true); } 
     else if (config.channel === ChannelType.FULFILMENT) { setShowCpModal(true); } 
@@ -304,10 +316,17 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     if (isMidCycleQuote) {
         hasUTD = config.midCycleProduct === 'UTD_ADV';
         hasLXD = config.midCycleProduct?.startsWith('LXD_') ?? false;
+    } else if (isExtensionQuote) {
+        const extVar = (config.extensionVariant || extensionResults?.variant || '').toUpperCase();
+        const isUtd = ['ANYWHERE', 'UTDADV', 'UTDEE', 'UTDEE-EAI', 'SM'].includes(extVar) || extVar.startsWith('UTD');
+        hasUTD = isUtd;
+        hasLXD = !isUtd;
     }
     
     if (hasUTD) {
-        const variant = isMidCycleQuote ? 'UTDADV' : (config.productInputs['utd']?.variant || '');
+        let variant = config.productInputs['utd']?.variant || '';
+        if (isMidCycleQuote) variant = 'UTDADV';
+        if (isExtensionQuote) variant = config.extensionVariant || extensionResults?.variant || '';
         let title = "UpToDate\u00AE";
         if (variant === 'ANYWHERE') title = "UpToDate\u00AE Anywhere";
         if (variant === 'UTDADV') title = "UpToDate\u00AE Advanced";
@@ -336,6 +355,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     if (hasLXD) {
         let variant = config.productInputs['lxd']?.variant || '';
         if (isMidCycleQuote) variant = config.midCycleProduct?.replace('LXD_', '') || '';
+        if (isExtensionQuote) variant = config.extensionVariant || extensionResults?.variant || '';
         let subHeading = "Drug Referential Solution";
         if (variant.includes('FLINK')) subHeading = variant.includes('IPE') ? "including Formulink\u2122 and Integrated Patient Education" : "including Formulink\u2122";
         
@@ -405,15 +425,26 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     doc.setFontSize(16); doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFont(fontName, 'bold'); doc.text(isExtensionQuote ? "Extension Quote Details" : "Pricing Details", 14, 45);
 
-    const getYearLabel = (yearIndex: number) => {
+    const getTermLabel = (r: PricingResult, resultIndex: number, allResults: PricingResult[]) => {
+        const termLabel = `Term ${resultIndex + 1} (${r.termMonths} months)`;
         if (useStartDate && startMonthYear) {
             const [yearStr, monthStr] = startMonthYear.split('-');
-            const start = new Date(parseInt(yearStr) + yearIndex, parseInt(monthStr) - 1, 1);
-            const end = new Date(start); end.setFullYear(end.getFullYear() + 1); end.setDate(end.getDate() - 1);
+            const start = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
+            
+            let monthsBefore = 0;
+            for (let i = 0; i < resultIndex; i++) {
+                monthsBefore += allResults[i].termMonths || 12;
+            }
+            start.setMonth(start.getMonth() + monthsBefore);
+            
+            const end = new Date(start);
+            end.setMonth(end.getMonth() + (r.termMonths || 12));
+            end.setDate(end.getDate() - 1);
+            
             const formatD = (d: Date) => { const mo = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; return `${mo[d.getMonth()]} ${d.getDate().toString().padStart(2, '0')}, ${d.getFullYear()}`; };
-            return `Year ${yearIndex + 1}:\n${formatD(start)} to ${formatD(end)}`;
+            return `${termLabel}\n${formatD(start)} to ${formatD(end)}`;
         }
-        return `Year ${yearIndex + 1}`;
+        return termLabel;
     };
 
     let tableHead: string[][] = []; let tableBody: string[][] = []; const columnStyles: any = {};
@@ -431,37 +462,64 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     };
 
     if (isExtensionQuote && extensionResults) {
-      if (extensionResults.type === 'A') {
-        const durationText = extensionResults.useFullExtension ? `${extensionResults.days} days (${extensionResults.integerMonths} months${extensionResults.extraDays > 0 ? ` and ${extensionResults.extraDays} days` : ''})` : `${Math.round(extensionResults.monthsAvailable * 30)} days (${extensionResults.monthsAvailable.toFixed(2)} months)`;
-        tableHead = [['Description', 'Value']];
-        tableBody = [
-          ['Product', PRODUCT_FULL_NAMES[extensionResults.variant] || extensionResults.variant],
-          ['Dates', getExtensionDates()],
-          ['Total Contract\'s Value (SAR)', formatMoney(extensionResults.customerTCV * EXCHANGE_RATE_SAR, 'SAR')],
-          ['Extension Percentage', `${extensionResults.extensionPercentage.toFixed(2)}%`],
-          ['Extension Value (SAR)', formatMoney(extensionResults.customerExtension * EXCHANGE_RATE_SAR, 'SAR')],
-          ['Current Spend of Last Year (SAR)', formatMoney(extensionResults.currentSpend * EXCHANGE_RATE_SAR, 'SAR')],
-          ['Daily Cost (SAR)', formatMoney((extensionResults.monthlyCost / 30) * EXCHANGE_RATE_SAR, 'SAR')],
-          ['Extension Duration', durationText],
-          ['End-User Price (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')],
-          ['VAT (15%) (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')],
-          ['Total (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')]
-        ];
-      } else {
-        tableHead = [['Description', 'Value']];
-        tableBody = [
-          ['Product', PRODUCT_FULL_NAMES[extensionResults.variant] || extensionResults.variant],
-          ['Dates', getExtensionDates()],
-          ['Current Spend of Last Year (SAR)', formatMoney(extensionResults.currentSpend * EXCHANGE_RATE_SAR, 'SAR')],
-          ['Extension FPI Percentage', `${(extensionResults.fpiPercentage || 0).toFixed(2)}%`],
-          ['Effective Monthly Cost (SAR)', formatMoney(extensionResults.monthlyCostSAR, 'SAR')],
-          ['Daily Cost (SAR)', formatMoney((extensionResults.monthlyCost / 30) * EXCHANGE_RATE_SAR, 'SAR')],
-          ['Extension Duration', `${Math.round(extensionResults.monthsCovered * 30)} days (${extensionResults.monthsCovered} months) (Exact: ${extensionResults.monthsAvailable?.toFixed(2)} months)`],
-          ['End-User Price (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR, 'SAR')],
-          ['VAT (15%) (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 0.15, 'SAR')],
-          ['Total (SAR)', formatMoney(extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15, 'SAR')]
-        ];
+      const extRows: string[][] = [
+        ['Product', PRODUCT_FULL_NAMES[extensionResults.variant] || extensionResults.variant]
+      ];
+
+      if (useStartDate && startMonthYear) {
+        extRows.push(['Dates', getExtensionDates()]);
       }
+
+      const availMonthsVal = extensionResults.monthsAvailable !== undefined && extensionResults.monthsAvailable !== null
+        ? extensionResults.monthsAvailable
+        : extensionResults.monthsCovered;
+
+      if (extensionResults.type === 'A') {
+        const availTextA = `${availMonthsVal?.toFixed(2)} months (${Math.round((availMonthsVal || 0) * 30)} days)`;
+        let durationText = extensionResults.useFullExtension
+          ? `${extensionResults.days} days (${extensionResults.integerMonths} months${extensionResults.extraDays > 0 ? ` and ${extensionResults.extraDays} days` : ''})`
+          : `${Math.round(extensionResults.monthsAvailable * 30)} days (${extensionResults.monthsAvailable.toFixed(2)} months)`;
+        if (showAvailableMonths) {
+          durationText += ` (Exact Available: ${availTextA})`;
+        }
+        extRows.push(['Extension Duration', durationText]);
+        if (showAvailableMonths) {
+          extRows.push(['Available Duration', availTextA]);
+        }
+      } else {
+        const availTextB = `${availMonthsVal?.toFixed(2)} months`;
+        let durationText = `${extensionResults.monthsCovered} months`;
+        if (showAvailableMonths) {
+          durationText += ` (Exact Available: ${availTextB})`;
+        }
+        extRows.push(['Extension Duration', durationText]);
+        if (showAvailableMonths) {
+          extRows.push(['Available Duration', availTextB]);
+        }
+      }
+
+      if (isIndirect) {
+        let euPriceSAR = extensionResults.endUserPrice * EXCHANGE_RATE_SAR;
+        if (extensionResults.roundUpOptionB) {
+          euPriceSAR = Math.ceil(euPriceSAR / 1000) * 1000;
+        }
+        extRows.push(
+          ['End-User Price (SAR)', formatMoney(euPriceSAR, 'SAR')],
+          ['VAT (15%) (SAR)', formatMoney(euPriceSAR * 0.15, 'SAR')],
+          ['Total (SAR)', formatMoney(euPriceSAR * 1.15, 'SAR')]
+        );
+      } else {
+        let euPriceUSD = extensionResults.endUserPrice;
+        if (extensionResults.roundUpOptionB) {
+          euPriceUSD = Math.ceil(euPriceUSD / 1000) * 1000;
+        }
+        extRows.push(
+          ['End-User Price (USD)', formatMoney(euPriceUSD, 'USD')]
+        );
+      }
+
+      tableHead = [['Description', 'Value']];
+      tableBody = extRows;
     } else if (isMidCycleQuote && data.midCycleResults) {
       let productDisplay = data.midCycleResults.product;
       if (data.midCycleResults.dlmSelected) {
@@ -511,24 +569,21 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
       if (isIndirect) {
         const prodCols = config.selectedProducts.map(pid => { return `${pid === 'utd' ? 'UpToDate' : pid === 'lxd' ? 'Lexidrug' : pid} (SAR)`; });
-        tableHead = [['Year', ...prodCols, 'Total (SAR)', 'VAT (15%)', 'Grand Total\n(SAR)']];
-        tableBody = data.yearlyResults.map(r => {
+        tableHead = [['Term', ...prodCols, 'Total (SAR)', 'VAT (15%)', 'Grand Total\n(SAR)']];
+        tableBody = data.yearlyResults.map((r, i) => {
           const pValues = config.selectedProducts.map(pid => { const bd = r.breakdown.find(x => x.id === pid); return bd ? formatMoney(bd.grossSAR, 'SAR') : '-'; });
-          return [ getYearLabel(r.year - 1), ...pValues, formatMoney(r.grossSAR, 'SAR'), formatMoney(r.vatSAR, 'SAR'), formatMoney(r.grandTotalSAR, 'SAR') ];
+          return [ getTermLabel(r, i, data.yearlyResults), ...pValues, formatMoney(r.grossSAR, 'SAR'), formatMoney(r.vatSAR, 'SAR'), formatMoney(r.grandTotalSAR, 'SAR') ];
         });
         if (showTotals) {
-            const productTotalsSAR = config.selectedProducts.map(pid => {
-                const total = data.yearlyResults.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === pid)?.grossSAR || 0), 0);
-                return formatMoney(total, 'SAR');
-            });
-            tableBody.push(['TOTAL', ...productTotalsSAR, formatMoney(data.totalGrossSAR, 'SAR'), formatMoney(data.totalVatSAR, 'SAR'), formatMoney(data.totalGrandTotalSAR, 'SAR')]);
+           const totals = ['TOTAL', ...config.selectedProducts.map(pid => formatMoney(data.productNetTotals[pid] * EXCHANGE_RATE_SAR, 'SAR')), formatMoney(data.totalGrossSAR, 'SAR'), formatMoney(data.totalVatSAR, 'SAR'), formatMoney(data.totalGrandTotalSAR, 'SAR')];
+           tableBody.push(totals);
         }
       } else {
-        const prodCols = config.selectedProducts.map(pid => `${pid === 'utd' ? 'UpToDate' : pid === 'lxd' ? 'Lexidrug' : pid} (USD)`);
-        tableHead = [['Year', ...prodCols, 'Total (USD)']];
-        tableBody = data.yearlyResults.map(r => {
+        const prodCols = config.selectedProducts.map(pid => { return `${pid === 'utd' ? 'UpToDate' : pid === 'lxd' ? 'Lexidrug' : pid} (USD)`; });
+        tableHead = [['Term', ...prodCols, 'Total (USD)']];
+        tableBody = data.yearlyResults.map((r, i) => {
           const pValues = config.selectedProducts.map(pid => { const bd = r.breakdown.find(x => x.id === pid); return bd ? formatMoney(bd.gross, 'USD') : '-'; });
-          return [ getYearLabel(r.year - 1), ...pValues, formatMoney(r.grossUSD, 'USD') ];
+          return [ getTermLabel(r, i, data.yearlyResults), ...pValues, formatMoney(r.grossUSD, 'USD') ];
         });
         if (showTotals) {
             const productTotalsUSD = config.selectedProducts.map(pid => {
@@ -547,7 +602,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       columnStyles: columnStyles, margin: { top: 35, left: 14, right: 14 },
       didParseCell: (data) => {
         if (isExtensionQuote) {
-            if (data.section === 'body' && ['Dates', 'Extension Duration', 'End-User Price (SAR)', 'Total (SAR)'].includes(Array.isArray(data.row.raw) ? String(data.row.raw[0]) : '')) data.cell.styles.fontStyle = 'bold';
+            if (data.section === 'body' && ['Dates', 'Extension Duration', 'Available Duration', 'End-User Price (SAR)', 'End-User Price (USD)', 'Total (SAR)', 'Total (USD)'].includes(Array.isArray(data.row.raw) ? String(data.row.raw[0]) : '')) data.cell.styles.fontStyle = 'bold';
         } else {
             if (showTotals && data.section === 'body' && data.row.index === tableBody.length - 1) data.cell.styles.fontStyle = 'bold'; 
         }
@@ -581,36 +636,37 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     };
 
     if (!isExtensionQuote) {
-      doc.setFontSize(14); doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.setFont(fontName, 'bold'); doc.text("Operating Statistics", 14, finalY); finalY += 6;
-      doc.setFontSize(9); doc.setTextColor(0, 0, 0);
-
-      const statsParts: string[] = [];
-      if (isMidCycleQuote) {
-          if (config.midCycleProduct === 'UTD_ADV' && config.midCycleExistingSpend) {
-               statsParts.push(`$${Number(config.midCycleExistingSpend).toLocaleString('en-US')} existing spend for UpToDate`);
-          } else if (config.midCycleProduct?.startsWith('LXD_') && config.midCycleBedCount) {
-               statsParts.push(`${Number(config.midCycleBedCount).toLocaleString('en-US')} active beds for Lexidrug`);
-          }
-      } else {
-          config.selectedProducts.forEach(pid => {
-              const p = AVAILABLE_PRODUCTS.find(x => x.id === pid); const inp = config.productInputs[pid];
-              if(p && inp) {
-                  let productName = p.name;
-                  if (pid === 'utd') productName = 'UpToDate'; if (pid === 'lxd') productName = 'Lexidrug';
-                  let countLabelText = p.countLabel;
-                  if (p.countLabel === 'HC') countLabelText = 'clinicians'; if (p.countLabel === 'BC') countLabelText = 'active beds';
-                  if (pid === 'lxd' && inp.variant && (inp.variant.includes('Seats') || inp.variant === 'Hospital Pharmacy Model')) countLabelText = 'seats';
-                  const statsToPrint = inp.count > 0 ? inp.count : (inp.existingCount || 0);
-                  if (statsToPrint > 0) statsParts.push(`${statsToPrint.toLocaleString('en-US')} ${countLabelText} for ${productName}`);
-              }
-          });
-      }
-      
-      if(statsParts.length > 0 && showStats) {
-          doc.setFont(fontName, 'normal');
-          const splitStats = doc.splitTextToSize(`This proposal is based on the following statistics for ${customerName}: ${statsParts.join(', ')}.`, 180);
-          doc.text(splitStats, 14, finalY); finalY += (splitStats.length * 4) + 1.5;
+      if (showStats) {
+        const statsParts: string[] = [];
+        if (isMidCycleQuote) {
+            if (config.midCycleProduct === 'UTD_ADV' && config.midCycleExistingSpend) {
+                 statsParts.push(`$${Number(config.midCycleExistingSpend).toLocaleString('en-US')} existing spend for UpToDate`);
+            } else if (config.midCycleProduct?.startsWith('LXD_') && config.midCycleBedCount) {
+                 statsParts.push(`${Number(config.midCycleBedCount).toLocaleString('en-US')} active beds for Lexidrug`);
+            }
+        } else {
+            config.selectedProducts.forEach(pid => {
+                const p = AVAILABLE_PRODUCTS.find(x => x.id === pid); const inp = config.productInputs[pid];
+                if(p && inp) {
+                    let productName = p.name;
+                    if (pid === 'utd') productName = 'UpToDate'; if (pid === 'lxd') productName = 'Lexidrug';
+                    let countLabelText = p.countLabel;
+                    if (p.countLabel === 'HC') countLabelText = 'clinicians'; if (p.countLabel === 'BC') countLabelText = 'active beds';
+                    if (pid === 'lxd' && inp.variant && (inp.variant.includes('Seats') || inp.variant === 'Hospital Pharmacy Model')) countLabelText = 'seats';
+                    const statsToPrint = inp.count > 0 ? inp.count : (inp.existingCount || 0);
+                    if (statsToPrint > 0) statsParts.push(`${statsToPrint.toLocaleString('en-US')} ${countLabelText} for ${productName}`);
+                }
+            });
+        }
+        
+        if(statsParts.length > 0) {
+            doc.setFontSize(14); doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+            doc.setFont(fontName, 'bold'); doc.text("Operating Statistics", 14, finalY); finalY += 6;
+            doc.setFontSize(9); doc.setTextColor(0, 0, 0);
+            doc.setFont(fontName, 'normal');
+            const splitStats = doc.splitTextToSize(`This proposal is based on the following statistics for ${customerName}: ${statsParts.join(', ')}.`, 180);
+            doc.text(splitStats, 14, finalY); finalY += (splitStats.length * 4) + 1.5;
+        }
       }
 
       if (config.dealType === DealType.RENEWAL && includeRenewalIncreaseInfo && renewalNotes.length > 0) {
@@ -620,12 +676,18 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       }
 
       if (showMonthlyCost) {
+          const getProdYears = (pid: string) => {
+            let m = config.years * 12;
+            if (config.dealType === DealType.NEW_LOGO && config.isPartialYear) m += (config.partialMonths?.[pid] || 0);
+            return Math.max(0.01, m / 12);
+          };
+
           const getValue = (valUSD: number, valSAR: number) => isIndirect ? valSAR : valUSD;
           if (config.selectedProducts.includes('utd')) {
               const count = config.productInputs['utd'].count || 1;
               const totalGrossUSD = data.yearlyResults.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === 'utd')?.gross || 0), 0);
               const totalGrossSAR = data.yearlyResults.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === 'utd')?.grossSAR || 0), 0);
-              const valStr = `${displayCurrency} ${((getValue(totalGrossUSD, totalGrossSAR) / config.years) / count / 12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+              const valStr = `${displayCurrency} ${((getValue(totalGrossUSD, totalGrossSAR) / getProdYears('utd')) / count / 12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
               doc.setFont(fontName, 'normal'); doc.text("Your UpToDate subscription costs ", 14, finalY);
               const w1 = doc.getTextWidth("Your UpToDate subscription costs "); doc.setFont(fontName, 'bold'); doc.text(valStr, 14 + w1, finalY);
               const w2 = doc.getTextWidth(valStr); doc.setFont(fontName, 'normal'); doc.text(" monthly per physician.", 14 + w1 + w2, finalY); finalY += 5;
@@ -634,7 +696,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               const count = config.productInputs['lxd'].count || 1;
               const totalGrossUSD = data.yearlyResults.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === 'lxd')?.gross || 0), 0);
               const totalGrossSAR = data.yearlyResults.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === 'lxd')?.grossSAR || 0), 0);
-              const valStr = `${displayCurrency} ${((getValue(totalGrossUSD, totalGrossSAR) / config.years) / count / 12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+              const valStr = `${displayCurrency} ${((getValue(totalGrossUSD, totalGrossSAR) / getProdYears('lxd')) / count / 12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
               doc.setFont(fontName, 'normal'); doc.text("Your Lexidrug subscription costs ", 14, finalY);
               const w1 = doc.getTextWidth("Your Lexidrug subscription costs "); doc.setFont(fontName, 'bold'); doc.text(valStr, 14 + w1, finalY);
               const w2 = doc.getTextWidth(valStr); doc.setFont(fontName, 'normal'); doc.text(" monthly per bed.", 14 + w1 + w2, finalY); finalY += 5;
@@ -660,7 +722,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                     const count = site.counts[pid] || 0; row.push(count.toLocaleString());
                     if (!showSitesOnly) {
                         const totalCount = config.productInputs[pid]?.count || 1; 
-                        const productTotalNet = data.productNetTotals[pid] / config.years; 
+                        let prodM = config.years * 12;
+                        if (config.dealType === DealType.NEW_LOGO && config.isPartialYear) prodM += (config.partialMonths?.[pid] || 0);
+                        const prodY = Math.max(0.01, prodM / 12);
+                        const productTotalNet = data.productNetTotals[pid] / prodY; 
                         if (totalCount > 0) siteTotalCost += (count / totalCount) * productTotalNet;
                     }
                 });
@@ -857,7 +922,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           addFooter(i); 
       }
 
-      const productMix = config.selectedProducts.map(p => p.toUpperCase()).join('_');
+      let productMix = config.selectedProducts.map(p => p.toUpperCase()).join('_');
+      if (isMidCycleQuote) {
+          productMix = config.midCycleProduct || 'MID_CYCLE';
+      } else if (isExtensionQuote) {
+          productMix = (config.extensionVariant || extensionResults?.variant || 'EXTENSION').replace(/\s+/g, '_');
+      }
       const filename = customerName 
        ? `Quote_${customerName.replace(/\s+/g,'_')}_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.pdf`
        : `Quote_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.pdf`;
@@ -882,6 +952,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const getColLetter = (colIndex: number) => { let letter = ''; while (colIndex > 0) { let remainder = (colIndex - 1) % 26; letter = String.fromCharCode(65 + remainder) + letter; colIndex = Math.floor((colIndex - 1) / 26); } return letter; };
 
   const handleExcelExport = async () => {
+    if (hasPartialMonths && (!useStartDate || !startMonthYear)) {
+      alert("Start Date is mandatory for partial-year New Logo deals.");
+      return;
+    }
     if (!customerName.trim()) { alert("Please enter a Customer Name before exporting."); return; }
     setIsExcelLoading(true);
     try {
@@ -979,43 +1053,77 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
          }
          contentRowStart = ws.rowCount + 2;
       } else {
-          let headers = ['Year', ...prodNames];
-          if (isIndirect) headers.push('Total Net (USD)', 'Total (SAR)', 'VAT (15%)', 'Grand Total (SAR)');
-          else headers.push('Total (USD)');
+          let headers = ['Year'];
+          config.selectedProducts.forEach(pid => {
+              const pName = PRODUCT_FULL_NAMES[pid] || PRODUCT_FULL_NAMES[config.productInputs[pid]?.variant] || pid;
+              headers.push(`${pName} (USD)`);
+          });
+          headers.push('Total (USD)');
+          
+          if (isIndirect) {
+              config.selectedProducts.forEach(pid => {
+                  const pName = PRODUCT_FULL_NAMES[pid] || PRODUCT_FULL_NAMES[config.productInputs[pid]?.variant] || pid;
+                  headers.push(`${pName} (SAR)`);
+              });
+              headers.push('Total (SAR)', 'VAT (15%)', 'Grand Total (SAR)');
+          }
+          headers.push('Recognized Total (USD)');
 
           const headerRow = ws.addRow(headers);
           headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
           headerRow.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF007AC3' } }; cell.alignment = { vertical: 'middle', horizontal: 'center' }; });
 
+          const getTermLabelExcel = (r: PricingResult, resultIndex: number, allResults: PricingResult[]) => {
+              const termLabel = `Term ${resultIndex + 1} (${r.termMonths} months)`;
+              if (useStartDate && startMonthYear) {
+                  const [yearStr, monthStr] = startMonthYear.split('-');
+                  const start = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
+                  
+                  let monthsBefore = 0;
+                  for (let i = 0; i < resultIndex; i++) {
+                      monthsBefore += allResults[i].termMonths || 12;
+                  }
+                  start.setMonth(start.getMonth() + monthsBefore);
+                  
+                  const end = new Date(start);
+                  end.setMonth(end.getMonth() + (r.termMonths || 12));
+                  end.setDate(end.getDate() - 1);
+                  
+                  const formatD = (d: Date) => { const mo = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; return `${mo[d.getMonth()]} ${d.getDate().toString().padStart(2, '0')}, ${d.getFullYear()}`; };
+                  return `${termLabel}\n${formatD(start)} to ${formatD(end)}`;
+              }
+              return termLabel;
+          };
+
           const startRowIndex = ws.rowCount + 1;
           data.yearlyResults.forEach((r, idx) => {
-              const rowData: any[] = [`Year ${r.year}`];
+              const rowData: any[] = [getTermLabelExcel(r, idx, data.yearlyResults)];
+              
+              // Product USD columns
               config.selectedProducts.forEach(pid => { 
                 const bd = r.breakdown.find(x => x.id === pid); 
-                rowData.push(bd ? (isIndirect ? bd.net : bd.gross) : 0); 
+                rowData.push(bd ? bd.gross : 0); 
               });
               
+              // Total USD
+              rowData.push(r.grossUSD);
+              
               if (isIndirect) {
-                  // Net USD, Gross SAR, VAT, Grand Total
-                  rowData.push(r.netUSD, r.grossSAR, r.vatSAR, r.grandTotalSAR);
-              } else {
-                  rowData.push(r.grossUSD);
+                  // Product SAR columns
+                  config.selectedProducts.forEach(pid => { 
+                    const bd = r.breakdown.find(x => x.id === pid); 
+                    rowData.push(bd ? bd.grossSAR : 0); 
+                  });
+                  
+                  // Total SAR, VAT, Grand Total
+                  rowData.push(r.grossSAR, r.vatSAR, r.grandTotalSAR);
               }
+              
+              // Recognized Total USD
+              rowData.push(r.recognizedUSD);
 
               const newRow = ws.addRow(rowData);
-              
-              // Add formulas for years 2+ if it's MYFPI method and rates are simple
-              if (idx > 0 && config.method === 'MYFPI' && !config.flatPricing) {
-                  config.selectedProducts.forEach((pid, pIdx) => {
-                      const rate = (config.productRates[pid] || config.rates)[idx] || 0;
-                      if (rate > 0) {
-                          const colLetter = getColLetter(2 + pIdx);
-                          const prevCell = `${colLetter}${newRow.number - 1}`;
-                          newRow.getCell(2 + pIdx).value = { formula: `${prevCell}*(1+${rate/100})` };
-                      }
-                  });
-              }
-
+              newRow.getCell(1).alignment = { wrapText: true, vertical: 'middle', horizontal: 'center' };
               newRow.eachCell((cell, colNum) => { if (colNum > 1) cell.numFmt = '#,##0.00'; });
           });
 
@@ -1024,26 +1132,9 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               const startDataRow = startRowIndex;
               const endDataRow = ws.rowCount;
               
-              config.selectedProducts.forEach((pid, pIdx) => {
-                  const colLetter = getColLetter(2 + pIdx);
+              for (let c = 2; c <= headers.length; c++) {
+                  const colLetter = getColLetter(c);
                   totalRowData.push({ formula: `SUM(${colLetter}${startDataRow}:${colLetter}${endDataRow})` });
-              });
-
-              if (isIndirect) {
-                  const netUsdCol = getColLetter(2 + config.selectedProducts.length);
-                  const grossSarCol = getColLetter(3 + config.selectedProducts.length);
-                  const vatCol = getColLetter(4 + config.selectedProducts.length);
-                  const grandTotalCol = getColLetter(5 + config.selectedProducts.length);
-                  
-                  totalRowData.push(
-                    { formula: `SUM(${netUsdCol}${startDataRow}:${netUsdCol}${endDataRow})` },
-                    { formula: `SUM(${grossSarCol}${startDataRow}:${grossSarCol}${endDataRow})` },
-                    { formula: `SUM(${vatCol}${startDataRow}:${vatCol}${endDataRow})` },
-                    { formula: `SUM(${grandTotalCol}${startDataRow}:${grandTotalCol}${endDataRow})` }
-                  );
-              } else {
-                  const totalUsdCol = getColLetter(2 + config.selectedProducts.length);
-                  totalRowData.push({ formula: `SUM(${totalUsdCol}${startDataRow}:${totalUsdCol}${endDataRow})` });
               }
               
               const totalRow = ws.addRow(totalRowData);
@@ -1052,12 +1143,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           }
           
           if (includeCalcDetails) {
-              const calcWs = wb.addWorksheet('Calculation Details');
+              const calcWs = ws;
+              calcWs.addRow([]);
               calcWs.addRow(['Detailed Calculation Breakdown']).font = { bold: true, size: 14 };
               calcWs.addRow([]);
               
               calcWs.addRow(['Product', 'Metric', 'Formula / Logic', 'Value']);
-              const hRow = calcWs.getRow(3);
+              const hRow = calcWs.getRow(calcWs.rowCount);
               hRow.font = { bold: true };
               hRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
 
@@ -1091,8 +1183,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               calcWs.addRow(['Exchange Rate', `1 USD = ${EXCHANGE_RATE_SAR} SAR`]);
               calcWs.addRow(['Channel', config.channel]);
               calcWs.addRow(['Start Date', config.useStartDate ? config.startMonthYear : 'Not Set']);
-              
-              calcWs.columns.forEach(column => { column.width = 30; });
           }
           contentRowStart = ws.rowCount + 2;
       }
@@ -1117,7 +1207,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                   const count = site.counts[pid] || 0; row.push(count);
                   if (!showSitesOnly) {
                       const totalCount = config.productInputs[pid]?.count || 1; 
-                      const productTotalNet = data.productNetTotals[pid] / config.years; 
+                      let prodM = config.years * 12;
+                      if (config.dealType === DealType.NEW_LOGO && config.isPartialYear) prodM += (config.partialMonths?.[pid] || 0);
+                      const prodY = Math.max(0.01, prodM / 12);
+                      const productTotalNet = data.productNetTotals[pid] / prodY; 
                       if (totalCount > 0) siteTotalCost += (count / totalCount) * productTotalNet;
                   }
               });
@@ -1133,7 +1226,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = URL.createObjectURL(blob);
       const tempLink = document.createElement('a'); tempLink.href = url; 
-      const productMix = config.selectedProducts.map(p => p.toUpperCase()).join('_');
+      let productMix = config.selectedProducts.map(p => p.toUpperCase()).join('_');
+      if (isMidCycleQuote) {
+          productMix = config.midCycleProduct || 'MID_CYCLE';
+      } else if (isExtensionQuote) {
+          productMix = (config.extensionVariant || extensionResults?.variant || 'EXTENSION').replace(/\s+/g, '_');
+      }
       const filename = customerName 
        ? `Quote_${customerName.replace(/\s+/g,'_')}_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.xlsx`
        : `Quote_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.xlsx`;
@@ -1188,6 +1286,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                   <input type="checkbox" checked={includeCalcDetails} onChange={(e) => setIncludeCalcDetails(e.target.checked)} className="rounded text-green-600 focus:ring-green-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                   <span>Include Calc Details</span>
                 </label>
+              {isExtensionQuote && (
+                <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <input type="checkbox" checked={showAvailableMonths} onChange={(e) => setShowAvailableMonths(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                  <span>Show Available Months/Days</span>
+                </label>
+              )}
               {!isExtensionQuote && (
                 <>
                   <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
@@ -1262,7 +1366,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           <div className="pt-6 border-t border-gray-100 dark:border-gray-700 flex flex-wrap gap-4">
             <button 
               onClick={handlePDFPreview} 
-              disabled={isPdfLoading || isFontLoading || !customerName.trim() || (config.dealType !== DealType.NEW_LOGO && !useStartDate)} 
+              disabled={isPdfLoading || isFontLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (hasPartialMonths && !useStartDate))} 
               className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
             >
               {isPdfLoading || isFontLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FileText className="w-5 h-5" />}
@@ -1270,7 +1374,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             </button>
             <button 
               onClick={handlePDFExport} 
-              disabled={isPdfLoading || isFontLoading || !customerName.trim() || (config.dealType !== DealType.NEW_LOGO && !useStartDate)} 
+              disabled={isPdfLoading || isFontLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (hasPartialMonths && !useStartDate))} 
               className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
             >
               {isPdfLoading || isFontLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Download className="w-5 h-5" />}
@@ -1278,14 +1382,14 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             </button>
             <button 
               onClick={handleExcelExport} 
-              disabled={isExcelLoading || !customerName.trim() || (config.dealType !== DealType.NEW_LOGO && !useStartDate)} 
+              disabled={isExcelLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (hasPartialMonths && !useStartDate))} 
               className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
             >
               {isExcelLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Table className="w-5 h-5" />}
               {isExcelLoading ? 'Generating Excel...' : 'Export to Excel'}
             </button>
           </div>
-          {(config.dealType !== DealType.NEW_LOGO && !useStartDate) && (
+          {((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (hasPartialMonths && !useStartDate)) && (
             <div className="mt-2 text-xs text-red-500 font-medium">
               Please select "Include Start Date" to enable exporting for Renewals and Extensions.
             </div>
@@ -1492,8 +1596,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       )}
 
       {isPreviewModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-70">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 md:p-8 bg-black/75 backdrop-blur-sm overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-5xl h-full max-h-[85vh] flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700">
                 <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><FileText className="w-5 h-5" /> PDF Preview</h3>
                     <div className="flex gap-3">
@@ -1514,6 +1618,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                 <div className="flex-1 flex flex-col md:flex-row bg-gray-100 dark:bg-gray-700 overflow-hidden">
                     <div className="w-full md:w-64 p-6 flex flex-col gap-4 overflow-y-auto bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
                         <h4 className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-2">Export Options</h4>
+                        {isExtensionQuote && (
+                          <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                              <input type="checkbox" checked={showAvailableMonths} onChange={(e) => setShowAvailableMonths(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                              <span>Show Available Months/Days</span>
+                          </label>
+                        )}
                         {!isExtensionQuote && (
                           <>
                             <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">

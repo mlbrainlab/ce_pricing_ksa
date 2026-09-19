@@ -47,6 +47,9 @@ export interface ProductYearlyData {
 
 export interface PricingResult {
   year: number;
+  termMonths?: number;
+  startDate?: string;
+  endDate?: string;
   breakdown: ProductYearlyData[]; // Per product values
   grossUSD: number;
   grossSAR: number;
@@ -65,6 +68,8 @@ export interface DealConfiguration {
   selectedProducts: string[]; // IDs
   productInputs: Record<string, ProductInput>; // Map of product ID to inputs
   years: number;
+  isPartialYear?: boolean;
+  partialMonths?: Record<string, number>;
   method: PricingMethod; // Keep for backwards compatibility or default
   productMethods?: Record<string, PricingMethod>; // New: Per product method
   rates: number[]; // Global fallback
@@ -84,6 +89,8 @@ export interface DealConfiguration {
   extensionFPI?: number | null;
   extensionVariant?: string;
   useFullExtension?: boolean;
+  roundUpOptionB?: boolean;
+  optionBMonths?: number | null;
   // Mid-Cycle Add-on Fields
   midCycleExpiryDate?: string;
   midCycleStartDate?: string;
