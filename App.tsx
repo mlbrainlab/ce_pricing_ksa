@@ -4,6 +4,7 @@ import Login from "./components/Login";
 import { Layout } from "./components/Layout";
 import { ExportSection } from "./components/ExportSection";
 import { QuotesManager } from "./components/QuotesManager";
+import { AdminPanel } from "./components/AdminPanel";
 import { ProfileModal } from "./components/ProfileModal";
 import { logout, supabase } from "./components/auth";
 import { FormattedNumberInput } from "./components/FormattedNumberInput";
@@ -1017,6 +1018,7 @@ const App: React.FC = () => {
         </div>
       )}
       
+        <AdminPanel onLoadQuote={loadConfig} />
         <QuotesManager 
           currentConfig={config} 
           currentResults={results} 
