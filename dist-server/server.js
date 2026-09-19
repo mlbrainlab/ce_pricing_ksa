@@ -121580,9 +121580,9 @@ var StorageBucketApi = class extends BaseApiClient {
     if (opts === null || opts === void 0 ? void 0 : opts.useNewHostname) {
       if (/supabase\.(co|in|red)$/.test(baseUrl.hostname) && !baseUrl.hostname.includes("storage.supabase.")) baseUrl.hostname = baseUrl.hostname.replace("supabase.", "storage.supabase.");
     }
-    const finalUrl = baseUrl.href.replace(/\/$/, "");
+    const finalUrl2 = baseUrl.href.replace(/\/$/, "");
     const finalHeaders = _objectSpread22(_objectSpread22({}, DEFAULT_HEADERS), headers);
-    super(finalUrl, finalHeaders, fetch$1, "storage");
+    super(finalUrl2, finalHeaders, fetch$1, "storage");
   }
   /**
   * Retrieves the details of all Storage buckets within an existing project.
@@ -121904,9 +121904,9 @@ var StorageAnalyticsClient = class extends BaseApiClient {
   * ```
   */
   constructor(url, headers = {}, fetch$1) {
-    const finalUrl = url.replace(/\/$/, "");
+    const finalUrl2 = url.replace(/\/$/, "");
     const finalHeaders = _objectSpread22(_objectSpread22({}, DEFAULT_HEADERS), headers);
-    super(finalUrl, finalHeaders, fetch$1, "storage");
+    super(finalUrl2, finalHeaders, fetch$1, "storage");
   }
   /**
   * @alpha
@@ -122219,9 +122219,9 @@ var StorageAnalyticsClient = class extends BaseApiClient {
 var VectorIndexApi = class extends BaseApiClient {
   /** Creates a new VectorIndexApi instance */
   constructor(url, headers = {}, fetch$1) {
-    const finalUrl = url.replace(/\/$/, "");
+    const finalUrl2 = url.replace(/\/$/, "");
     const finalHeaders = _objectSpread22(_objectSpread22({}, DEFAULT_HEADERS), {}, { "Content-Type": "application/json" }, headers);
-    super(finalUrl, finalHeaders, fetch$1, "vectors");
+    super(finalUrl2, finalHeaders, fetch$1, "vectors");
   }
   /** Creates a new vector index within a bucket */
   async createIndex(options) {
@@ -122261,9 +122261,9 @@ var VectorIndexApi = class extends BaseApiClient {
 var VectorDataApi = class extends BaseApiClient {
   /** Creates a new VectorDataApi instance */
   constructor(url, headers = {}, fetch$1) {
-    const finalUrl = url.replace(/\/$/, "");
+    const finalUrl2 = url.replace(/\/$/, "");
     const finalHeaders = _objectSpread22(_objectSpread22({}, DEFAULT_HEADERS), {}, { "Content-Type": "application/json" }, headers);
-    super(finalUrl, finalHeaders, fetch$1, "vectors");
+    super(finalUrl2, finalHeaders, fetch$1, "vectors");
   }
   /** Inserts or updates vectors in batch (1-500 per request) */
   async putVectors(options) {
@@ -122312,9 +122312,9 @@ var VectorDataApi = class extends BaseApiClient {
 var VectorBucketApi = class extends BaseApiClient {
   /** Creates a new VectorBucketApi instance */
   constructor(url, headers = {}, fetch$1) {
-    const finalUrl = url.replace(/\/$/, "");
+    const finalUrl2 = url.replace(/\/$/, "");
     const finalHeaders = _objectSpread22(_objectSpread22({}, DEFAULT_HEADERS), {}, { "Content-Type": "application/json" }, headers);
-    super(finalUrl, finalHeaders, fetch$1, "vectors");
+    super(finalUrl2, finalHeaders, fetch$1, "vectors");
   }
   /** Creates a new vector bucket */
   async createBucket(vectorBucketName) {
@@ -123472,9 +123472,14 @@ if (shouldShowDeprecationWarning()) console.warn("\u26A0\uFE0F  Node.js 18 and b
 // services/supabaseClient.ts
 var supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
 var supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
-var supabase = createClient(supabaseUrl, supabaseAnonKey);
+var finalUrl = supabaseUrl || "https://dummy.supabase.co";
+var finalKey = supabaseAnonKey || "dummy";
+if (!supabaseUrl) {
+  console.warn("WARNING: Supabase URL and Key are missing from environment variables.");
+}
+var supabase = createClient(finalUrl, finalKey);
 var getUserClient = (token) => {
-  return createClient(supabaseUrl, supabaseAnonKey, {
+  return createClient(finalUrl, finalKey, {
     global: {
       headers: {
         Authorization: `Bearer ${token}`
