@@ -6,8 +6,7 @@ interface AdminQuote {
   title: string;
   is_draft: boolean;
   created_at: string;
-  first_name: string;
-  last_name: string;
+  rep_name?: string;
   config: any;
 }
 
@@ -33,7 +32,7 @@ export function AdminPanel({ onLoadQuote }: { onLoadQuote: (config: any) => void
   const fetchAllQuotes = async () => {
     try {
       const { data, error } = await supabase
-        .from('admin_quotes')
+        .from('quotes')
         .select('*')
         .order('created_at', { ascending: false });
         
@@ -54,7 +53,7 @@ export function AdminPanel({ onLoadQuote }: { onLoadQuote: (config: any) => void
 
   const filteredQuotes = quotes.filter(q => 
     q.title.toLowerCase().includes(search.toLowerCase()) || 
-    (q.first_name + ' ' + q.last_name).toLowerCase().includes(search.toLowerCase())
+    (q.rep_name || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -85,7 +84,7 @@ export function AdminPanel({ onLoadQuote }: { onLoadQuote: (config: any) => void
                     {q.is_draft ? 'Draft' : 'Final'}
                   </span>
                   <div className="text-sm text-gray-500 mt-1">
-                    Rep: <span className="font-semibold text-purple-700 dark:text-purple-400">{q.first_name} {q.last_name}</span> • {new Date(q.created_at).toLocaleString()}
+                    Rep: <span className="font-semibold text-purple-700 dark:text-purple-400">{q.rep_name || 'Unknown Rep'}</span> • {new Date(q.created_at).toLocaleString()}
                   </div>
                 </div>
                 <div className="flex gap-2">
