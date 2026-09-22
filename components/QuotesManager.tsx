@@ -34,6 +34,7 @@ export function QuotesManager({
       const { data, error } = await supabase
         .from('quotes')
         .select('*')
+        .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
         
       if (error) throw error;
@@ -53,27 +54,58 @@ export function QuotesManager({
 
   const handleSave = async (isDraft: boolean) => {
     let finalTitle = title.trim();
+    
     if (!finalTitle) {
-      // Auto-generate title
-      const productMix = currentConfig.selectedProducts && currentConfig.selectedProducts.length > 0 
-        ? currentConfig.selectedProducts.join('_') 
+      // Replicate the exact ExportSection.tsx filename logic
+      const safeAccountName = customerName ? customerName.trim().replace(/\s+/g, '_') : 'Customer';
+      const accountType = (currentConfig.institutionType === 'ACADEMIC' || currentConfig.institutionType === 'Academic Institutions') ? 'AA' : 'PP';
+      const dealTypeStr = currentConfig.dealType || 'DEAL';
+      
+      let productMix = currentConfig.selectedProducts && currentConfig.selectedProducts.length > 0 
+        ? currentConfig.selectedProducts.map((p: string) => p.toUpperCase()).join('_')
         : 'Quote';
-      finalTitle = customerName 
-       ? `Quote_${customerName.replace(/\s+/g,'_')}_${currentConfig.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}`
-       : `Quote_${currentConfig.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}`;
-       
-      setTitle(finalTitle); // update the input visually
+        
+      if (currentConfig.dealType === 'Mid-Cycle Upgrade' || currentConfig.dealType === 'MID_CYCLE') {
+          productMix = currentConfig.midCycleProduct || 'MID_CYCLE';
+      } else if (currentConfig.dealType === 'Extension' || currentConfig.dealType === 'EXTENSION') {
+          productMix = (currentConfig.extensionVariant || currentResults?.extension?.variant || 'EXTENSION').replace(/\s+/g, '_');
+      }
+      
+      const yearsStr = `${currentConfig.years || 1}Y`;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      
+      finalTitle = `Quote_${safeAccountName}_${accountType}_${dealTypeStr}_${productMix}_${yearsStr}_${dateStr}`;
     }
+
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      // Check for exact name matches to auto-version
+      let versionedTitle = finalTitle;
+      const { data: existingQuotes } = await supabase
+        .from('quotes')
+        .select('title')
+        .eq('user_id', session.user.id)
+        .like('title', `${finalTitle}%`);
+
+      if (existingQuotes && existingQuotes.length > 0) {
+        // Simple versioning: if we find matches, append _v2, _v3, etc. until unique
+        let v = 2;
+        while (existingQuotes.some(q => q.title === versionedTitle)) {
+          versionedTitle = `${finalTitle}_v${v}`;
+          v++;
+        }
+      }
+      
+      setTitle(versionedTitle); // update the input visually
+
       const { error } = await supabase
         .from('quotes')
         .insert([{
           user_id: session.user.id,
-          title: finalTitle,
+          title: versionedTitle,
           config: currentConfig,
           results: currentResults,
           is_draft: isDraft,
@@ -84,7 +116,7 @@ export function QuotesManager({
       
       setTitle('');
       fetchQuotes();
-      alert('Quote saved successfully!');
+      alert(isDraft ? 'Draft saved!' : 'Quote saved!');
     } catch (e) {
       console.error(e);
     } finally {
