@@ -145,9 +145,24 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     const lines = bulkPasteText.split('\n').filter(line => line.trim() !== '');
     if (lines.length === 0) return;
 
-    const newSites: SiteBreakdownItem[] = lines.map((line, index) => ({
-      id: Date.now().toString() + index, name: line.trim(), counts: {}
-    }));
+    const newSites: SiteBreakdownItem[] = lines.map((line, index) => {
+      let initialCounts: Record<string, number> = {};
+      if (config.institutionType === "Academic Institutions") {
+          const isHospital = line.trim().toLowerCase().includes('hospital');
+          if (isHospital) {
+              if (config.selectedProducts.includes('utd')) initialCounts['utd'] = config.productInputs['utd']?.count || 0;
+              if (config.selectedProducts.includes('lxd')) initialCounts['lxd'] = config.productInputs['lxd']?.count || 0;
+          } else {
+              if (config.selectedProducts.includes('utd')) {
+                  initialCounts['utd'] = (config.productInputs['utd']?.facultyCount || 0) + (config.productInputs['utd']?.medStudentsCount || 0) + (config.productInputs['utd']?.pharmaStudentsCount || 0) + (config.productInputs['utd']?.residentsCount || 0);
+              }
+              if (config.selectedProducts.includes('lxd')) {
+                  initialCounts['lxd'] = config.productInputs['lxd']?.totalStudentsCount || 0;
+              }
+          }
+      }
+      return { id: Date.now().toString() + index, name: line.trim(), counts: initialCounts };
+    });
     
     setSiteBreakdown(prev => {
       if (prev.length > 0 && prev[0].name.trim() === '' && Object.keys(prev[0].counts).length === 0) {
@@ -767,7 +782,15 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                 config.selectedProducts.forEach(pid => {
                     const count = site.counts[pid] || 0; row.push(count.toLocaleString());
                     if (!showSitesOnly) {
-                        const totalCount = config.productInputs[pid]?.count || 1; 
+                        let totalCount = config.productInputs[pid]?.count || 0;
+                        if (config.institutionType === "Academic Institutions") {
+                            if (pid === 'utd') {
+                                totalCount += (config.productInputs[pid]?.facultyCount || 0) + (config.productInputs[pid]?.medStudentsCount || 0) + (config.productInputs[pid]?.pharmaStudentsCount || 0) + (config.productInputs[pid]?.residentsCount || 0);
+                            } else if (pid === 'lxd') {
+                                totalCount += (config.productInputs[pid]?.totalStudentsCount || 0);
+                            }
+                        }
+                        if (totalCount === 0) totalCount = 1;
                         let prodM = config.years * 12;
                         if (config.dealType === DealType.NEW_LOGO && config.isPartialYear) prodM += (config.partialMonths?.[pid] || 0);
                         const prodY = Math.max(0.01, prodM / 12);
@@ -1252,7 +1275,15 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               config.selectedProducts.forEach(pid => {
                   const count = site.counts[pid] || 0; row.push(count);
                   if (!showSitesOnly) {
-                      const totalCount = config.productInputs[pid]?.count || 1; 
+                      let totalCount = config.productInputs[pid]?.count || 0;
+                        if (config.institutionType === "Academic Institutions") {
+                            if (pid === 'utd') {
+                                totalCount += (config.productInputs[pid]?.facultyCount || 0) + (config.productInputs[pid]?.medStudentsCount || 0) + (config.productInputs[pid]?.pharmaStudentsCount || 0) + (config.productInputs[pid]?.residentsCount || 0);
+                            } else if (pid === 'lxd') {
+                                totalCount += (config.productInputs[pid]?.totalStudentsCount || 0);
+                            }
+                        }
+                        if (totalCount === 0) totalCount = 1;
                       let prodM = config.years * 12;
                       if (config.dealType === DealType.NEW_LOGO && config.isPartialYear) prodM += (config.partialMonths?.[pid] || 0);
                       const prodY = Math.max(0.01, prodM / 12);
@@ -1538,7 +1569,14 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                   <div className="sticky top-0 z-10 flex flex-wrap gap-4 text-xs font-bold text-gray-600 dark:text-gray-400 p-2 mb-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 shadow-sm">
                     <div className="w-full mb-1 text-gray-800 dark:text-gray-200">Expected Totals:</div>
                     {config.selectedProducts.map(pid => {
-                      const expectedCount = config.productInputs[pid]?.count || 0;
+                      let expectedCount = config.productInputs[pid]?.count || 0;
+                      if (config.institutionType === "Academic Institutions") {
+                          if (pid === 'utd') {
+                              expectedCount += (config.productInputs[pid]?.facultyCount || 0) + (config.productInputs[pid]?.medStudentsCount || 0) + (config.productInputs[pid]?.pharmaStudentsCount || 0) + (config.productInputs[pid]?.residentsCount || 0);
+                          } else if (pid === 'lxd') {
+                              expectedCount += (config.productInputs[pid]?.totalStudentsCount || 0);
+                          }
+                      }
                       const enteredCount = siteBreakdown.reduce((sum, site) => sum + (site.counts[pid] || 0), 0);
                       const isOver = enteredCount > expectedCount;
                       const label = AVAILABLE_PRODUCTS.find(x => x.id === pid)?.shortName || pid;
@@ -1553,25 +1591,33 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
                   <div className="flex-1 overflow-y-auto pr-2 space-y-2">
                     {siteBreakdown.map(site => (
-                      <div key={site.id} className="flex flex-row items-center gap-3 p-2 border rounded border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
-                        <input
-                          type="text"
-                          className="flex-1 min-w-[150px] px-3 py-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                          placeholder="Hospital name"
-                          value={site.name}
-                          onChange={e => setSiteBreakdown(prev => prev.map(s => s.id === site.id ? { ...s, name: e.target.value } : s))}
-                        />
-                        <div className="flex flex-wrap gap-4 items-center">
+                      <div key={site.id} className="flex flex-col gap-3 p-3 border rounded border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
+                        <div className="flex flex-row items-center justify-between gap-3">
+                            <input
+                              type="text"
+                              className="flex-1 w-full px-3 py-1.5 border rounded text-sm font-medium dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                              placeholder="Site name"
+                              value={site.name}
+                              onChange={e => setSiteBreakdown(prev => prev.map(s => s.id === site.id ? { ...s, name: e.target.value } : s))}
+                            />
+                            <button
+                              onClick={() => setSiteBreakdown(prev => prev.filter(s => s.id !== site.id))}
+                              className="text-red-500 hover:text-red-700 font-bold px-2 text-lg shrink-0"
+                            >
+                              ×
+                            </button>
+                        </div>
+                        <div className="flex flex-wrap gap-4 items-center bg-gray-50 dark:bg-gray-700/50 p-2 rounded">
                           {config.selectedProducts.map(pid => {
                             const unit = AVAILABLE_PRODUCTS.find(x => x.id === pid)?.countLabel || 'Count';
                             const label = AVAILABLE_PRODUCTS.find(x => x.id === pid)?.shortName || pid;
                             return (
                               <div key={pid} className="flex items-center gap-2">
-                                <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{label} {unit}:</span>
+                                <span className="text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">{label} {unit}:</span>
                                 <input
                                   type="number"
                                   min="0"
-                                  className="w-16 px-2 py-1 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                  className="w-20 px-2 py-1 border rounded text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
                                   value={site.counts[pid] !== undefined ? site.counts[pid] : ''}
                                   onChange={e => {
                                     const val = e.target.value === '' ? '' : (parseInt(e.target.value) || 0);
@@ -1582,12 +1628,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                             );
                           })}
                         </div>
-                        <button
-                          onClick={() => setSiteBreakdown(prev => prev.filter(s => s.id !== site.id))}
-                          className="text-red-500 hover:text-red-700 font-bold px-2 text-lg shrink-0"
-                        >
-                          ×
-                        </button>
                       </div>
                     ))}
                     <button
