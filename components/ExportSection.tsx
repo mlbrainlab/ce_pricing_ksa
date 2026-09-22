@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState } from 'react';
 import { Download, FileText, Table } from 'lucide-react';
-import { CalculationOutput, DealConfiguration, ChannelType, DealType } from '../types';
+import { CalculationOutput, DealConfiguration, ChannelType, DealType, InstitutionType } from '../types';
 import { AVAILABLE_PRODUCTS, EXCHANGE_RATE_SAR } from '../constants';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -991,15 +991,18 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           addFooter(i); 
       }
 
+      const safeAccountName = customerName ? customerName.trim().replace(/\s+/g, '_') : 'Customer';
+      const accountType = (config.institutionType === InstitutionType.ACADEMIC || config.institutionType === 'Academic Institutions') ? 'AA' : 'PP';
+      const dealTypeStr = config.dealType || 'DEAL';
       let productMix = config.selectedProducts.map(p => p.toUpperCase()).join('_');
       if (isMidCycleQuote) {
           productMix = config.midCycleProduct || 'MID_CYCLE';
       } else if (isExtensionQuote) {
           productMix = (config.extensionVariant || extensionResults?.variant || 'EXTENSION').replace(/\s+/g, '_');
       }
-      const filename = customerName 
-       ? `Quote_${customerName.replace(/\s+/g,'_')}_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.pdf`
-       : `Quote_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.pdf`;
+      const yearsStr = `${config.years || 1}Y`;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `Quote_${safeAccountName}_${accountType}_${dealTypeStr}_${productMix}_${yearsStr}_${dateStr}.pdf`;
       
       const pdfBlob = doc.output('blob');
       
@@ -1303,15 +1306,18 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = URL.createObjectURL(blob);
       const tempLink = document.createElement('a'); tempLink.href = url; 
+      const safeAccountName = customerName ? customerName.trim().replace(/\s+/g, '_') : 'Customer';
+      const accountType = (config.institutionType === InstitutionType.ACADEMIC || config.institutionType === 'Academic Institutions') ? 'AA' : 'PP';
+      const dealTypeStr = config.dealType || 'DEAL';
       let productMix = config.selectedProducts.map(p => p.toUpperCase()).join('_');
       if (isMidCycleQuote) {
           productMix = config.midCycleProduct || 'MID_CYCLE';
       } else if (isExtensionQuote) {
           productMix = (config.extensionVariant || extensionResults?.variant || 'EXTENSION').replace(/\s+/g, '_');
       }
-      const filename = customerName 
-       ? `Quote_${customerName.replace(/\s+/g,'_')}_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.xlsx`
-       : `Quote_${config.dealType}_${productMix}_${new Date().toISOString().slice(0,10)}.xlsx`;
+      const yearsStr = `${config.years || 1}Y`;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `Quote_${safeAccountName}_${accountType}_${dealTypeStr}_${productMix}_${yearsStr}_${dateStr}.xlsx`;
       tempLink.download = filename; tempLink.click();
       URL.revokeObjectURL(url);
     } catch (e) {
