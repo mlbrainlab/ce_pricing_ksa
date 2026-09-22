@@ -16,6 +16,11 @@ export enum PricingMethod {
   MYFPI = "MYFPI (Inflation)",
 }
 
+export enum InstitutionType {
+  PROVIDER = "Providers-Payers",
+  ACADEMIC = "Academic Institutions",
+}
+
 export interface ProductDefinition {
   id: string;
   name: string;
@@ -36,6 +41,17 @@ export interface ProductInput {
   forceHeadcountOverride?: boolean; // If true, prioritize HC calculation if higher
   changeInStats?: boolean; // For UTD EE Upsell (Switching/Changing stats)
   eaiActivation?: boolean; // Toggle for EAI 3% uplift
+  
+  // Academic specific fields
+  facultyCount?: number | "";
+  residentsCount?: number | "";
+  medStudentsCount?: number | "";
+  pharmaStudentsCount?: number | "";
+  totalStudentsCount?: number | "";
+  lxdAcademicBase?: boolean;
+  lxdAcademicSelect?: boolean;
+  lxdAcademicMartindale?: boolean;
+  educationalDiscount?: number | "";
 }
 
 export interface ProductYearlyData {
@@ -65,6 +81,8 @@ export interface PricingResult {
 export interface DealConfiguration {
   dealType: DealType;
   channel: ChannelType;
+  institutionType?: InstitutionType;
+  includeHospital?: boolean;
   selectedProducts: string[]; // IDs
   productInputs: Record<string, ProductInput>; // Map of product ID to inputs
   years: number;

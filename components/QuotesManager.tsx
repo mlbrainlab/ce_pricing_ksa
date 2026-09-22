@@ -76,7 +76,8 @@ export function QuotesManager({
           title: finalTitle,
           config: currentConfig,
           results: currentResults,
-          is_draft: isDraft
+          is_draft: isDraft,
+          rep_name: `${session.user.user_metadata?.first_name || 'Unknown'} ${session.user.user_metadata?.last_name || 'Rep'}`.trim()
         }]);
         
       if (error) throw error;

@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTablePlugin from 'jspdf-autotable';
-import { DealConfiguration, CalculationOutput, ChannelType, DealType } from '../types.js';
+import { DealConfiguration, CalculationOutput, ChannelType, DealType, InstitutionType } from '../types.js';
 import { AVAILABLE_PRODUCTS, EXCHANGE_RATE_SAR } from '../constants.js';
 import { SAMIR_WHITE_LOGO_BASE64 } from '../samirLogo.js';
 import { WK_LOGO_BASE64 } from '../wkLogo.js';
@@ -66,6 +66,7 @@ export async function generateQuotePDF(config: DealConfiguration, data: Calculat
   currentY += 6;
   doc.text(customerName || "Valued Customer", 14, currentY);
   
+
   // Custom Rep Override for CP Deals
   let finalRepName = repName;
   let finalRepEmail = repEmail;
@@ -114,11 +115,37 @@ export async function generateQuotePDF(config: DealConfiguration, data: Calculat
   if (showStats) {
       const statsList = config.selectedProducts.map(id => {
           const inp = config.productInputs[id];
-          if (!inp || !inp.count) return null;
+          if (!inp) return null;
+          if (config.institutionType === InstitutionType.ACADEMIC) {
+              if (id === 'utd') {
+                  const parts = [];
+                  if (inp.facultyCount) parts.push(`Faculty: ${inp.facultyCount}`);
+                  if (inp.medStudentsCount) parts.push(`Med Students: ${inp.medStudentsCount}`);
+                  if (inp.residentsCount) parts.push(`Residents: ${inp.residentsCount}`);
+                  if (inp.pharmaStudentsCount) parts.push(`Pharma/Nursing: ${inp.pharmaStudentsCount}`);
+                  if (config.includeHospital && inp.count) parts.push(`Hospital HC: ${inp.count}`);
+                  return parts.length > 0 ? `UpToDate: ${parts.join(', ')}` : null;
+              } else if (id === 'lxd') {
+                  const parts = [];
+                  if (inp.totalStudentsCount) parts.push(`Total Students: ${inp.totalStudentsCount}`);
+                  if (inp.lxdAcademicSelect) parts.push(`Lexi-SELECT (Mobile App)`);
+                  if (inp.lxdAcademicMartindale) parts.push(`Martindale`);
+                  if (config.includeHospital && inp.count) parts.push(`Hospital Beds: ${inp.count}`);
+                  return parts.length > 0 ? `Lexicomp: ${parts.join(', ')}` : null;
+              }
+          }
+          if (!inp.count) return null;
           return `${AVAILABLE_PRODUCTS.find(p => p.id === id)?.shortName}: ${inp.count} ${AVAILABLE_PRODUCTS.find(p => p.id === id)?.countLabel}`;
       }).filter(Boolean).join(' | ');
       if (statsList) {
-          doc.text(`Statistics: ${statsList}`, 105, currentY + 21);
+          const splitStats = doc.splitTextToSize(`Statistics: ${statsList}`, 90);
+          doc.text(splitStats, 105, currentY + 21);
+          let statY = currentY + 21 + ((splitStats.length - 1) * 5);
+          
+          if (config.institutionType === InstitutionType.ACADEMIC && config.includeHospital && customerName) {
+              const sitesText = doc.splitTextToSize(`Designated Sites (2): ${customerName}, ${customerName} Hospital`, 90);
+              doc.text(sitesText, 105, statY + 5);
+          }
       }
   }
 

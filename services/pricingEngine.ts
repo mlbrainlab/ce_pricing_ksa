@@ -6,6 +6,7 @@ import {
   ChannelType,
   PricingMethod,
   ProductYearlyData,
+  InstitutionType,
 } from "../types.js";
 import {
   WHT_FACTOR,
@@ -17,6 +18,12 @@ import {
   LXD_VARIANTS,
   LXD_ADDONS,
   UTD_SM_BUCKETS,
+  UTD_ACADEMIC_FACULTY_PRICE,
+  UTD_ACADEMIC_STUDENT_MED,
+  UTD_ACADEMIC_STUDENT_PHARMA,
+  LXD_ACADEMIC_BASE,
+  LXD_ACADEMIC_SELECT,
+  LXD_ACADEMIC_MARTINDALE,
 } from "../constants.js";
 
 // Dynamic Net Factor Calculation based on Year index and Deal Type
@@ -54,9 +61,9 @@ const getNetFactor = (
   return 1.0;
 };
 
-const convertToSAR = (usdAmount: number): number => {
+const convertToSAR = (usdAmount: number, applyRounding: boolean): number => {
   const rawSar = usdAmount * EXCHANGE_RATE_SAR;
-  return Math.ceil(rawSar / 10) * 10; // Rounding to nearest 10 SAR for cleaner numbers
+  return applyRounding ? Math.ceil(rawSar / 100) * 100 : rawSar;
 };
 
 export const calculatePricing = (
@@ -75,7 +82,6 @@ export const calculatePricing = (
     renewalUpliftRates,
     applyWHT,
     flatPricing,
-    rounding,
   } = config;
 
   // Define Floors based on WHT setting
@@ -107,43 +113,99 @@ export const calculatePricing = (
 
     // NEW LOGO / STANDARD CALCULATION
     let listRate = 0;
-    if (prodId === "utd") {
-      if (inputs.variant === "SM") {
-        const c = inputs.count;
-        if (c > 499) {
-          listRate = 0;
-          productNotes.push("UTD SM: Count > 499 not applicable");
-        } else {
-          const bucket = UTD_SM_BUCKETS.find((b) => c >= b.min && c <= b.max);
-          listRate = bucket ? bucket.price : 0;
-          if (c > 0 && !bucket) productNotes.push("UTD SM: Count out of range");
-        }
-      } else {
-        listRate = UTD_VARIANTS[inputs.variant] || 0;
-      }
-      
-      // EAI Activation: +3% on list price for New Business / base list conversions
-      const eaiActive = inputs.eaiActivation ?? true;
-      if (eaiActive) {
-        listRate = listRate * 1.03;
-      }
-    } else if (prodId === "lxd") {
-      listRate = LXD_VARIANTS[inputs.variant] || 0;
-    } else {
-      listRate = definition?.defaultBasePrice || 0;
-    }
-
-    const count = inputs.count;
     let baseGross = 0;
-
-    if (prodId === "lxd" && inputs.variant === "Hospital Pharmacy Model") {
-      const extraUsers = Math.max(0, count - 6);
-      baseGross = 6500 + extraUsers * 1000;
+    
+    if (config.institutionType === InstitutionType.ACADEMIC) {
+      if (prodId === "utd") {
+        const faculty = Number(inputs.facultyCount) || 0;
+        const residents = Number(inputs.residentsCount) || 0;
+        const med = Number(inputs.medStudentsCount) || 0;
+        const pharma = Number(inputs.pharmaStudentsCount) || 0;
+        const eduDiscount = (Number(inputs.educationalDiscount) || 0) / 100;
+        const hospitalHc = Number(inputs.count) || 0;
+        
+        const academicClinicianBase = (faculty + residents) * UTD_ACADEMIC_FACULTY_PRICE;
+        let hospitalCost = 0;
+        if (config.includeHospital) {
+           const vPrice = inputs.variant === "UTDADV" ? UTD_VARIANTS["ANYWHERE"] : (UTD_VARIANTS[inputs.variant] || 0);
+           hospitalCost = hospitalHc * vPrice;
+           // Apply discount to hospital rate if bundled
+           hospitalCost = hospitalCost * (1 - eduDiscount);
+        }
+        
+        // If pure academic, discount applies to the faculty+residents cost
+        const finalAcademicClinicianCost = config.includeHospital ? academicClinicianBase : (academicClinicianBase * (1 - eduDiscount));
+        
+        const studentCost = (med * UTD_ACADEMIC_STUDENT_MED) + (pharma * UTD_ACADEMIC_STUDENT_PHARMA);
+        
+        baseGross = finalAcademicClinicianCost + studentCost + hospitalCost;
+        
+        if (inputs.variant === "UTDADV") {
+           baseGross = baseGross * 1.08;
+        }
+        
+        // EAI Activation
+        const eaiActive = inputs.eaiActivation ?? true;
+        if (eaiActive) {
+          baseGross = baseGross * 1.03;
+        }
+        
+      } else if (prodId === "lxd") {
+        const totalStudents = Number(inputs.totalStudentsCount) || 0;
+        const lxdBase = (inputs.lxdAcademicBase ?? true) ? LXD_ACADEMIC_BASE : 0;
+        const lxdSelect = inputs.lxdAcademicSelect ? LXD_ACADEMIC_SELECT : 0;
+        const lxdMartindale = inputs.lxdAcademicMartindale ? LXD_ACADEMIC_MARTINDALE : 0;
+        
+        const academicCost = totalStudents * (lxdBase + lxdSelect + lxdMartindale);
+        
+        let hospitalCost = 0;
+        if (config.includeHospital) {
+            const beds = Number(inputs.count) || 0;
+            const vPrice = LXD_VARIANTS[inputs.variant] || 0;
+            hospitalCost = beds * vPrice;
+        }
+        
+        baseGross = academicCost + hospitalCost;
+      }
     } else {
-      baseGross =
-        definition?.hasVariants || prodId === "utd" || prodId === "lxd"
-          ? count * listRate
-          : definition?.defaultBasePrice || 0;
+      // PROVIDER CALCULATION
+      if (prodId === "utd") {
+        if (inputs.variant === "SM") {
+          const c = inputs.count;
+          if (c > 499) {
+            listRate = 0;
+            productNotes.push("UTD SM: Count > 499 not applicable");
+          } else {
+            const bucket = UTD_SM_BUCKETS.find((b) => c >= b.min && c <= b.max);
+            listRate = bucket ? bucket.price : 0;
+            if (c > 0 && !bucket) productNotes.push("UTD SM: Count out of range");
+          }
+        } else {
+          listRate = UTD_VARIANTS[inputs.variant] || 0;
+        }
+        
+        // EAI Activation: +3% on list price for New Business / base list conversions
+        const eaiActive = inputs.eaiActivation ?? true;
+        if (eaiActive) {
+          listRate = listRate * 1.03;
+        }
+      } else if (prodId === "lxd") {
+        listRate = LXD_VARIANTS[inputs.variant] || 0;
+      } else {
+        listRate = definition?.defaultBasePrice || 0;
+      }
+
+      const count = inputs.count;
+
+      if (prodId === "lxd" && inputs.variant === "Hospital Pharmacy Model") {
+        const extraUsers = Math.max(0, count - 6);
+        baseGross = 6500 + extraUsers * 1000;
+      } else {
+        baseGross =
+          definition?.hasVariants || prodId === "utd" || prodId === "lxd"
+            ? count * listRate
+            : definition?.defaultBasePrice || 0;
+      }
     }
 
     year1ProductGross[prodId] = baseGross;
@@ -617,24 +679,6 @@ export const calculatePricing = (
     });
   }
 
-  if (rounding) {
-    selectedProducts.forEach((prodId) => {
-      const schedule = productSchedules[prodId];
-      for (let i = 0; i < globalRows; i++) {
-        const val = schedule[i];
-        if (val === 0) continue;
-        if (channel === ChannelType.DIRECT) {
-          schedule[i] = Math.ceil(val / 100) * 100;
-        } else {
-          const rawSAR = val * EXCHANGE_RATE_SAR;
-          const roundedSAR = Math.ceil(rawSAR / 1000) * 1000;
-          schedule[i] = roundedSAR / EXCHANGE_RATE_SAR;
-        }
-      }
-      productSchedules[prodId] = schedule;
-    });
-  }
-
   // --- Step 4: Aggregate and Format ---
   let totalTCV = 0,
     totalGrossUSD = 0,
@@ -658,13 +702,13 @@ export const calculatePricing = (
       breakdown.push({
         id: prodId,
         gross: val,
-        grossSAR: convertToSAR(val),
+        grossSAR: convertToSAR(val, config.rounding || false),
         net: netVal,
       });
       productNetTotals[prodId] += netVal;
     });
 
-    const yearGrossSAR = convertToSAR(yearSum);
+    const yearGrossSAR = convertToSAR(yearSum, config.rounding || false);
     const yearVatSAR = yearGrossSAR * 0.15;
     const yearGrandTotalSAR = yearGrossSAR + yearVatSAR;
     const recognizedUSD = yearSum * netFactor;
@@ -872,16 +916,9 @@ export const calculatePricing = (
 
     totalGross = (annualRate / 12) * Math.max(0, durationMonths);
 
-    if (config.rounding) {
-        if (channel === ChannelType.DIRECT) {
-            totalGross = Math.ceil(totalGross / 100) * 100;
-        } else {
-            const rawSAR = totalGross * EXCHANGE_RATE_SAR;
-            const roundedSAR = Math.ceil(rawSAR / 1000) * 1000;
-            totalGross = roundedSAR / EXCHANGE_RATE_SAR;
-        }
-    }
 
+
+    const midCycleGrossSAR = convertToSAR(totalGross, config.rounding || false);
     results.midCycleResults = {
       product: config.midCycleProduct,
       dlmSelected: config.midCycleDlm,
@@ -890,9 +927,9 @@ export const calculatePricing = (
       endUserGrossUSD: totalGross,
       netPriceUSD: totalGross * netFactor,
       commissionUSD: totalGross * (1 - netFactor),
-      grossSAR: totalGross * EXCHANGE_RATE_SAR,
-      vatSAR: totalGross * EXCHANGE_RATE_SAR * 0.15,
-      grandTotalSAR: totalGross * EXCHANGE_RATE_SAR * 1.15,
+      grossSAR: midCycleGrossSAR,
+      vatSAR: midCycleGrossSAR * 0.15,
+      grandTotalSAR: midCycleGrossSAR * 1.15,
       netPriceSAR: totalGross * netFactor * EXCHANGE_RATE_SAR,
       commissionSAR: totalGross * (1 - netFactor) * EXCHANGE_RATE_SAR,
       whtApplied: config.midCycleWHT

@@ -317,3 +317,11 @@ export const LXD_ADDONS = {
   IPE: 16,
   FLINK_IPE: 28, // 12 + 16
 };
+
+export const UTD_ACADEMIC_FACULTY_PRICE = 259;
+export const UTD_ACADEMIC_STUDENT_MED = 40;
+export const UTD_ACADEMIC_STUDENT_PHARMA = 28;
+
+export const LXD_ACADEMIC_BASE = 7;
+export const LXD_ACADEMIC_SELECT = 3;
+export const LXD_ACADEMIC_MARTINDALE = 1;

@@ -118,6 +118,27 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const [siteBreakdown, setSiteBreakdown] = useState<SiteBreakdownItem[]>([]);
   const [bulkPasteText, setBulkPasteText] = useState('');
 
+  const [autoSitesSyncedName, setAutoSitesSyncedName] = useState("");
+
+  React.useEffect(() => {
+    if (config.institutionType === "Academic Institutions" && config.includeHospital && customerName) {
+      if (!hasDesignatedSites && designatedSites === '') {
+        setHasDesignatedSites(true);
+        setDesignatedSites(`${customerName}\n${customerName} Hospital`);
+        setAutoSitesSyncedName(customerName);
+      } else if (hasDesignatedSites && designatedSites === `${autoSitesSyncedName}\n${autoSitesSyncedName} Hospital`) {
+        setDesignatedSites(`${customerName}\n${customerName} Hospital`);
+        setAutoSitesSyncedName(customerName);
+      }
+    } else if (config.institutionType === "Academic Institutions" && !config.includeHospital) {
+      if (hasDesignatedSites && designatedSites === `${autoSitesSyncedName}\n${autoSitesSyncedName} Hospital`) {
+        setHasDesignatedSites(false);
+        setDesignatedSites('');
+        setAutoSitesSyncedName('');
+      }
+    }
+  }, [config.institutionType, config.includeHospital, customerName, hasDesignatedSites, designatedSites, autoSitesSyncedName]);
+
   const [showCpModal, setShowCpModal] = useState(false);
 
   const handleBulkPaste = () => {
@@ -650,11 +671,36 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                 if(p && inp) {
                     let productName = p.name;
                     if (pid === 'utd') productName = 'UpToDate'; if (pid === 'lxd') productName = 'Lexidrug';
-                    let countLabelText = p.countLabel;
-                    if (p.countLabel === 'HC') countLabelText = 'clinicians'; if (p.countLabel === 'BC') countLabelText = 'active beds';
-                    if (pid === 'lxd' && inp.variant && (inp.variant.includes('Seats') || inp.variant === 'Hospital Pharmacy Model')) countLabelText = 'seats';
-                    const statsToPrint = inp.count > 0 ? inp.count : (inp.existingCount || 0);
-                    if (statsToPrint > 0) statsParts.push(`${statsToPrint.toLocaleString('en-US')} ${countLabelText} for ${productName}`);
+                    
+                    const metrics: string[] = [];
+                    if (config.institutionType === "Academic Institutions") {
+                        if (pid === 'utd') {
+                            if (inp.facultyCount) metrics.push(`${Number(inp.facultyCount).toLocaleString('en-US')} faculty members`);
+                            if (inp.medStudentsCount) metrics.push(`${Number(inp.medStudentsCount).toLocaleString('en-US')} medical students`);
+                            if (inp.residentsCount) metrics.push(`${Number(inp.residentsCount).toLocaleString('en-US')} residents`);
+                            if (inp.pharmaStudentsCount) metrics.push(`${Number(inp.pharmaStudentsCount).toLocaleString('en-US')} pharma/nursing students`);
+                            if (config.includeHospital && inp.count) metrics.push(`${Number(inp.count).toLocaleString('en-US')} hospital clinicians`);
+                        } else if (pid === 'lxd') {
+                            if (inp.totalStudentsCount) metrics.push(`${Number(inp.totalStudentsCount).toLocaleString('en-US')} total students`);
+                            if (config.includeHospital && inp.count) metrics.push(`${Number(inp.count).toLocaleString('en-US')} hospital active beds`);
+                        }
+                    } else {
+                        let countLabelText = p.countLabel;
+                        if (p.countLabel === 'HC') countLabelText = 'clinicians'; if (p.countLabel === 'BC') countLabelText = 'active beds';
+                        if (pid === 'lxd' && inp.variant && (inp.variant.includes('Seats') || inp.variant === 'Hospital Pharmacy Model')) countLabelText = 'seats';
+                        const statsToPrint = inp.count > 0 ? inp.count : (inp.existingCount || 0);
+                        if (statsToPrint > 0) metrics.push(`${statsToPrint.toLocaleString('en-US')} ${countLabelText}`);
+                    }
+                    
+                    if (metrics.length > 0) {
+                        if (metrics.length === 1) {
+                            statsParts.push(`${metrics[0]} for ${productName}`);
+                        } else if (metrics.length === 2) {
+                            statsParts.push(`${metrics[0]} and ${metrics[1]} for ${productName}`);
+                        } else {
+                            statsParts.push(`${metrics.join(', ')} for ${productName}`);
+                        }
+                    }
                 }
             });
         }
