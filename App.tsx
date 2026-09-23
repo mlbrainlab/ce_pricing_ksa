@@ -1663,7 +1663,7 @@ const App: React.FC = () => {
                                 {institutionType === InstitutionType.ACADEMIC && product.id === 'utd' && (
                                   <div className="col-span-2 grid grid-cols-2 gap-3 mb-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-100 dark:border-blue-800">
                                     <div>
-                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Faculty (M.D. / D.O.)</label>
+                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Faculty (M.D. / D.O.) <span className="text-red-500">*</span></label>
                                       <FormattedNumberInput value={input.facultyCount || 0} onChange={(val) => handleInputChange(product.id, 'facultyCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
                                     </div>
                                     <div>
@@ -1671,7 +1671,7 @@ const App: React.FC = () => {
                                       <FormattedNumberInput value={input.residentsCount || 0} onChange={(val) => handleInputChange(product.id, 'residentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
                                     </div>
                                     <div>
-                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Med Students</label>
+                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Med Students <span className="text-red-500">*</span></label>
                                       <FormattedNumberInput value={input.medStudentsCount || 0} onChange={(val) => handleInputChange(product.id, 'medStudentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
                                     </div>
                                     <div>
@@ -1715,7 +1715,7 @@ const App: React.FC = () => {
                                 {institutionType === InstitutionType.ACADEMIC && product.id === 'lxd' && (
                                   <div className="col-span-2 grid grid-cols-1 gap-2 mb-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-100 dark:border-blue-800">
                                     <div>
-                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Total Healthcare Students</label>
+                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Total Healthcare Students <span className="text-red-500">*</span></label>
                                       <FormattedNumberInput value={input.totalStudentsCount || 0} onChange={(val) => handleInputChange(product.id, 'totalStudentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
                                     </div>
                                     <div className="flex flex-col space-y-1 mt-1">
@@ -1723,7 +1723,7 @@ const App: React.FC = () => {
                                         <input type="checkbox" checked={input.lxdAcademicBase ?? true} onChange={(e) => handleInputChange(product.id, 'lxdAcademicBase', e.target.checked)} className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" /> LXD Base Package ($7)
                                       </label>
                                       <label className="flex items-center text-xs text-gray-700 dark:text-gray-300">
-                                        <input type="checkbox" checked={input.lxdAcademicSelect ?? false} onChange={(e) => handleInputChange(product.id, 'lxdAcademicSelect', e.target.checked)} className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" /> Lexi-SELECT (Mobile App) ($3)
+                                        <input type="checkbox" checked={input.lxdAcademicSelect ?? true} onChange={(e) => handleInputChange(product.id, 'lxdAcademicSelect', e.target.checked)} className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" /> Lexi-SELECT (Mobile App) ($3)
                                       </label>
                                       <label className="flex items-center text-xs text-gray-700 dark:text-gray-300">
                                         <input type="checkbox" checked={input.lxdAcademicMartindale ?? false} onChange={(e) => handleInputChange(product.id, 'lxdAcademicMartindale', e.target.checked)} className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" /> Martindale ($1)
@@ -1956,6 +1956,7 @@ const App: React.FC = () => {
                                           ? "New Stats"
                                           : product.countLabel}
                                       {isCountDisabled && " (Ignored)"}
+                                      <span className="text-red-500 ml-1">*</span>
                                     </label>
                                     <FormattedNumberInput
                                       value={input.count}
