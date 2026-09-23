@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { APP_VERSION, CHANGELOG } from '../constants';
 
-export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void; userName?: string; onProfileClick?: () => void; }> = ({ children, onLogout, userName, onProfileClick }) => {
+export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void; userName?: string; onProfileClick?: () => void; onMyQuotesClick?: () => void; isAdmin?: boolean; onAdminClick?: () => void; }> = ({ children, onLogout, userName, onProfileClick, onMyQuotesClick, isAdmin, onAdminClick }) => {
   const [themePref, setThemePref] = useState<'light' | 'dark' | 'system'>('system');
   const [mounted, setMounted] = useState(false);
   const [showReleaseAlert, setShowReleaseAlert] = useState(false);
@@ -100,6 +100,24 @@ export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void
           
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
+              {isAdmin && onAdminClick && (
+                <button
+                  onClick={onAdminClick}
+                  className="p-2 flex items-center gap-1 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-800/40 focus:outline-none transition-colors"
+                  title="Admin Dashboard"
+                >
+                  🛡️ <span className="hidden sm:inline text-sm font-medium">Admin</span>
+                </button>
+              )}
+              {onMyQuotesClick && (
+                <button
+                  onClick={onMyQuotesClick}
+                  className="p-2 flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none transition-colors"
+                  title="My Saved Quotes & Drafts"
+                >
+                  📂 <span className="hidden sm:inline text-sm font-medium">Quotes</span>
+                </button>
+              )}
               {onLogout && (
                 <button
                   onClick={onLogout}

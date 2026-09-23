@@ -48,8 +48,11 @@ const App: React.FC = () => {
   const [isAuthChecked, setIsAuthChecked] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isQuotesModalOpen, setIsQuotesModalOpen] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [customerName, setCustomerName] = useState("");
-  const [metadata, setMetadata] = useState<{
+    const [metadata, setMetadata] = useState<{
     availableProducts: ProductDefinition[];
     utdVariants: Record<string, number>;
     lxdVariants: Record<string, number>;
@@ -65,6 +68,12 @@ const App: React.FC = () => {
       if (session) {
         setIsAuthenticated(true);
         setUserProfile(session.user.user_metadata);
+        
+        // Check if admin
+        supabase.from('admins').select('user_id').eq('user_id', session.user.id).limit(1).then(({ data }) => {
+          if (data && data.length > 0) setIsAdmin(true);
+        });
+
         if (session.user.user_metadata) {
           const { first_name, last_name, quote_email, phone } = session.user.user_metadata;
           const fullName = [first_name, last_name].filter(Boolean).join(' ');
@@ -149,6 +158,13 @@ const App: React.FC = () => {
   const [dealType, setDealType] = useState<DealType>(DealType.NEW_LOGO);
   const [channel, setChannel] = useState<ChannelType>(ChannelType.DIRECT);
   const [institutionType, setInstitutionType] = useState<InstitutionType>(InstitutionType.PROVIDER);
+
+  // Auto-fill customer name for Academic Institutions
+  useEffect(() => {
+    if (institutionType === InstitutionType.ACADEMIC && !customerName.trim()) {
+      setCustomerName("___ University");
+    }
+  }, [institutionType]);
   const [includeHospital, setIncludeHospital] = useState<boolean>(false);
   
   // Mid-Cycle State Variables
@@ -1016,7 +1032,14 @@ const App: React.FC = () => {
   }
 
   return (
-    <Layout onLogout={handleLogout} userName={userProfile ? `${userProfile.first_name || ""} ${userProfile.last_name || ""}`.trim() : ""} onProfileClick={() => setIsProfileModalOpen(true)}>
+    <Layout 
+      onLogout={handleLogout} 
+      userName={userProfile ? `${userProfile.first_name || ""} ${userProfile.last_name || ""}`.trim() : ""} 
+      onProfileClick={() => setIsProfileModalOpen(true)}
+      isAdmin={isAdmin}
+      onAdminClick={() => setIsAdminModalOpen(true)}
+      onMyQuotesClick={() => setIsQuotesModalOpen(true)}
+    >
       <ProfileModal 
         isOpen={isProfileModalOpen} 
         onClose={() => setIsProfileModalOpen(false)} 
@@ -1036,13 +1059,8 @@ const App: React.FC = () => {
         </div>
       )}
       
-        <AdminPanel onLoadQuote={loadConfig} />
-        <QuotesManager 
-          currentConfig={config} 
-          currentResults={results} 
-          customerName={customerName}
-          onLoadQuote={loadConfig} 
-        />
+        
+        
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
         {/* Left Column: Configuration */}
         <div className="xl:col-span-1 space-y-6">
@@ -3690,6 +3708,23 @@ const App: React.FC = () => {
           )}
         </div>
       </div>
+    
+      {isQuotesModalOpen && (
+        <QuotesManager
+          currentConfig={config}
+          currentResults={results}
+          onLoadQuote={loadConfig}
+          customerName={customerName}
+          onClose={() => setIsQuotesModalOpen(false)}
+        />
+      )}
+      {isAdminModalOpen && (
+        <AdminPanel
+          onLoadQuote={loadConfig}
+          onClose={() => setIsAdminModalOpen(false)}
+        />
+      )}
+
     </Layout>
   );
 };
