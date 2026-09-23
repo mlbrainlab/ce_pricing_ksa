@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
+import { useSaveQuote } from '../hooks/useSaveQuote';
 import { Download, FileText, Table } from 'lucide-react';
 import { CalculationOutput, DealConfiguration, ChannelType, DealType, InstitutionType } from '../types';
 import { AVAILABLE_PRODUCTS, EXCHANGE_RATE_SAR } from '../constants';
@@ -75,6 +76,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     const [repName, setRepName] = useState(() => localStorage.getItem('wk_rep_name') || '');
   const [repPhone, setRepPhone] = useState(() => localStorage.getItem('wk_rep_phone') || '');
   const [repEmail, setRepEmail] = useState(() => localStorage.getItem('wk_rep_email') || '');
+  const { saveQuote, savingType } = useSaveQuote();
+  const isSavingDraft = savingType === 'draft';
+  const isSavingFinal = savingType === 'final';
+  const isSavingAny = savingType !== null;
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [isExcelLoading, setIsExcelLoading] = useState(false);
   
@@ -1447,6 +1452,23 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           </div>
 
           <div className="pt-6 border-t border-gray-100 dark:border-gray-700 flex flex-wrap gap-4">
+            <button 
+              onClick={() => saveQuote(true, config, data, customerName)} 
+              disabled={isSavingAny || !customerName.trim()} 
+              className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
+            >
+              {isSavingDraft ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <span className="text-xl">📝</span>}
+              {isSavingDraft ? 'Saving...' : 'Save Draft'}
+            </button>
+            <button 
+              onClick={() => saveQuote(false, config, data, customerName)} 
+              disabled={isSavingAny || !customerName.trim()} 
+              className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
+            >
+              {isSavingFinal ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <span className="text-xl">💾</span>}
+              {isSavingFinal ? 'Saving...' : 'Save Final'}
+            </button>
+
             <button 
               onClick={handlePDFPreview} 
               disabled={isPdfLoading || isFontLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (hasPartialMonths && !useStartDate))} 
