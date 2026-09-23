@@ -1,9 +1,25 @@
 
 import { ProductDefinition } from './types.js';
 
-export const APP_VERSION = '6.7.0';
+export const APP_VERSION = '6.8.0';
 
 export const CHANGELOG = [
+  {
+    version: "6.8.0",
+    date: new Date().toISOString().split('T')[0],
+    changes: [
+      "Introduced the Academic Pricing Engine for Academic Institutions",
+      "Added Super Admin Dashboard for organization-wide quote management",
+      "Moved My Quotes and Admin Panel to clean top-navigation Modals",
+      "Moved Save Draft and Save Final buttons to the bottom export section",
+      "Added Auto-Versioning for quotes with duplicate titles",
+      "Enforced Customer Name requirement for saving quotes",
+      "Added Academic Auto-fill for Customer Name",
+      "Fixed independent loading animations for save buttons",
+      "Locked rep names natively to saved quotes for robust database security"
+    ]
+  },
+
   {
     version: '6.7.0',
     date: '2026-09-18',

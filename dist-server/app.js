@@ -126559,6 +126559,272 @@ var getUserClient = (token) => {
 import cookieParser from "cookie-parser";
 
 // constants.ts
+var CHANGELOG = [
+  {
+    version: "6.8.0",
+    date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+    changes: [
+      "Introduced the Academic Pricing Engine for Academic Institutions",
+      "Added Super Admin Dashboard for organization-wide quote management",
+      "Moved My Quotes and Admin Panel to clean top-navigation Modals",
+      "Moved Save Draft and Save Final buttons to the bottom export section",
+      "Added Auto-Versioning for quotes with duplicate titles",
+      "Enforced Customer Name requirement for saving quotes",
+      "Added Academic Auto-fill for Customer Name",
+      "Fixed independent loading animations for save buttons",
+      "Locked rep names natively to saved quotes for robust database security"
+    ]
+  },
+  {
+    version: "6.7.0",
+    date: "2026-09-18",
+    changes: [
+      "Authentication Migration: Migrated away from static shared passcodes to dedicated user accounts using Supabase Auth (Email & Password).",
+      "Row-Level Security (RLS): Implemented database Row-Level Security ensuring strict isolation of user profiles and quote history.",
+      "Quotes Manager: Added Quotes Manager dashboard allowing users to save and resume drafts and finalized quotes securely to their accounts.",
+      "Profile Auto-fill: Integrated First Name, Last Name, Email, and Phone fields directly into User Profiles for automatic rendering in the Export views."
+    ]
+  },
+  {
+    version: "6.6.10",
+    date: "2026-09-17",
+    changes: [
+      "Partial-Year Calculations: Restructured core engine to support end-loaded partial terms. Terms up to 15 months combine into a single term; exceeding terms split into full 12-month standard years followed by the remaining prorated months.",
+      'Export Enhancements: Updated commercial schedule arrays in UI, PDF, and Excel to bundle row labeling accurately. Tables now reflect "Term X (YY months)" language alongside specific date ranges in exports.'
+    ]
+  },
+  {
+    version: "6.6.9",
+    date: "2026-09-02",
+    changes: [
+      "Extension Option B: Enabled customizable Extension Duration (Months) input, allowing users to specify custom extension months below or up to the 100K SAR ex-VAT threshold.",
+      "UI & PDF Fixes: Captured selected Extension Variant titles accurately in PDF cover pages, export filenames, and PDF/Excel previews.",
+      "Annual Increase (FPI) Input: Decimal FPI rates (e.g. 5.5%, 8.2%) unlocked across all multi-year structure inputs.",
+      "Session Lock: Added header Lock button for quick one-click return to login screen."
+    ]
+  },
+  {
+    version: "6.6.8",
+    date: "2026-07-28",
+    changes: [
+      "Extension PDF Export: Internal calculations omitted to show client values only (Product, Dates, Duration, End-User Price, VAT, Total), with optional Show Available Months/Days toggle.",
+      "Extension Option B Updates: Default Uplift FPI% set to 8.0% for UTD variants and 5.0% for LXD variants (editable), months-only Extension Duration display, and nearest-thousand value rounding (ROUNDUP to nearest 1,000).",
+      "Direct Context Safeguards: Automatically disables and greys out Round Up checkboxes for Direct channel context."
+    ]
+  },
+  {
+    version: "6.6.7",
+    date: "2026-07-15",
+    changes: [
+      "Added EAI Activation toggle for UTD with a 3% uplift defaults to ON for new business and 2026 renewals.",
+      "Reflected EAI inclusion silently within core FPI and List computations as per 2026 mandates."
+    ]
+  },
+  {
+    version: "6.6.6",
+    date: "2026-07-02",
+    changes: [
+      "Applying WHT on DLM and including DLM in prorated mid-cycle calculation.",
+      "Adjusted mid-cycle duration calculation to prorate annual rates including DLM additions and factoring WHT into the base calculation."
+    ]
+  },
+  {
+    version: "6.6.5",
+    date: "2026-06-25",
+    changes: [
+      "Mid-Cycle Add-on Quote functionality: Added structured workflows for UTD ADV, LXD FLINK, LXD IPE, and LXD FLINK+IPE expansions, including pro-rated monthly calculations and WHT adaptations.",
+      "Designated Sites UX enhancements: In-window site addition logic now arrays hospital name, clinicians, and bed count on simplified single rows.",
+      "Designated Sites workflow persistence: Ensures pasted text converts seamlessly to full site breakdowns dynamically without state loss when toggling.",
+      'Sites Export clarity: Export table headers now properly denote site names as "Hospital Name" and distinguish between "Clinicians" (UTD) and "Bed Count" (LXD).',
+      "Sites Export minimalism: Added functionality to omit extensive monetary distributions in exported sheets/PDFs, prioritizing clean site capability distributions."
+    ]
+  },
+  {
+    version: "6.6.4",
+    date: "2025-06-05",
+    changes: [
+      "Extension Option B Expansion: Added customizable Uplift FPI% input applying specified rate to current spend for exact fractional and integer month calculation within 100K SAR limits.",
+      'UI Refinement: Redesigned the Uplift FPI% fields with interactive "+" and "-" step buttons (incrementing/decrementing whole values) while supporting manual decimal inputs (up to one decimal place).',
+      "Rules Update: Simplified the Extension Finance approval threshold to apply selectively on any Uplift FPI% below 5% across both Option A and Option B.",
+      'UI Cleanup: Renamed "Difference to Extension (FPI %)" labels to "Uplift FPI%" for consistency with renewal uplift fields.',
+      "Loosened Variant Criteria for Rightsizing: MYPP is now fully unlocked for any UTD variant in renewal (including standard Anywhere, UTDADV, etc.)",
+      "Expiring Spend Floor Safeguard: Incorporated a strict mathematical check inside Step 3 (Multi-Year Projection) of the calculation engine.",
+      "Synchronized Real-Time Warning Alert Banner: The frontend client now dynamically extracts these reversion logs from the backend response in real-time, rendering a high-visibility red alert banner some commercial options.",
+      "Architect Notes & Build Safety Logs: These warnings are automatically archived inside the Architect Notes section and are formatted in both PDF and Excel exports."
+    ]
+  },
+  {
+    version: "6.6.3",
+    date: "2026-05-20",
+    changes: [
+      "Feature: Added UTDEE-EAI Pricing.",
+      "Pricing: Enable FPI less than standard with warning."
+    ]
+  },
+  {
+    version: "6.6.2",
+    date: "2026-05-12",
+    changes: [
+      "UI: Redesigned and streamlined Export Options section.",
+      'Feature: Restored and improved "Multiple Sites" list functionality allowing precise price breakdowns per site.',
+      'Feature: Restored "Technical Specifications" section in PDF exports.',
+      "UX: Improved Seller Information inputs alignment.",
+      "UX: Cleaned up unnecessary backend scripts."
+    ]
+  },
+  {
+    version: "6.6.1",
+    date: "2026-05-05",
+    changes: [
+      "Pricing logic update: In a renewal scenario, if the customer is renewing the same variant and changing only the statistics (bed or head), the rate used for the additional stats (aka upsell value) is now the expiring rate * FPI / existing stat.",
+      "Security: Full-stack migration of export and pricing logic.",
+      "Security: Proprietary constants removed from frontend bundle.",
+      'Feature: Default "Show Stats" for proposals.',
+      "Feature: Automated rounding for CP deals.",
+      "UI: Polish and modern icons for Export section."
+    ]
+  },
+  {
+    version: "6.6.0",
+    date: "2026-04-21",
+    changes: [
+      'Feature: Added specific "Channel Partner" (CP) export flow for Fulfillment and Partner-Sourced queries.',
+      'Feature: Intercepts PDF generation for CP deals to ask if the proposal is "Direct" or "CP".',
+      "Feature: Applies automated overriding data for Samir Group (Rep Name, Email, Phone) upon CP PDF selection.",
+      "Feature: Integrates exact Session-based CP quote counter tracking (AH/DDMMYY/XX) referencing logic in CP generated PDFs.",
+      "Feature: Injects Noto Sans Arabic fonts strictly via the PDF exporter to faithfully render localized CP footer phrasing.",
+      "Feature: Enhances dynamic PDF layout to offset CP-centric footer headers/border margins without occluding standard content like footnotes (EMR/Opt-out logic).",
+      "System: Updated PostHog analytical tracking SDK engine version for Doctor compliance (v1.369.5)."
+    ]
+  },
+  {
+    version: "6.5.6",
+    date: "2026-04-16",
+    changes: [
+      "UI: Replaced MYFPI/MYPP radio buttons with touch-friendly segmented pills.",
+      "UI: Color-coded product backgrounds (Green for UTD, Blue for LXD) to improve visual hierarchy in configuration and commercial schedules.",
+      "UI: Standardized Duration and Rate step-inputs to identical squared sizes with centered text.",
+      "UI: Replaced standard number inputs for Base Discount and Combo Discount with touch-friendly step buttons.",
+      "Feature: Fixed Android PWA top bar to dynamically inherit the application theme color (Dark/Light).",
+      "Feature: Changed the Architectural Note to use Customer ACV rather than TCV for comparing against Expiring Amount.",
+      "Feature: Appended Architectural Note directly into the PDF Export.",
+      "Export Update: Added exact product mix IDs into exported filenames."
+    ]
+  },
+  {
+    version: "6.5.5",
+    date: "2026-04-07",
+    changes: [
+      "Security: Migrated pricing engine to backend to protect proprietary algorithms.",
+      "Security: Implemented secure backend authentication and session management.",
+      "Feature: Rep details are now securely stored in local storage for convenience.",
+      "UI Update: Removed initials requirement from login screen."
+    ]
+  },
+  {
+    version: "6.5.4",
+    date: "2026-04-05",
+    changes: [
+      "Feature: Added 10-minute idle auto log-out for security.",
+      "Feature: Support for split pricing methods (e.g., UTD on MYPP, LXD on MYFPI).",
+      "Feature: Enforced $10,000 minimum Y1 value for MYPP (automatically reverts to MYFPI if not met).",
+      "Feature: Auto-switch annual increase percentages when toggling between MYPP and MYFPI.",
+      "Feature: Added Exception Form alert for out-of-bounds MYPP and MYFPI rates.",
+      "Feature: MYPP default rate automatically sets to 8%.",
+      "UI Fix: MYPP and FPI fields now accept 0 as a valid override.",
+      "UI Fix: Fixed RangeError when the number of years is left blank.",
+      "Bug Fix: Resolved PostHog client rate limiting errors by optimizing event capture.",
+      'Product Update (UTD SM): Changed product name to "UpToDate\xAE Subscriber Manager".',
+      "Product Update (UTD SM): Added specific terms to PDF and disabled irrelevant export checkboxes."
+    ]
+  },
+  {
+    version: "6.5.3",
+    date: "2026-04-03",
+    changes: [
+      "Logic Update: UTD Renewal calculations now strictly follow the new rules for Anywhere, Advanced, and EE.",
+      "Logic Update: Added EE eligibility check. Clients are ineligible for EE if their Anywhere/Advanced renewal is under $30k.",
+      "Logic Update: Added recommendation to upgrade to EE if renewal exceeds $30k."
+    ]
+  },
+  {
+    version: "6.5.2",
+    date: "2026-04-03",
+    changes: [
+      "Bug Fix: Duration field accepts clearing without RangeError.",
+      "Bug Fix: Reset Form now clears designated sites.",
+      'Bug Fix: "Include Start Date" auto-selects only for Renewal/Extension.',
+      "Feature: Customer Name is now mandatory for exports.",
+      "Feature: Added release notes alert for new version updates."
+    ]
+  },
+  {
+    version: "6.5.1",
+    date: "2026-04-01",
+    changes: [
+      "UI Refinements: Extension months navigation arrows.",
+      "UI Refinements: Numeric inputs format with comma separators.",
+      "PDF Fix: Product full names mapped correctly.",
+      "PDF Fix: Designated sites render for Extension Quotes.",
+      "PDF Fix: Font loading state clears on error.",
+      "PDF Fix: Footer alignment and table bolding adjusted."
+    ]
+  },
+  {
+    version: "6.5.0",
+    date: "2026-03-31",
+    changes: [
+      'Feature: "Use Full Extension" logic.',
+      "Feature: Auto Credential Capture.",
+      'Patch/Fix: Fixed infinite "processing..." bug in PDF export.',
+      'Patch/Fix: Added "Reset Form" button.'
+    ]
+  },
+  {
+    version: "6.4.0",
+    date: "2026-02-15",
+    changes: [
+      'Feature: Introduced "Extension" as a brand new Deal Type alongside New Logo and Renewal.',
+      "Feature: Added Option A (Pro-rated) and Option B (Flat Rate) calculation logic."
+    ]
+  },
+  {
+    version: "6.3.0",
+    date: "2026-01-10",
+    changes: [
+      'Feature: Added "Designated Sites" logic (Breakdown per site, showing sites only).',
+      "Feature: Added Start Date selection and logic.",
+      "Feature: Added WHT (Withholding Tax) toggles and Rounding options."
+    ]
+  },
+  {
+    version: "6.2.0",
+    date: "2025-11-20",
+    changes: [
+      "Feature: Implemented the Login screen with monthly passcodes and initials validation.",
+      "Feature: Added PostHog analytics to track user logins and quote generation.",
+      "Feature: Added Dark/Light mode toggling and responsive layout refinements."
+    ]
+  },
+  {
+    version: "6.1.0",
+    date: "2025-10-05",
+    changes: [
+      "Feature: Added the ability to generate and download professional PDF proposals.",
+      "Feature: Added the ability to export raw data to Excel (.xlsx) files.",
+      "Feature: Implemented dynamic tables and technical specification links in the exports."
+    ]
+  },
+  {
+    version: "6.0.0",
+    date: "2025-08-15",
+    changes: [
+      "Feature: The initial translation of the Excel pricing calculator into a React web application.",
+      "Feature: Core pricing engine (MYFPI, MYPP, Renewals, New Logo).",
+      "Feature: Product variants (UTD, LXD, Add-ons)."
+    ]
+  }
+];
 var WHT_FACTOR = 0.95;
 var EXCHANGE_RATE_SAR = 3.76;
 var STANDARD_FLOOR_RAW = 6500;
