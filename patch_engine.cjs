@@ -1,14 +1,12 @@
 const fs = require('fs');
 let code = fs.readFileSync('services/pricingEngine.ts', 'utf8');
 
-code = code.replace(
-  'const vPrice = UTD_VARIANTS[inputs.variant] || 0;',
-  'const vPrice = inputs.variant === "UTDADV" ? UTD_VARIANTS["ANYWHERE"] : (UTD_VARIANTS[inputs.variant] || 0);'
-);
+const anchor = `const academicClinicianBase = (faculty + residents) * UTD_ACADEMIC_FACULTY_PRICE;`;
+const replacement = `const academicClinicianBase = (faculty + residents) * (inputs.variant === "UTDEE" ? 210 : (inputs.variant === "UTDEE (265)" ? 265 : UTD_ACADEMIC_FACULTY_PRICE));`;
 
-code = code.replace(
-  'const lxdBase = inputs.lxdAcademicBase ? LXD_ACADEMIC_BASE : 0;',
-  'const lxdBase = (inputs.lxdAcademicBase ?? true) ? LXD_ACADEMIC_BASE : 0;'
-);
-
-fs.writeFileSync('services/pricingEngine.ts', code);
+if (code.includes(anchor)) {
+    fs.writeFileSync('services/pricingEngine.ts', code.replace(anchor, replacement));
+    console.log("Patched pricingEngine successfully.");
+} else {
+    console.log("Could not find anchor.");
+}

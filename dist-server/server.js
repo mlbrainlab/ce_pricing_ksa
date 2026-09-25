@@ -126948,7 +126948,7 @@ var calculatePricing = (config) => {
         const pharma = Number(inputs.pharmaStudentsCount) || 0;
         const eduDiscount = (Number(inputs.educationalDiscount) || 0) / 100;
         const hospitalHc = Number(inputs.count) || 0;
-        const academicClinicianBase = (faculty + residents) * UTD_ACADEMIC_FACULTY_PRICE;
+        const academicClinicianBase = (faculty + residents) * (inputs.variant === "UTDEE" ? 210 : inputs.variant === "UTDEE (265)" ? 265 : UTD_ACADEMIC_FACULTY_PRICE);
         let hospitalCost = 0;
         if (config.includeHospital) {
           const vPrice = inputs.variant === "UTDADV" ? UTD_VARIANTS["ANYWHERE"] : UTD_VARIANTS[inputs.variant] || 0;

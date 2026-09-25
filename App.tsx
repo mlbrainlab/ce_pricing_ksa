@@ -1620,7 +1620,7 @@ const App: React.FC = () => {
 
                       // Variants Filtering
                       const allowedTargetVariants = institutionType === InstitutionType.ACADEMIC
-                        ? (product.id === "utd" ? ["ANYWHERE", "UTDADV"] : ["BASE PKG", "BASE PKG+FLINK", "BASE PKG+FLINK+IPE"])
+                        ? (product.id === "utd" ? ["ANYWHERE", "UTDADV", "UTDEE"] : ["BASE PKG", "BASE PKG+FLINK", "BASE PKG+FLINK+IPE", "EE-Combo", "EE-Combo+FLINK", "EE-Combo+FLINK+IPE"])
                         : isRenewal
                         ? getAllowedTargetVariants(product.id, existingVariant)
                         : product.id === "utd"
@@ -1807,7 +1807,7 @@ const App: React.FC = () => {
                                           Object.keys(
                                             metadata?.utdVariants || {},
                                           ).map((v) => {
-                                            if (institutionType === InstitutionType.ACADEMIC && !["ANYWHERE", "UTDADV"].includes(v))
+                                            if (institutionType === InstitutionType.ACADEMIC && !["ANYWHERE", "UTDADV", "UTDEE"].includes(v))
                                               return null;
                                             return (
                                               <option key={v} value={v}>
@@ -1819,9 +1819,9 @@ const App: React.FC = () => {
                                           Object.keys(
                                             metadata?.lxdVariants || {},
                                           ).map((v) => {
-                                            if (v.includes("EE-Combo"))
+                                            if (v.includes("EE-Combo") && institutionType !== InstitutionType.ACADEMIC)
                                               return null;
-                                            if (institutionType === InstitutionType.ACADEMIC && !["BASE PKG", "BASE PKG+FLINK", "BASE PKG+FLINK+IPE"].includes(v))
+                                            if (institutionType === InstitutionType.ACADEMIC && !["BASE PKG", "BASE PKG+FLINK", "BASE PKG+FLINK+IPE", "EE-Combo", "EE-Combo+FLINK", "EE-Combo+FLINK+IPE"].includes(v))
                                               return null;
                                             return (
                                               <option key={v} value={v}>
