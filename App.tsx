@@ -676,7 +676,7 @@ const App: React.FC = () => {
           (p: any) => p.id === "utd",
         );
         if (utdY1 && utdY1.gross < 30000) {
-          return "Warning: UTDEE deals under $30k/year require additional approval.";
+          return "Year 1 ACV should >= $30K to qualify for EE";
         }
       }
     }
@@ -808,20 +808,7 @@ const App: React.FC = () => {
         }
       }
 
-      // Specific Logic: If UTD Variant becomes UTDEE or UTDEE (265), enforce min count 90
-      if (
-        id === "utd" &&
-        field === "variant" &&
-        (value === "UTDEE" || value === "UTDEE (265)")
-      ) {
-        if (newState["utd"].count < 90) {
-          newState["utd"].count = 90;
-          setNotification(
-            "Headcount adjusted to 90 (Minimum for UTD Enterprise)",
-          );
-          setTimeout(() => setNotification(null), 3000);
-        }
-      }
+      // Removed 90 HC minimum for UTDEE, restriction is now based on $30k deal size
 
       // UTD SM Variant Check
       if (id === "utd" && field === "variant" && value === "SM") {
@@ -874,13 +861,7 @@ const App: React.FC = () => {
 
       if (id === "utd" && field === "count") {
         const currentCount = prevInput.count;
-        if (prevInput.variant?.includes("UTDEE") && currentCount < 90) {
-          newState["utd"].variant = "UTDADV";
-          setNotification(
-            "Variant switched to UTD Advanced (UTD EE requires 90+ HC)",
-          );
-          setTimeout(() => setNotification(null), 3000);
-        }
+        // Removed 90 HC minimum for UTDEE fallback
         if (prevInput.variant === "SM" && currentCount > 499) {
           newState["utd"].variant = "UTDADV"; // Fallback to ADV
           setNotification(
@@ -1652,6 +1633,11 @@ const App: React.FC = () => {
                             >
                               {product.name}
                             </span>
+                            {product.id === "utd" && utdEeWarning && (
+                              <span className="ml-auto text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded">
+                                {utdEeWarning}
+                              </span>
+                            )}
                           </div>
 
                           {/* Expanded Input Row */}
@@ -1678,7 +1664,7 @@ const App: React.FC = () => {
                                       <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Pharma/Nursing Students</label>
                                       <FormattedNumberInput value={input.pharmaStudentsCount || 0} onChange={(val) => handleInputChange(product.id, 'pharmaStudentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
                                     </div>
-                                    { ((Number(input.facultyCount)||0) + (Number(input.residentsCount)||0) >= 50 && (Number(input.medStudentsCount)||0) + (Number(input.pharmaStudentsCount)||0) >= 1) && (
+                                    { ((Number(input.facultyCount)||0) + (Number(input.residentsCount)||0) >= 50 || (Number(input.medStudentsCount)||0) + (Number(input.pharmaStudentsCount)||0) >= 1) && (
                                       <div className="col-span-2 mt-2 pt-2 border-t border-blue-200 dark:border-blue-700 w-1/2">
                                         <label className="block text-[10px] text-pink-600 dark:text-pink-400 font-bold mb-1">Educational Discount % (Max 20%)</label>
                                         <div className="mt-1 flex items-center border border-pink-300 dark:border-pink-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 h-8">
@@ -3613,6 +3599,7 @@ const App: React.FC = () => {
             extensionResults={extensionResults}
             isMidCycleQuote={isMidCycleQuote}
             renewalNotes={renewalNotes}
+            exportDisabledMessage={utdEeWarning}
           />
 
           {!isExtensionQuote && (
@@ -3625,11 +3612,6 @@ const App: React.FC = () => {
                   <h4 className="text-sm font-bold text-yellow-800 dark:text-yellow-200">
                     Architect Notes
                   </h4>
-                  {utdEeWarning && (
-                    <span className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded">
-                      {utdEeWarning}
-                    </span>
-                  )}
                 </div>
                 <svg
                   className={`w-5 h-5 text-yellow-700 dark:text-yellow-300 transform transition-transform duration-200 ${isArchitectNotesOpen ? "rotate-180" : ""}`}

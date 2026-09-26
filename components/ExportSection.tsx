@@ -25,6 +25,7 @@ interface ExportSectionProps {
   extensionResults?: any;
   isMidCycleQuote?: boolean;
   renewalNotes?: string[];
+  exportDisabledMessage?: string | null;
 }
 
 const FONT_URLS = {
@@ -71,7 +72,7 @@ const formatMoney = (amount: number, currency: string) => {
 
 export const ExportSection: React.FC<ExportSectionProps> = ({ 
   data, config, useStartDate, setUseStartDate, startMonthYear, setStartMonthYear,
-  isExtensionQuote, extensionResults, isMidCycleQuote, renewalNotes = [], customerName, setCustomerName
+  isExtensionQuote, extensionResults, isMidCycleQuote, renewalNotes = [], customerName, setCustomerName, exportDisabledMessage
 }) => {
     const [repName, setRepName] = useState(() => localStorage.getItem('wk_rep_name') || '');
   const [repPhone, setRepPhone] = useState(() => localStorage.getItem('wk_rep_phone') || '');
@@ -1471,7 +1472,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
             <button 
               onClick={handlePDFPreview} 
-              disabled={isPdfLoading || isFontLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (hasPartialMonths && !useStartDate))} 
+              disabled={!!exportDisabledMessage || isPdfLoading || isFontLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (hasPartialMonths && !useStartDate))} 
               className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
             >
               {isPdfLoading || isFontLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FileText className="w-5 h-5" />}
@@ -1479,7 +1480,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             </button>
             <button 
               onClick={handlePDFExport} 
-              disabled={isPdfLoading || isFontLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (hasPartialMonths && !useStartDate))} 
+              disabled={!!exportDisabledMessage || isPdfLoading || isFontLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (hasPartialMonths && !useStartDate))} 
               className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
             >
               {isPdfLoading || isFontLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Download className="w-5 h-5" />}
@@ -1487,13 +1488,18 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             </button>
             <button 
               onClick={handleExcelExport} 
-              disabled={isExcelLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (hasPartialMonths && !useStartDate))} 
+              disabled={!!exportDisabledMessage || isExcelLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (hasPartialMonths && !useStartDate))} 
               className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
             >
               {isExcelLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Table className="w-5 h-5" />}
               {isExcelLoading ? 'Generating Excel...' : 'Export to Excel'}
             </button>
           </div>
+          {exportDisabledMessage && (
+            <div className="mt-2 text-sm text-red-600 font-bold bg-red-100 p-3 rounded-md">
+              {exportDisabledMessage}
+            </div>
+          )}
           {((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (hasPartialMonths && !useStartDate)) && (
             <div className="mt-2 text-xs text-red-500 font-medium">
               Please select "Include Start Date" to enable exporting for Renewals and Extensions.
