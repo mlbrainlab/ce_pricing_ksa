@@ -126565,8 +126565,22 @@ import cookieParser from "cookie-parser";
 // constants.ts
 var CHANGELOG = [
   {
-    version: "6.8.0",
+    version: "6.8.1",
     date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+    changes: [
+      "Removed hardcoded 90 headcount minimum for UTDEE",
+      "Restricted UTDEE in New Logo to >= $30,000 ACV and added threshold alert",
+      "Restricted UTDEE upgrade in Renewals to >= $15,000 expiring value",
+      "Auto-adjust 'Renewal Uplift' field for Variant transitions (e.g. 11% for ANYWHERE -> UTDEE)",
+      "Moved stacked variant-upgrade FPI math (e.g. ANYWHERE -> UTDADV) into the Commercial Schedule",
+      "Removed EAI (265) variants from selection",
+      "Fixed Educational discount appearance logic",
+      "Toggled 'Apply annual increase for Year 2+' on by default"
+    ]
+  },
+  {
+    version: "6.8.0",
+    date: "2026-09-27",
     changes: [
       "Introduced the Academic Pricing Engine for Academic Institutions",
       "Added Super Admin Dashboard for organization-wide quote management",
