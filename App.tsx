@@ -156,6 +156,25 @@ const App: React.FC = () => {
 
   // Deal State
   const [dealType, setDealType] = useState<DealType>(DealType.NEW_LOGO);
+
+  const handleDealTypeChange = (newType: DealType) => {
+    setDealType(newType);
+    if (newType === DealType.RENEWAL) {
+      setProductInputs((prev) => {
+        const next = { ...prev };
+        if (next["utd"] && next["utd"].variant === "UTDEE" && next["utd"].existingVariant !== "UTDEE") {
+          const exp = Number(next["utd"].expiringAmount) || 0;
+          if (exp < 15000) {
+            setNotification("UTD-EE is only available for expiring value ≥ $15,000.");
+            setTimeout(() => setNotification(null), 3000);
+            next["utd"] = { ...next["utd"], variant: next["utd"].existingVariant || "ANYWHERE" };
+          }
+        }
+        return next;
+      });
+    }
+  };
+
   const [channel, setChannel] = useState<ChannelType>(ChannelType.DIRECT);
   const [institutionType, setInstitutionType] = useState<InstitutionType>(InstitutionType.PROVIDER);
 
@@ -213,7 +232,7 @@ const App: React.FC = () => {
   );
 
   // Structure Rates (Multi-Year logic: FPI or Reverse Discount)
-  const [applyAnnualRate, setApplyAnnualRate] = useState<boolean>(false); // Toggle for Renewal MYFPI
+  const [applyAnnualRate, setApplyAnnualRate] = useState<boolean>(true); // Toggle for Renewal MYFPI
   const [globalRateVal, setGlobalRateVal] = useState<number>(5);
   const [utdRateVal, setUtdRateVal] = useState<number>(8); // Default 8%
   const [lxdRateVal, setLxdRateVal] = useState<number>(5);
@@ -667,7 +686,7 @@ const App: React.FC = () => {
 
   // Validation Logic for UTDEE
   const utdEeWarning = useMemo(() => {
-    if (selectedProductIds.includes("utd")) {
+    if (dealType === DealType.NEW_LOGO && selectedProductIds.includes("utd")) {
       const inputs = productInputs["utd"];
       if (inputs.variant?.includes("UTDEE")) {
         // Check Year 1 Gross USD for UTD
@@ -676,12 +695,12 @@ const App: React.FC = () => {
           (p: any) => p.id === "utd",
         );
         if (utdY1 && utdY1.gross < 30000) {
-          return "Year 1 ACV should >= $30K to qualify for EE";
+          return "Year 1 ACV should ≥ $30K to qualify for EE";
         }
       }
     }
     return null;
-  }, [results, selectedProductIds, productInputs]);
+  }, [results, selectedProductIds, productInputs, dealType]);
 
   // Calculate Monthly Costs for Architect Notes
   const monthlyCosts = useMemo(() => {
@@ -782,11 +801,31 @@ const App: React.FC = () => {
     value: string | number | boolean,
   ) => {
     // EAI Activation Renewal Uplift sync
-    if (id === "utd" && field === "eaiActivation" && dealType === DealType.RENEWAL) {
-      if (value === true) {
-        setRenewalUpliftUTD(11);
-      } else {
-        setRenewalUpliftUTD(8);
+    // Auto-adjust UTD uplift field when variant or existingVariant changes in RENEWAL
+    if (id === "utd" && dealType === DealType.RENEWAL && (field === "variant" || field === "existingVariant")) {
+      const currentUtd = productInputs["utd"] || {};
+      let ext = field === "existingVariant" ? (value as string) : (currentUtd.existingVariant || "");
+      let tgt = field === "variant" ? (value as string) : (currentUtd.variant || "");
+
+      if (field === "existingVariant") {
+        if (typeof value === "string" && value.includes("UTDEE")) {
+          tgt = value as string;
+          setUtdRateVal(8);
+        }
+      }
+
+      let newUplift = 8;
+      if (ext !== "UTDEE" && tgt === "UTDEE") {
+        newUplift = 11;
+      } else if (ext === "UTDEE" && tgt === "UTDEE") {
+        newUplift = 8;
+      } else if (ext === "ANYWHERE" && tgt === "UTDADV") {
+        newUplift = 8;
+      }
+      
+      setRenewalUpliftUTD(newUplift);
+      if (!showSplitRates) {
+        setRenewalUpliftGlobal(newUplift);
       }
     }
 
@@ -825,19 +864,8 @@ const App: React.FC = () => {
 
       // Reset logic when Existing Variant changes
       if (dealType === DealType.RENEWAL && field === "existingVariant") {
-        // If existing changes, reset target variant to match existing initially
-        // to avoid invalid combinations.
-        // EXCEPTION: If Existing is UTDEE, Target must be UTDEE
         if (typeof value === "string" && value.includes("UTDEE")) {
           newState[id].variant = value as string;
-          if (id === "utd") {
-            setUtdRateVal(8);
-            if (newState[id].eaiActivation === true || newState[id].eaiActivation === undefined) {
-              setRenewalUpliftUTD(11);
-            } else {
-              setRenewalUpliftUTD(8);
-            }
-          }
         } else {
           newState[id].variant = value as string;
         }
@@ -845,6 +873,22 @@ const App: React.FC = () => {
         // Also reset upgrade checkboxes
         newState[id].changeInStats = false;
         newState[id].forceHeadcountOverride = false;
+      }
+
+      // Rule: UTD-EE is only available for expiring value >= 15000 in Renewals
+      if (id === "utd" && dealType === DealType.RENEWAL) {
+        if (field === "expiringAmount" || field === "variant" || field === "existingVariant") {
+           const expAmount = field === "expiringAmount" ? Number(value) : Number(newState.utd.expiringAmount || 0);
+           const tgtVar = field === "variant" ? value : newState.utd.variant;
+           const extVar = field === "existingVariant" ? value : newState.utd.existingVariant;
+           
+           if (tgtVar === "UTDEE" && extVar !== "UTDEE" && expAmount < 15000) {
+              setNotification("UTD-EE is only available for expiring value ≥ $15,000");
+              setTimeout(() => setNotification(null), 3000);
+              // auto-revert to existing variant
+              newState.utd.variant = extVar as string;
+           }
+        }
       }
 
       return newState;
@@ -880,14 +924,13 @@ const App: React.FC = () => {
     existingVariant: string,
   ) => {
     if (productId === "utd") {
-      if (existingVariant === "UTDEE (265)") return ["UTDEE (265)"];
-      if (existingVariant === "UTDEE") return ["UTDEE", "UTDEE (265)"];
+      if (existingVariant === "UTDEE") return ["UTDEE"];
 
-      // Anywhere -> Anywhere, Adv, EE, EE-EAI
+      // Anywhere -> Anywhere, Adv, EE
       if (existingVariant === "ANYWHERE")
-        return ["ANYWHERE", "UTDADV", "UTDEE", "UTDEE (265)"];
-      // Adv -> Adv, EE, EE-EAI
-      if (existingVariant === "UTDADV") return ["UTDADV", "UTDEE", "UTDEE (265)"];
+        return ["ANYWHERE", "UTDADV", "UTDEE"];
+      // Adv -> Adv, EE
+      if (existingVariant === "UTDADV") return ["UTDADV", "UTDEE"];
     }
     if (productId === "lxd") {
       if (existingVariant === "BASE PKG")
@@ -1112,7 +1155,7 @@ const App: React.FC = () => {
                 <select
                   className="mt-1 block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   value={dealType}
-                  onChange={(e) => setDealType(e.target.value as DealType)}
+                  onChange={(e) => handleDealTypeChange(e.target.value as DealType)}
                 >
                   <option value={DealType.NEW_LOGO}>New Logo</option>
                   <option value={DealType.RENEWAL}>Renewal</option>
@@ -1600,13 +1643,17 @@ const App: React.FC = () => {
                       }
 
                       // Variants Filtering
-                      const allowedTargetVariants = institutionType === InstitutionType.ACADEMIC
+                      let allowedTargetVariants = institutionType === InstitutionType.ACADEMIC
                         ? (product.id === "utd" ? ["ANYWHERE", "UTDADV", "UTDEE"] : ["BASE PKG", "BASE PKG+FLINK", "BASE PKG+FLINK+IPE", "EE-Combo", "EE-Combo+FLINK", "EE-Combo+FLINK+IPE"])
                         : isRenewal
                         ? getAllowedTargetVariants(product.id, existingVariant)
                         : product.id === "utd"
-                          ? Object.keys(metadata?.utdVariants || {})
+                          ? Object.keys(metadata?.utdVariants || {}).filter(v => v !== "UTDEE (265)")
                           : Object.keys(metadata?.lxdVariants || {});
+
+                      if (isRenewal && product.id === "utd" && existingVariant !== "UTDEE" && (Number(input.expiringAmount) || 0) < 15000) {
+                        allowedTargetVariants = allowedTargetVariants.filter(v => v !== "UTDEE");
+                      }
 
                       const isUTDSM =
                         product.id === "utd" && input.variant === "SM";
@@ -1793,6 +1840,7 @@ const App: React.FC = () => {
                                           Object.keys(
                                             metadata?.utdVariants || {},
                                           ).map((v) => {
+                                            if (v === "UTDEE (265)") return null;
                                             if (institutionType === InstitutionType.ACADEMIC && !["ANYWHERE", "UTDADV", "UTDEE"].includes(v))
                                               return null;
                                             return (

@@ -127047,39 +127047,13 @@ var calculatePricing = (config) => {
               return applyWHT ? net / WHT_FACTOR : net;
             } else {
               if (existing === "ANYWHERE" && currentTarget === "UTDADV") {
-                return effectiveStats * expiringRate * (1 + upliftVal / 100 + 0.08);
-              } else if (existing === "ANYWHERE" && currentTarget === "UTDEE") {
-                return effectiveStats * expiringRate * 1.11;
-              } else if (existing === "UTDADV" && currentTarget === "UTDEE") {
-                return effectiveStats * expiringRate * 1.11;
-              } else if ((existing === "ANYWHERE" || existing === "UTDADV") && currentTarget === "UTDEE (265)") {
-                return effectiveStats * expiringRate * 1.14;
-              } else if (existing === "UTDEE" && currentTarget === "UTDEE (265)") {
-                return effectiveStats * expiringRate * 1.11;
-              } else {
-                return effectiveStats * expiringRate * (1 + upliftVal / 100);
+                return effectiveStats * expiringRate * (1 + upliftVal / 100) * 1.08;
               }
+              return effectiveStats * expiringRate * (1 + upliftVal / 100);
             }
           }
         };
         pathBasedPrice = calculatePriceForTarget(target);
-        let isEligibleForEE = false;
-        if (existing === "UTDEE" || existing === "UTDEE (265)") {
-          isEligibleForEE = true;
-        } else if (pathBasedPrice > 3e4) {
-          isEligibleForEE = true;
-        }
-        if ((target === "UTDEE" || target === "UTDEE (265)") && !isEligibleForEE) {
-          productNotes.push(
-            `UTD: Ineligible for EE (Renewal < $30k). Reverting to ${existing}.`
-          );
-          finalTarget = existing;
-          pathBasedPrice = calculatePriceForTarget(finalTarget);
-        } else if (finalTarget !== "UTDEE" && finalTarget !== "UTDEE (265)" && isEligibleForEE) {
-          productNotes.push(
-            `UTD: Renewal > $30k. Recommend upgrading to UTD EE.`
-          );
-        }
         const isStatsIncrease = inputs.changeInStats && inputs.count > (inputs.existingCount || 0);
         if (isStatsIncrease && existing === finalTarget) {
           productNotes.push(
@@ -127091,15 +127065,9 @@ var calculatePricing = (config) => {
           );
         } else if (existing !== finalTarget) {
           if (existing === "ANYWHERE" && finalTarget === "UTDADV") {
-            productNotes.push(`UTD: Upsell Anywhere -> Adv (+8% applied)`);
-          } else if (finalTarget === "UTDEE") {
-            productNotes.push(
-              `UTD: Upsell to EE (${upliftVal < 8 ? "Exception: " : ""}11% uplift recommendation applies)`
-            );
-          } else if (finalTarget === "UTDEE (265)") {
-            productNotes.push(
-              `UTD: Upsell to EE-EAI (${upliftVal < 8 ? "Exception: " : ""}${existing === "UTDEE" ? "11%" : "14%"} uplift recommendation applies)`
-            );
+            productNotes.push(`UTD: Upsell ANYWHERE -> UTDADV (${upliftVal}% FPI + 8% upsell applied)`);
+          } else {
+            productNotes.push(`UTD: Upsell ${existing} -> ${finalTarget} (${upliftVal}% uplift applied)`);
           }
         }
         actualY1Price = pathBasedPrice;
