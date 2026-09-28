@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
+import { useAutoState } from '../hooks/useAutoState';
 import { useSaveQuote } from '../hooks/useSaveQuote';
 import { Download, FileText, Table } from 'lucide-react';
 import { CalculationOutput, DealConfiguration, ChannelType, DealType, InstitutionType } from '../types';
@@ -84,8 +85,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [isExcelLoading, setIsExcelLoading] = useState(false);
   
-  const [includeRenewalIncreaseInfo, setIncludeRenewalIncreaseInfo] = useState(false);
-  const [includeCalcDetails, setIncludeCalcDetails] = useState(true);
+  const [includeRenewalIncreaseInfo, setIncludeRenewalIncreaseInfo] = useAutoState('includeRenewalIncreaseInfo', false);
+  const [includeCalcDetails, setIncludeCalcDetails] = useAutoState('includeCalcDetails', true);
   React.useEffect(() => {
     const authName = localStorage.getItem('wk_auth_name');
     if (authName) {
@@ -104,24 +105,24 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
   const isUtdSm = config.selectedProducts.includes('utd') && config.productInputs['utd']?.variant === 'SM';
   const isIndirect = config.channel !== ChannelType.DIRECT;
-  const [showStats, setShowStats] = useState(true);
-  const [showMonthlyCost, setShowMonthlyCost] = useState(false);
-  const [showTotals, setShowTotals] = useState(true);
-  const [showEmrIntegration, setShowEmrIntegration] = useState(true);
-  const [hasOptOutClause, setHasOptOutClause] = useState(false);
+  const [showStats, setShowStats] = useAutoState('showStats', true);
+  const [showMonthlyCost, setShowMonthlyCost] = useAutoState('showMonthlyCost', false);
+  const [showTotals, setShowTotals] = useAutoState('showTotals', true);
+  const [showEmrIntegration, setShowEmrIntegration] = useAutoState('showEmrIntegration', true);
+  const [hasOptOutClause, setHasOptOutClause] = useAutoState('hasOptOutClause', false);
   
   const canShowFLinkIntegration = config.selectedProducts.includes('utd') && config.selectedProducts.includes('lxd') && (config.productInputs['lxd']?.variant || '').includes('FLINK');
-  const [showFLinkIntegration, setShowFLinkIntegration] = useState(false);
-  const [showAvailableMonths, setShowAvailableMonths] = useState(false);
+  const [showFLinkIntegration, setShowFLinkIntegration] = useAutoState('showFLinkIntegration', false);
+  const [showAvailableMonths, setShowAvailableMonths] = useAutoState('showAvailableMonths', false);
 
-  const [hasDesignatedSites, setHasDesignatedSites] = useState(false);
-  const [designatedSites, setDesignatedSites] = useState('');
+  const [hasDesignatedSites, setHasDesignatedSites] = useAutoState('hasDesignatedSites', false);
+  const [designatedSites, setDesignatedSites] = useAutoState('designatedSites', '');
   const [isSiteModalOpen, setIsSiteModalOpen] = useState(false);
   const [isStartDateModalOpen, setIsStartDateModalOpen] = useState(false);
   
-  const [isBreakdownPerSite, setIsBreakdownPerSite] = useState(false);
-  const [showSitesOnly, setShowSitesOnly] = useState(false);
-  const [siteBreakdown, setSiteBreakdown] = useState<SiteBreakdownItem[]>([]);
+  const [isBreakdownPerSite, setIsBreakdownPerSite] = useAutoState('isBreakdownPerSite', false);
+  const [showSitesOnly, setShowSitesOnly] = useAutoState('showSitesOnly', false);
+  const [siteBreakdown, setSiteBreakdown] = useAutoState<SiteBreakdownItem[]>('siteBreakdown', []);
   const [bulkPasteText, setBulkPasteText] = useState('');
 
   const [autoSitesSyncedName, setAutoSitesSyncedName] = useState("");

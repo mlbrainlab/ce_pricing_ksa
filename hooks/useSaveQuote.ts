@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { autoStateValues } from './useAutoState';
 import { supabase } from '../components/auth';
 
 export function useSaveQuote() {
@@ -59,7 +60,7 @@ export function useSaveQuote() {
         .insert([{
           user_id: session.user.id,
           title: versionedTitle,
-          config: currentConfig,
+          config: { ...currentConfig, uiState: autoStateValues },
           results: currentResults,
           is_draft: isDraft,
           rep_name: `${session.user.user_metadata?.first_name || 'Unknown'} ${session.user.user_metadata?.last_name || 'Rep'}`.trim()

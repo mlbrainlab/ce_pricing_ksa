@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useAutoState, restoreAutoState } from "./hooks/useAutoState";
 import posthog from "posthog-js";
 import Login from "./components/Login";
 import { Layout } from "./components/Layout";
@@ -51,7 +52,7 @@ const App: React.FC = () => {
   const [isQuotesModalOpen, setIsQuotesModalOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [customerName, setCustomerName] = useState("");
+  const [customerName, setCustomerName] = useAutoState<string>("customerName", "");
     const [metadata, setMetadata] = useState<{
     availableProducts: ProductDefinition[];
     utdVariants: Record<string, number>;
@@ -155,7 +156,7 @@ const App: React.FC = () => {
   }, [isAuthenticated]);
 
   // Deal State
-  const [dealType, setDealType] = useState<DealType>(DealType.NEW_LOGO);
+  const [dealType, setDealType] = useAutoState<DealType>('dealType', DealType.NEW_LOGO);
 
   const handleDealTypeChange = (newType: DealType) => {
     setDealType(newType);
@@ -175,8 +176,8 @@ const App: React.FC = () => {
     }
   };
 
-  const [channel, setChannel] = useState<ChannelType>(ChannelType.DIRECT);
-  const [institutionType, setInstitutionType] = useState<InstitutionType>(InstitutionType.PROVIDER);
+  const [channel, setChannel] = useAutoState<ChannelType>('channel', ChannelType.DIRECT);
+  const [institutionType, setInstitutionType] = useAutoState<InstitutionType>('institutionType', InstitutionType.PROVIDER);
 
   // Auto-fill customer name for Academic Institutions
   useEffect(() => {
@@ -184,28 +185,28 @@ const App: React.FC = () => {
       setCustomerName("___ University");
     }
   }, [institutionType]);
-  const [includeHospital, setIncludeHospital] = useState<boolean>(false);
+  const [includeHospital, setIncludeHospital] = useAutoState<boolean>('includeHospital', false);
   
   // Mid-Cycle State Variables
-  const [midCycleExpiryDate, setMidCycleExpiryDate] = useState<string>("");
-  const [midCycleStartDate, setMidCycleStartDate] = useState<string>("");
-  const [midCycleProduct, setMidCycleProduct] = useState<string>("UTD_ADV"); 
-  const [midCycleExistingSpend, setMidCycleExistingSpend] = useState<number | "">("");
-  const [midCycleBedCount, setMidCycleBedCount] = useState<number | "">("");
-  const [midCycleWHT, setMidCycleWHT] = useState<boolean>(false);
-  const [midCycleDlm, setMidCycleDlm] = useState<boolean>(false);
+  const [midCycleExpiryDate, setMidCycleExpiryDate] = useAutoState<string>('midCycleExpiryDate', "");
+  const [midCycleStartDate, setMidCycleStartDate] = useAutoState<string>('midCycleStartDate', "");
+  const [midCycleProduct, setMidCycleProduct] = useAutoState<string>('midCycleProduct', "UTD_ADV"); 
+  const [midCycleExistingSpend, setMidCycleExistingSpend] = useAutoState<number | "">('midCycleExistingSpend', "");
+  const [midCycleBedCount, setMidCycleBedCount] = useAutoState<number | "">('midCycleBedCount', "");
+  const [midCycleWHT, setMidCycleWHT] = useAutoState<boolean>('midCycleWHT', false);
+  const [midCycleDlm, setMidCycleDlm] = useAutoState<boolean>('midCycleDlm', false);
 
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
-  const [years, setYears] = useState<number>(3);
-  const [isPartialYear, setIsPartialYear] = useState<boolean>(false);
+  const [selectedProductIds, setSelectedProductIds] = useAutoState<string[]>('selectedProductIds', []);
+  const [years, setYears] = useAutoState<number>('years', 3);
+  const [isPartialYear, setIsPartialYear] = useAutoState<boolean>('isPartialYear', false);
   const [partialMonths, setPartialMonths] = useState<Record<string, number>>({});
-  const [method, setMethod] = useState<PricingMethod>(PricingMethod.MYFPI);
+  const [method, setMethod] = useAutoState<PricingMethod>('method', PricingMethod.MYFPI);
   const [productMethods, setProductMethods] = useState<
     Record<string, PricingMethod>
   >({ utd: PricingMethod.MYFPI, lxd: PricingMethod.MYFPI });
-  const [applyWHT, setApplyWHT] = useState<boolean>(true); // Default true for KSA
-  const [flatPricing, setFlatPricing] = useState<boolean>(false);
-  const [rounding, setRounding] = useState<boolean>(false); // New Rounding Option
+  const [applyWHT, setApplyWHT] = useAutoState<boolean>('applyWHT', true); // Default true for KSA
+  const [flatPricing, setFlatPricing] = useAutoState<boolean>('flatPricing', false);
+  const [rounding, setRounding] = useAutoState<boolean>('rounding', false); // New Rounding Option
   const [notification, setNotification] = useState<string | null>(null); // Notification State
   const [resetKey, setResetKey] = useState<number>(0); // Key to reset child components
   const [isArchitectNotesOpen, setIsArchitectNotesOpen] =
@@ -214,35 +215,33 @@ const App: React.FC = () => {
   // Extension Quote State
   const isExtensionQuote = dealType === DealType.EXTENSION;
   const isMidCycleQuote = dealType === DealType.MID_CYCLE;
-  const [extensionOption, setExtensionOption] = useState<"A" | "B" | "C">("A");
-  const [expiringTerm, setExpiringTerm] = useState<"multi" | "single">("multi");
-  const [expiringTCV, setExpiringTCV] = useState<number>(0);
-  const [currentSpend, setCurrentSpend] = useState<number>(0);
-  const [extensionPercentage, setExtensionPercentage] = useState<number>(10);
-  const [extensionFPI, setExtensionFPI] = useState<number | null>(null);
-  const [extensionVariant, setExtensionVariant] = useState<string>("ANYWHERE");
-  const [useFullExtension, setUseFullExtension] = useState<boolean>(false);
-  const [roundUpOptionB, setRoundUpOptionB] = useState<boolean>(false);
-  const [optionBMonths, setOptionBMonths] = useState<number | null>(null);
-  const [optionCValue, setOptionCValue] = useState<number>(0);
-  const [optionCMonths, setOptionCMonths] = useState<number>(6);
+  const [extensionOption, setExtensionOption] = useAutoState<"A" | "B" | "C">('extensionOption', "A");
+  const [expiringTerm, setExpiringTerm] = useAutoState<"multi" | "single">('expiringTerm', "multi");
+  const [expiringTCV, setExpiringTCV] = useAutoState<number>('expiringTCV', 0);
+  const [currentSpend, setCurrentSpend] = useAutoState<number>('currentSpend', 0);
+  const [extensionPercentage, setExtensionPercentage] = useAutoState<number>('extensionPercentage', 10);
+  const [extensionFPI, setExtensionFPI] = useAutoState<number | null>('extensionFPI', null);
+  const [extensionVariant, setExtensionVariant] = useAutoState<string>('extensionVariant', "ANYWHERE");
+  const [useFullExtension, setUseFullExtension] = useAutoState<boolean>('useFullExtension', false);
+  const [roundUpOptionB, setRoundUpOptionB] = useAutoState<boolean>('roundUpOptionB', false);
+  const [optionBMonths, setOptionBMonths] = useAutoState<number | null>('optionBMonths', null);
+  const [optionCValue, setOptionCValue] = useAutoState<number>('optionCValue', 0);
+  const [optionCMonths, setOptionCMonths] = useAutoState<number>('optionCMonths', 6);
 
   // Start Date State
-  const [useStartDate, setUseStartDate] = useState<boolean>(false);
-  const [startMonthYear, setStartMonthYear] = useState<string>(
-    new Date().toISOString().slice(0, 10),
-  );
+  const [useStartDate, setUseStartDate] = useAutoState<boolean>('useStartDate', false);
+  const [startMonthYear, setStartMonthYear] = useAutoState<string>("startMonthYear", new Date().toISOString().slice(0, 10));
 
   // Structure Rates (Multi-Year logic: FPI or Reverse Discount)
-  const [applyAnnualRate, setApplyAnnualRate] = useState<boolean>(true); // Toggle for Renewal MYFPI
-  const [globalRateVal, setGlobalRateVal] = useState<number>(5);
-  const [utdRateVal, setUtdRateVal] = useState<number>(8); // Default 8%
-  const [lxdRateVal, setLxdRateVal] = useState<number>(5);
+  const [applyAnnualRate, setApplyAnnualRate] = useAutoState<boolean>('applyAnnualRate', true); // Toggle for Renewal MYFPI
+  const [globalRateVal, setGlobalRateVal] = useAutoState<number>('globalRateVal', 5);
+  const [utdRateVal, setUtdRateVal] = useAutoState<number>('utdRateVal', 8); // Default 8%
+  const [lxdRateVal, setLxdRateVal] = useAutoState<number>('lxdRateVal', 5);
 
   // Renewal Uplift Rates (Specific to Renewal Base Calculation)
-  const [renewalUpliftGlobal, setRenewalUpliftGlobal] = useState<number>(5);
-  const [renewalUpliftUTD, setRenewalUpliftUTD] = useState<number>(8);
-  const [renewalUpliftLXD, setRenewalUpliftLXD] = useState<number>(5);
+  const [renewalUpliftGlobal, setRenewalUpliftGlobal] = useAutoState<number>('renewalUpliftGlobal', 5);
+  const [renewalUpliftUTD, setRenewalUpliftUTD] = useAutoState<number>('renewalUpliftUTD', 8);
+  const [renewalUpliftLXD, setRenewalUpliftLXD] = useAutoState<number>('renewalUpliftLXD', 5);
 
   // Product Inputs State
   const [productInputs, setProductInputs] = useState<
@@ -459,33 +458,13 @@ const App: React.FC = () => {
   // Derived Config
 
   const loadConfig = (loadedConfig: any) => {
-    if (loadedConfig.dealType !== undefined) setDealType(loadedConfig.dealType);
-    if (loadedConfig.channel !== undefined) setChannel(loadedConfig.channel);
-    if (loadedConfig.institutionType !== undefined) setInstitutionType(loadedConfig.institutionType);
-    if (loadedConfig.includeHospital !== undefined) setIncludeHospital(loadedConfig.includeHospital);
+    // Automatically restore all registered state
+    restoreAutoState(loadedConfig);
+    if (loadedConfig.uiState) {
+      restoreAutoState(loadedConfig.uiState);
+    }
+    // Specific edge cases that aren't auto-state
     if (loadedConfig.selectedProducts !== undefined) setSelectedProductIds(loadedConfig.selectedProducts);
-    if (loadedConfig.productInputs !== undefined) setProductInputs(loadedConfig.productInputs);
-    if (loadedConfig.years !== undefined) setYears(loadedConfig.years);
-    if (loadedConfig.isPartialYear !== undefined) setIsPartialYear(loadedConfig.isPartialYear);
-    if (loadedConfig.partialMonths !== undefined) setPartialMonths(loadedConfig.partialMonths);
-    if (loadedConfig.method !== undefined) setMethod(loadedConfig.method);
-    if (loadedConfig.productMethods !== undefined) setProductMethods(loadedConfig.productMethods);
-    if (loadedConfig.applyWHT !== undefined) setApplyWHT(loadedConfig.applyWHT);
-    if (loadedConfig.flatPricing !== undefined) setFlatPricing(loadedConfig.flatPricing);
-    if (loadedConfig.rounding !== undefined) setRounding(loadedConfig.rounding);
-    if (loadedConfig.useStartDate !== undefined) setUseStartDate(loadedConfig.useStartDate);
-    if (loadedConfig.startMonthYear !== undefined) setStartMonthYear(loadedConfig.startMonthYear);
-    if (loadedConfig.extensionOption !== undefined) setExtensionOption(loadedConfig.extensionOption);
-    if (loadedConfig.expiringTerm !== undefined) setExpiringTerm(loadedConfig.expiringTerm);
-    if (loadedConfig.expiringTCV !== undefined) setExpiringTCV(loadedConfig.expiringTCV);
-    if (loadedConfig.currentSpend !== undefined) setCurrentSpend(loadedConfig.currentSpend);
-    if (loadedConfig.extensionPercentage !== undefined) setExtensionPercentage(loadedConfig.extensionPercentage);
-    if (loadedConfig.extensionFPI !== undefined) setExtensionFPI(loadedConfig.extensionFPI);
-    if (loadedConfig.extensionVariant !== undefined) setExtensionVariant(loadedConfig.extensionVariant);
-    if (loadedConfig.useFullExtension !== undefined) setUseFullExtension(loadedConfig.useFullExtension);
-    if (loadedConfig.roundUpOptionB !== undefined) setRoundUpOptionB(loadedConfig.roundUpOptionB);
-    if (loadedConfig.optionBMonths !== undefined) setOptionBMonths(loadedConfig.optionBMonths);
-    if (loadedConfig.applyAnnualRate !== undefined) setApplyAnnualRate(loadedConfig.applyAnnualRate);
     
     // Reset key to force child components to update
     setResetKey(prev => prev + 1);
