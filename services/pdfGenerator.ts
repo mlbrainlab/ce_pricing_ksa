@@ -5,6 +5,18 @@ import { AVAILABLE_PRODUCTS, EXCHANGE_RATE_SAR } from '../constants.js';
 import { SAMIR_WHITE_LOGO_BASE64 } from '../samirLogo.js';
 import { WK_LOGO_BASE64 } from '../wkLogo.js';
 
+const formatStartDate = (val: string) => {
+  if (!val) return val;
+  const parts = val.split('-');
+  const mo = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  if (parts.length === 3) {
+    return `${parseInt(parts[2])} ${mo[parseInt(parts[1]) - 1]} ${parts[0]}`;
+  } else if (parts.length === 2) {
+    return `${mo[parseInt(parts[1]) - 1]} ${parts[0]}`;
+  }
+  return val;
+};
+
 export async function generateQuotePDF(config: DealConfiguration, data: CalculationOutput, options: any) {
   const doc = new jsPDF();
   const { customerName, repName, repPhone, repEmail, isCp, showStats, showMonthlyCost, showTotals, showEmrIntegration, hasOptOutClause, showFLinkIntegration, printNotes } = options;
@@ -105,8 +117,8 @@ export async function generateQuotePDF(config: DealConfiguration, data: Calculat
     doc.text(`Duration: ${config.years} Years`, 18, currentY + 21);
   }
 
-  if (config.useStartDate && config.startMonthYear) {
-    doc.text(`Start Date: ${config.startMonthYear}`, 18, currentY + 28);
+  if (config.useStartDate && formatStartDate(config.startMonthYear || "")) {
+    doc.text(`Start Date: ${formatStartDate(config.startMonthYear || "")}`, 18, currentY + 28);
   }
 
   // Right side of summary
@@ -165,8 +177,8 @@ export async function generateQuotePDF(config: DealConfiguration, data: Calculat
       ['Product', extResults.variant]
     ];
 
-    if (config.useStartDate && config.startMonthYear) {
-      extRows.push(['Dates', config.startMonthYear]);
+    if (config.useStartDate && formatStartDate(config.startMonthYear || "")) {
+      extRows.push(['Dates', formatStartDate(config.startMonthYear || "")]);
     }
 
     const availMonthsVal = extResults.monthsAvailable !== undefined && extResults.monthsAvailable !== null
@@ -185,7 +197,7 @@ export async function generateQuotePDF(config: DealConfiguration, data: Calculat
       if (options.showAvailableMonths) {
         extRows.push(['Available Duration', availTextA]);
       }
-    } else {
+    } else if (extResults.type === 'B') {
       const availTextB = `${availMonthsVal?.toFixed(2)} months`;
       let durationText = `${extResults.monthsCovered} months`;
       if (options.showAvailableMonths) {
@@ -195,6 +207,8 @@ export async function generateQuotePDF(config: DealConfiguration, data: Calculat
       if (options.showAvailableMonths) {
         extRows.push(['Available Duration', availTextB]);
       }
+    } else if (extResults.type === 'C') {
+      extRows.push(['Extension Duration', `${extResults.monthsCovered} months`]);
     }
 
     if (isIndirect) {

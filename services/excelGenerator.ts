@@ -2,6 +2,18 @@ import ExcelJS from 'exceljs';
 import { DealConfiguration, CalculationOutput, ChannelType, DealType } from '../types.js';
 import { AVAILABLE_PRODUCTS } from '../constants.js';
 
+const formatStartDate = (val: string) => {
+  if (!val) return val;
+  const parts = val.split('-');
+  const mo = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  if (parts.length === 3) {
+    return `${parseInt(parts[2])} ${mo[parseInt(parts[1]) - 1]} ${parts[0]}`;
+  } else if (parts.length === 2) {
+    return `${mo[parseInt(parts[1]) - 1]} ${parts[0]}`;
+  }
+  return val;
+};
+
 export async function generateQuoteExcel(config: DealConfiguration, data: CalculationOutput, options: any) {
   const { customerName, repName } = options;
   const workbook = new ExcelJS.Workbook();
@@ -36,8 +48,8 @@ export async function generateQuoteExcel(config: DealConfiguration, data: Calcul
     sheet.addRow(['Duration', `${config.years} Years`]).font = fontStyle;
   }
   
-  if (config.useStartDate && config.startMonthYear) {
-    sheet.addRow(['Start Date', config.startMonthYear]).font = fontStyle;
+  if (config.useStartDate && formatStartDate(config.startMonthYear || "")) {
+    sheet.addRow(['Start Date', formatStartDate(config.startMonthYear || "")]).font = fontStyle;
   }
 
   sheet.addRow([]);

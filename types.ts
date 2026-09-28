@@ -99,7 +99,9 @@ export interface DealConfiguration {
   useStartDate?: boolean;
   startMonthYear?: string;
   // Extension Fields
-  extensionOption?: "A" | "B";
+  extensionOption?: "A" | "B" | "C";
+  optionCValue?: number;
+  optionCMonths?: number;
   expiringTerm?: "multi" | "single";
   expiringTCV?: number;
   currentSpend?: number;

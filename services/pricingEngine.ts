@@ -785,7 +785,7 @@ export const calculatePricing = (
         results.extensionResults.percentageMore =
           tcv > 0 ? (((integerMonths + 1) * monthlyCost) / tcv) * 100 : 0;
       }
-    } else {
+    } else if (config.extensionOption === "B") {
       const maxSARExVAT = 100000 / 1.15;
       const isUtdVar = ['ANYWHERE', 'UTDADV', 'UTDEE', 'UTDEE-EAI', 'SM'].includes((config.extensionVariant || '').toUpperCase()) || (config.extensionVariant || '').toUpperCase().startsWith('UTD');
       const defaultFpi = isUtdVar ? 8.0 : 5.0;
@@ -824,6 +824,21 @@ export const calculatePricing = (
         commission: endUserPrice * (1 - netFactor),
         netPrice: endUserPrice * netFactor,
         roundUpOptionB: config.roundUpOptionB,
+      };
+    } else if (config.extensionOption === "C") {
+      const targetValue = config.optionCValue || 0;
+      const monthsCovered = config.optionCMonths || 0;
+      const monthlyCost = targetValue / 12;
+      const endUserPrice = monthsCovered * monthlyCost;
+      results.extensionResults = {
+        type: "C",
+        variant: config.extensionVariant,
+        targetValue,
+        monthlyCost,
+        monthsCovered,
+        endUserPrice,
+        commission: endUserPrice * (1 - netFactor),
+        netPrice: endUserPrice * netFactor,
       };
     }
   }

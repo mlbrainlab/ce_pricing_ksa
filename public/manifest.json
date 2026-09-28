@@ -1,6 +1,6 @@
 {
-  "name": "CE Pricing KSA v6.8.1",
-  "short_name": "CE Pricing",
+  "name": "CE Pricing Calculator v6.8.1",
+  "short_name": "CE Pricing v6.8.1",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

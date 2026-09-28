@@ -214,7 +214,7 @@ const App: React.FC = () => {
   // Extension Quote State
   const isExtensionQuote = dealType === DealType.EXTENSION;
   const isMidCycleQuote = dealType === DealType.MID_CYCLE;
-  const [extensionOption, setExtensionOption] = useState<"A" | "B">("A");
+  const [extensionOption, setExtensionOption] = useState<"A" | "B" | "C">("A");
   const [expiringTerm, setExpiringTerm] = useState<"multi" | "single">("multi");
   const [expiringTCV, setExpiringTCV] = useState<number>(0);
   const [currentSpend, setCurrentSpend] = useState<number>(0);
@@ -224,11 +224,13 @@ const App: React.FC = () => {
   const [useFullExtension, setUseFullExtension] = useState<boolean>(false);
   const [roundUpOptionB, setRoundUpOptionB] = useState<boolean>(false);
   const [optionBMonths, setOptionBMonths] = useState<number | null>(null);
+  const [optionCValue, setOptionCValue] = useState<number>(0);
+  const [optionCMonths, setOptionCMonths] = useState<number>(6);
 
   // Start Date State
   const [useStartDate, setUseStartDate] = useState<boolean>(false);
   const [startMonthYear, setStartMonthYear] = useState<string>(
-    new Date().toISOString().slice(0, 7),
+    new Date().toISOString().slice(0, 10),
   );
 
   // Structure Rates (Multi-Year logic: FPI or Reverse Discount)
@@ -295,7 +297,7 @@ const App: React.FC = () => {
     setOptionBMonths(null);
     setResetKey((prev) => prev + 1);
 
-    setStartMonthYear(new Date().toISOString().slice(0, 7));
+    setStartMonthYear(new Date().toISOString().slice(0, 10));
     setApplyAnnualRate(false);
     setGlobalRateVal(5);
     setUtdRateVal(8);
@@ -372,10 +374,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (dealType === DealType.MID_CYCLE && midCycleStartDate) {
       setUseStartDate(true);
-      const [year, month] = midCycleStartDate.split("-");
-      if (year && month) {
-        setStartMonthYear(`${year}-${month}`);
-      }
+      setStartMonthYear(midCycleStartDate);
     }
   }, [dealType, midCycleStartDate]);
 
@@ -572,6 +571,8 @@ const App: React.FC = () => {
       useFullExtension,
       roundUpOptionB,
       optionBMonths,
+      optionCValue,
+      optionCMonths,
       midCycleExpiryDate,
       midCycleStartDate,
       midCycleWHT,
@@ -615,6 +616,8 @@ const App: React.FC = () => {
     useFullExtension,
     roundUpOptionB,
     optionBMonths,
+    optionCValue,
+    optionCMonths,
     midCycleExpiryDate,
     midCycleStartDate,
     midCycleWHT,
@@ -674,15 +677,18 @@ const App: React.FC = () => {
       return extensionFPI !== null
         ? extensionFPI
         : extensionResults?.fpiPercentage ?? 0;
-    } else {
+    } else if (extensionOption === "B") {
       return extensionFPI !== null ? extensionFPI : defaultOptionBFPI;
+    } else {
+      return 5; // Option C doesn't use FPI, default to 5 so no finance warning
     }
   }, [extensionOption, extensionFPI, extensionResults, defaultOptionBFPI]);
 
   const extensionRequiresFinanceApproval = useMemo(() => {
     if (!isExtensionQuote) return false;
+    if (extensionOption === "C") return false; // Option C doesn't use FPI
     return currentFpiVal < 5;
-  }, [isExtensionQuote, currentFpiVal]);
+  }, [isExtensionQuote, currentFpiVal, extensionOption]);
 
   // Validation Logic for UTDEE
   const utdEeWarning = useMemo(() => {
@@ -1212,13 +1218,14 @@ const App: React.FC = () => {
                     className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     value={extensionOption}
                     onChange={(e) =>
-                      setExtensionOption(e.target.value as "A" | "B")
+                      setExtensionOption(e.target.value as "A" | "B" | "C")
                     }
                   >
                     <option value="A">Option A (% of TCV)</option>
                     <option value="B">
                       Option B (Specific Months under 100k SAR)
                     </option>
+                    <option value="C">Option C (Custom Scope / Target Value)</option>
                   </select>
                 </div>
 
@@ -1296,6 +1303,52 @@ const App: React.FC = () => {
                       onChange={setExtensionPercentage}
                       className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums"
                     />
+                  </div>
+                )}
+
+                {extensionOption === "C" && (
+                  <div className="space-y-4 mt-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Target Extension Total Value (USD)
+                      </label>
+                      <FormattedNumberInput
+                        value={optionCValue}
+                        onChange={setOptionCValue}
+                        className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="Enter target USD value"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Extension Duration (Months)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={optionCMonths}
+                        onChange={(e) => setOptionCMonths(parseFloat(e.target.value) || 0)}
+                        className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="e.g. 5.5"
+                      />
+                    </div>
+                    <div className={`flex items-center pt-2 border-t border-gray-100 dark:border-gray-700 ${!isIndirect ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                      <input
+                        id="round-up-option-c-checkbox"
+                        type="checkbox"
+                        disabled={!isIndirect}
+                        checked={isIndirect ? roundUpOptionB : false}
+                        onChange={(e) => setRoundUpOptionB(e.target.checked)}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600 cursor-pointer disabled:cursor-not-allowed"
+                      />
+                      <label
+                        htmlFor="round-up-option-c-checkbox"
+                        className={`ml-2 text-xs font-semibold select-none ${!isIndirect ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}
+                      >
+                        Round up value {!isIndirect && "(Disabled for Direct)"}
+                      </label>
+                    </div>
                   </div>
                 )}
 
@@ -1417,6 +1470,35 @@ const App: React.FC = () => {
                       >
                         Round up value (Option B) {!isIndirect && "(Disabled for Direct)"}
                       </label>
+                    </div>
+                  </div>
+                )}
+
+                {extensionOption === "C" && (
+                  <div className="space-y-4 mt-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Target Extension Total Value (USD)
+                      </label>
+                      <FormattedNumberInput
+                        value={optionCValue}
+                        onChange={setOptionCValue}
+                        className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Extension Duration (Months)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={optionCMonths}
+                        onChange={(e) => setOptionCMonths(parseFloat(e.target.value) || 0)}
+                        className="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="e.g. 5.5"
+                      />
                     </div>
                   </div>
                 )}
@@ -2892,6 +2974,163 @@ const App: React.FC = () => {
                                   extensionResults.endUserPrice *
                                     sarRate *
                                     1.15,
+                                  "SAR",
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-orange-500 dark:border-orange-400">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                            Reseller Fees
+                          </div>
+                          <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                            {formatCurrency(extensionResults.commission, "USD")}
+                          </div>
+                          {isIndirect && (
+                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                              <div>
+                                SAR:{" "}
+                                {formatCurrency(
+                                  extensionResults.commission * sarRate,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div>
+                                VAT (15%):{" "}
+                                {formatCurrency(
+                                  extensionResults.commission * sarRate * 0.15,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">
+                                Total:{" "}
+                                {formatCurrency(
+                                  extensionResults.commission * sarRate * 1.15,
+                                  "SAR",
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="bg-gray-100 dark:bg-gray-700 p-4 shadow rounded-lg border-l-4 border-gray-500 dark:border-gray-400">
+                          <div className="text-xs text-gray-500 dark:text-gray-300 uppercase font-sans">
+                            Net Price
+                          </div>
+                          <div className="text-lg font-bold text-gray-700 dark:text-gray-100 font-sans">
+                            {formatCurrency(extensionResults.netPrice, "USD")}
+                          </div>
+                          {isIndirect && (
+                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                              <div>
+                                SAR:{" "}
+                                {formatCurrency(
+                                  extensionResults.netPrice * sarRate,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div>
+                                VAT (15%):{" "}
+                                {formatCurrency(
+                                  extensionResults.netPrice * sarRate * 0.15,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">
+                                Total:{" "}
+                                {formatCurrency(
+                                  extensionResults.netPrice * sarRate * 1.15,
+                                  "SAR",
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+                {extensionResults.type === "C" && (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-100 dark:border-gray-600 animate-fade-in">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                          Target Value (USD)
+                        </div>
+                        <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                          {formatCurrency(
+                            extensionResults.targetValue,
+                            "USD",
+                          )}
+                        </div>
+                      </div>
+                      <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800 animate-fade-in">
+                        <div className="text-xs text-blue-600 dark:text-blue-400 uppercase font-sans">
+                          Extension Duration
+                        </div>
+                        <div className="text-xl font-bold text-blue-700 dark:text-blue-300 font-sans">
+                          {extensionResults.monthsCovered} months
+                        </div>
+                      </div>
+                      <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-100 dark:border-green-800 animate-fade-in">
+                        <div className="text-xs text-green-600 dark:text-green-400 uppercase font-sans">
+                          Monthly Cost (USD)
+                        </div>
+                        <div className="text-xl font-bold text-green-700 dark:text-green-300 font-sans">
+                          {formatCurrency(extensionResults.monthlyCost, "USD")}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+                      <h4 className="text-sm font-bold text-gray-800 dark:text-white mb-3 font-sans">
+                        Pricing Breakdown (for {extensionResults.monthsCovered}{" "}
+                        months)
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white dark:bg-gray-800 p-4 shadow rounded-lg border-l-4 border-blue-500 dark:border-blue-400">
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-sans">
+                              End-User Price
+                            </div>
+                            {extensionResults.roundUpOptionB && (
+                              <span className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 px-1.5 py-0.5 rounded font-semibold">
+                                Rounded Up (Nearest 1,000)
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                            {formatCurrency(
+                              extensionResults.endUserPrice,
+                              "USD",
+                            )}
+                          </div>
+                          {isIndirect && (
+                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                              <div>
+                                SAR:{" "}
+                                {formatCurrency(
+                                  extensionResults.roundUpOptionB
+                                    ? Math.ceil((extensionResults.endUserPrice * sarRate) / 1000) * 1000
+                                    : extensionResults.endUserPrice * sarRate,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div>
+                                VAT (15%):{" "}
+                                {formatCurrency(
+                                  (extensionResults.roundUpOptionB
+                                    ? Math.ceil((extensionResults.endUserPrice * sarRate) / 1000) * 1000
+                                    : extensionResults.endUserPrice * sarRate) * 0.15,
+                                  "SAR",
+                                )}
+                              </div>
+                              <div className="font-bold text-gray-700 dark:text-gray-300">
+                                Total:{" "}
+                                {formatCurrency(
+                                  (extensionResults.roundUpOptionB
+                                    ? Math.ceil((extensionResults.endUserPrice * sarRate) / 1000) * 1000
+                                    : extensionResults.endUserPrice * sarRate) * 1.15,
                                   "SAR",
                                 )}
                               </div>

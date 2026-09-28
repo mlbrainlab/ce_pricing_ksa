@@ -470,8 +470,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     const getTermLabel = (r: PricingResult, resultIndex: number, allResults: PricingResult[]) => {
         const termLabel = `Term ${resultIndex + 1} (${r.termMonths} months)`;
         if (useStartDate && startMonthYear) {
-            const [yearStr, monthStr] = startMonthYear.split('-');
-            const start = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
+            const [yearStr, monthStr, dayStr] = startMonthYear.split('-');
+            const start = new Date(parseInt(yearStr), parseInt(monthStr) - 1, dayStr ? parseInt(dayStr) : 1);
             
             let monthsBefore = 0;
             for (let i = 0; i < resultIndex; i++) {
@@ -480,7 +480,17 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             start.setMonth(start.getMonth() + monthsBefore);
             
             const end = new Date(start);
-            end.setMonth(end.getMonth() + (r.termMonths || 12));
+            const m = (r.termMonths || 12);
+            const intM = Math.floor(m);
+            const frac = m - intM;
+            end.setMonth(end.getMonth() + intM);
+            if (frac === 0.5) {
+                if (start.getDate() === 16) end.setMonth(end.getMonth() + 1, 1);
+                else if (start.getDate() === 1) end.setDate(16);
+                else end.setDate(end.getDate() + 15);
+            } else if (frac > 0) {
+                end.setDate(end.getDate() + Math.round(frac * 30));
+            }
             end.setDate(end.getDate() - 1);
             
             const formatD = (d: Date) => { const mo = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; return `${mo[d.getMonth()]} ${d.getDate().toString().padStart(2, '0')}, ${d.getFullYear()}`; };
@@ -492,11 +502,30 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
     let tableHead: string[][] = []; let tableBody: string[][] = []; const columnStyles: any = {};
     const getExtensionDates = () => {
         if (useStartDate && startMonthYear && extensionResults) {
-            const [yearStr, monthStr] = startMonthYear.split('-');
-            const start = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
+            const [yearStr, monthStr, dayStr] = startMonthYear.split('-');
+            const start = new Date(parseInt(yearStr), parseInt(monthStr) - 1, dayStr ? parseInt(dayStr) : 1);
             const end = new Date(start);
-            if (extensionResults.useFullExtension) { end.setMonth(end.getMonth() + extensionResults.integerMonths); end.setDate(end.getDate() + extensionResults.extraDays - 1); } 
-            else { end.setMonth(end.getMonth() + (extensionResults.type === 'A' ? extensionResults.integerMonths : extensionResults.monthsCovered)); end.setDate(end.getDate() - 1); }
+            if (extensionResults.useFullExtension) { 
+                end.setMonth(end.getMonth() + extensionResults.integerMonths); 
+                end.setDate(end.getDate() + extensionResults.extraDays - 1); 
+            } else { 
+                const m = extensionResults.type === 'A' ? extensionResults.integerMonths : extensionResults.monthsCovered;
+                const intM = Math.floor(m);
+                const frac = m - intM;
+                end.setMonth(end.getMonth() + intM);
+                if (frac === 0.5) {
+                    if (start.getDate() === 16) {
+                        end.setMonth(end.getMonth() + 1, 1);
+                    } else if (start.getDate() === 1) {
+                        end.setDate(16);
+                    } else {
+                        end.setDate(end.getDate() + 15);
+                    }
+                } else if (frac > 0) {
+                    end.setDate(end.getDate() + Math.round(frac * 30));
+                }
+                end.setDate(end.getDate() - 1);
+            }
             const formatD = (d: Date) => { const mo = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; return `${mo[d.getMonth()]} ${d.getDate().toString().padStart(2, '0')}, ${d.getFullYear()}`; };
             return `${formatD(start)} to ${formatD(end)}`;
         }
@@ -1154,8 +1183,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           const getTermLabelExcel = (r: PricingResult, resultIndex: number, allResults: PricingResult[]) => {
               const termLabel = `Term ${resultIndex + 1} (${r.termMonths} months)`;
               if (useStartDate && startMonthYear) {
-                  const [yearStr, monthStr] = startMonthYear.split('-');
-                  const start = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
+                  const [yearStr, monthStr, dayStr] = startMonthYear.split('-');
+            const start = new Date(parseInt(yearStr), parseInt(monthStr) - 1, dayStr ? parseInt(dayStr) : 1);
                   
                   let monthsBefore = 0;
                   for (let i = 0; i < resultIndex; i++) {
@@ -1164,7 +1193,17 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                   start.setMonth(start.getMonth() + monthsBefore);
                   
                   const end = new Date(start);
-                  end.setMonth(end.getMonth() + (r.termMonths || 12));
+                  const m = (r.termMonths || 12);
+                  const intM = Math.floor(m);
+                  const frac = m - intM;
+                  end.setMonth(end.getMonth() + intM);
+                  if (frac === 0.5) {
+                      if (start.getDate() === 16) end.setMonth(end.getMonth() + 1, 1);
+                      else if (start.getDate() === 1) end.setDate(16);
+                      else end.setDate(end.getDate() + 15);
+                  } else if (frac > 0) {
+                      end.setDate(end.getDate() + Math.round(frac * 30));
+                  }
                   end.setDate(end.getDate() - 1);
                   
                   const formatD = (d: Date) => { const mo = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; return `${mo[d.getMonth()]} ${d.getDate().toString().padStart(2, '0')}, ${d.getFullYear()}`; };
@@ -1695,7 +1734,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-80">
             <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Start Date</h3>
             <input
-              type="month"
+              type="date"
               value={startMonthYear}
               onChange={e => setStartMonthYear(e.target.value)}
               className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-6"
