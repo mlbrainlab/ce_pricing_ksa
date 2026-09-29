@@ -1754,77 +1754,7 @@ const App: React.FC = () => {
                               className={`px-3 pb-3 pt-0 border-t mt-1 grid grid-cols-1 gap-3 ${product.id === "utd" ? "border-green-100 dark:border-green-800" : "border-blue-100 dark:border-blue-800"}`}
                             >
                               <div className="grid grid-cols-2 gap-3 mt-2">
-                                {institutionType === InstitutionType.ACADEMIC && product.id === 'utd' && (
-                                  <div className="col-span-2 grid grid-cols-2 gap-3 mb-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-100 dark:border-blue-800">
-                                    <div>
-                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Faculty (M.D. / D.O.) <span className="text-red-500">*</span></label>
-                                      <FormattedNumberInput value={input.facultyCount || 0} onChange={(val) => handleInputChange(product.id, 'facultyCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Residents</label>
-                                      <FormattedNumberInput value={input.residentsCount || 0} onChange={(val) => handleInputChange(product.id, 'residentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Med Students <span className="text-red-500">*</span></label>
-                                      <FormattedNumberInput value={input.medStudentsCount || 0} onChange={(val) => handleInputChange(product.id, 'medStudentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Pharma/Nursing Students</label>
-                                      <FormattedNumberInput value={input.pharmaStudentsCount || 0} onChange={(val) => handleInputChange(product.id, 'pharmaStudentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
-                                    </div>
-                                    { ((Number(input.facultyCount)||0) + (Number(input.residentsCount)||0) >= 50 || (Number(input.medStudentsCount)||0) + (Number(input.pharmaStudentsCount)||0) >= 1) && (
-                                      <div className="col-span-2 mt-2 pt-2 border-t border-blue-200 dark:border-blue-700 w-1/2">
-                                        <label className="block text-[10px] text-pink-600 dark:text-pink-400 font-bold mb-1">Educational Discount % (Max 20%)</label>
-                                        <div className="mt-1 flex items-center border border-pink-300 dark:border-pink-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 h-8">
-                                          <button
-                                            type="button"
-                                            onClick={() => { let cur = Number(input.educationalDiscount) || 0; handleInputChange(product.id, 'educationalDiscount', Math.max(0, cur - 1)); }}
-                                            className="w-8 h-full flex-shrink-0 flex items-center justify-center text-pink-500 hover:text-pink-700 hover:bg-pink-50 dark:hover:bg-gray-600 focus:outline-none"
-                                          >
-                                            -
-                                          </button>
-                                          <input
-                                            type="number"
-                                            min="0"
-                                            max="20"
-                                            value={input.educationalDiscount === 0 ? 0 : input.educationalDiscount || ''}
-                                            onChange={(e) => { let v = parseInt(e.target.value); if(v>20)v=20; if(v<0)v=0; handleInputChange(product.id, 'educationalDiscount', isNaN(v)?'':v); }}
-                                            className="w-full h-full text-center text-xs p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
-                                            style={{ appearance: "textfield", MozAppearance: "textfield" }}
-                                          />
-                                          <button
-                                            type="button"
-                                            onClick={() => { let cur = Number(input.educationalDiscount) || 0; handleInputChange(product.id, 'educationalDiscount', Math.min(20, cur + 1)); }}
-                                            className="w-8 h-full flex-shrink-0 flex items-center justify-center text-pink-500 hover:text-pink-700 hover:bg-pink-50 dark:hover:bg-gray-600 focus:outline-none"
-                                          >
-                                            +
-                                          </button>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                  </div>
-                                )}
-
-                                {institutionType === InstitutionType.ACADEMIC && product.id === 'lxd' && (
-                                  <div className="col-span-2 grid grid-cols-1 gap-2 mb-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-100 dark:border-blue-800">
-                                    <div>
-                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Total Healthcare Students <span className="text-red-500">*</span></label>
-                                      <FormattedNumberInput value={input.totalStudentsCount || 0} onChange={(val) => handleInputChange(product.id, 'totalStudentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
-                                    </div>
-                                    <div className="flex flex-col space-y-1 mt-1">
-                                      <label className="flex items-center text-xs text-gray-700 dark:text-gray-300">
-                                        <input type="checkbox" checked={input.lxdAcademicBase ?? true} onChange={(e) => handleInputChange(product.id, 'lxdAcademicBase', e.target.checked)} className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" /> LXD Base Package ($7)
-                                      </label>
-                                      <label className="flex items-center text-xs text-gray-700 dark:text-gray-300">
-                                        <input type="checkbox" checked={input.lxdAcademicSelect ?? true} onChange={(e) => handleInputChange(product.id, 'lxdAcademicSelect', e.target.checked)} className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" /> Lexi-SELECT (Mobile App) ($3)
-                                      </label>
-                                      <label className="flex items-center text-xs text-gray-700 dark:text-gray-300">
-                                        <input type="checkbox" checked={input.lxdAcademicMartindale ?? false} onChange={(e) => handleInputChange(product.id, 'lxdAcademicMartindale', e.target.checked)} className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" /> Martindale ($1)
-                                      </label>
-                                    </div>
-                                  </div>
-                                )}
+                                
                                 {/* Renewal: Expiring Amount (Primary) */}
                                 {isRenewal && (
                                   <div className="col-span-2 p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 rounded">
@@ -1926,21 +1856,55 @@ const App: React.FC = () => {
                                           })}
                                       </select>
                                     </div>
+                                    {(institutionType === InstitutionType.PROVIDER || includeHospital) && (
+                                      <div>
+                                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                          Existing Stats
+                                        </label>
+                                        <FormattedNumberInput
+                                          value={input.existingCount || 0}
+                                          onChange={(val) =>
+                                            handleInputChange(
+                                              product.id,
+                                              "existingCount",
+                                              val,
+                                            )
+                                          }
+                                          className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-gray-500 border p-1 bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {isRenewal && institutionType === InstitutionType.ACADEMIC && product.id === 'utd' && (
+                                  <div className="col-span-2 grid grid-cols-2 gap-3 mb-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-200 dark:border-gray-700">
+                                    <div className="col-span-2 text-[10px] uppercase font-bold text-gray-500">Existing Academic Stats</div>
                                     <div>
-                                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                                        Existing Stats
-                                      </label>
-                                      <FormattedNumberInput
-                                        value={input.existingCount || 0}
-                                        onChange={(val) =>
-                                          handleInputChange(
-                                            product.id,
-                                            "existingCount",
-                                            val,
-                                          )
-                                        }
-                                        className="block w-full text-xs border-gray-300 dark:border-gray-600 rounded shadow-sm focus:ring-gray-500 border p-1 bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
-                                      />
+                                      <label className="block text-[10px] text-gray-500 dark:text-gray-400 font-bold mb-1">Existing Faculty</label>
+                                      <FormattedNumberInput value={input.existingFacultyCount || 0} onChange={(val) => handleInputChange(product.id, 'existingFacultyCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] text-gray-500 dark:text-gray-400 font-bold mb-1">Existing Residents</label>
+                                      <FormattedNumberInput value={input.existingResidentsCount || 0} onChange={(val) => handleInputChange(product.id, 'existingResidentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] text-gray-500 dark:text-gray-400 font-bold mb-1">Existing Med Students</label>
+                                      <FormattedNumberInput value={input.existingMedStudentsCount || 0} onChange={(val) => handleInputChange(product.id, 'existingMedStudentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] text-gray-500 dark:text-gray-400 font-bold mb-1">Existing Pharma Students</label>
+                                      <FormattedNumberInput value={input.existingPharmaStudentsCount || 0} onChange={(val) => handleInputChange(product.id, 'existingPharmaStudentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {isRenewal && institutionType === InstitutionType.ACADEMIC && product.id === 'lxd' && (
+                                  <div className="col-span-2 grid grid-cols-1 gap-2 mb-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-200 dark:border-gray-700">
+                                    <div className="text-[10px] uppercase font-bold text-gray-500">Existing Academic Stats</div>
+                                    <div>
+                                      <label className="block text-[10px] text-gray-500 dark:text-gray-400 font-bold mb-1">Existing Healthcare Students</label>
+                                      <FormattedNumberInput value={input.existingTotalStudentsCount || 0} onChange={(val) => handleInputChange(product.id, 'existingTotalStudentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
                                     </div>
                                   </div>
                                 )}
@@ -2034,6 +1998,79 @@ const App: React.FC = () => {
                                     <span className="ml-2 text-xs text-purple-700 dark:text-purple-300 font-medium">
                                       Switching or changing stats?
                                     </span>
+                                  </div>
+                                )}
+
+                                {/* Moved Academic Inputs */}
+                                {institutionType === InstitutionType.ACADEMIC && product.id === 'utd' && (!isRenewal || input.changeInStats) && (
+                                  <div className="col-span-2 grid grid-cols-2 gap-3 mb-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-100 dark:border-blue-800">
+                                    <div>
+                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Faculty (M.D. / D.O.) <span className="text-red-500">*</span></label>
+                                      <FormattedNumberInput value={input.facultyCount || 0} onChange={(val) => handleInputChange(product.id, 'facultyCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Residents</label>
+                                      <FormattedNumberInput value={input.residentsCount || 0} onChange={(val) => handleInputChange(product.id, 'residentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Med Students <span className="text-red-500">*</span></label>
+                                      <FormattedNumberInput value={input.medStudentsCount || 0} onChange={(val) => handleInputChange(product.id, 'medStudentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Pharma/Nursing Students</label>
+                                      <FormattedNumberInput value={input.pharmaStudentsCount || 0} onChange={(val) => handleInputChange(product.id, 'pharmaStudentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
+                                    </div>
+                                    { ((Number(input.facultyCount)||0) + (Number(input.residentsCount)||0) >= 50 || (Number(input.medStudentsCount)||0) + (Number(input.pharmaStudentsCount)||0) >= 1) && (
+                                      <div className="col-span-2 mt-2 pt-2 border-t border-blue-200 dark:border-blue-700 w-1/2">
+                                        <label className="block text-[10px] text-pink-600 dark:text-pink-400 font-bold mb-1">Educational Discount % (Max 20%)</label>
+                                        <div className="mt-1 flex items-center border border-pink-300 dark:border-pink-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 h-8">
+                                          <button
+                                            type="button"
+                                            onClick={() => { let cur = Number(input.educationalDiscount) || 0; handleInputChange(product.id, 'educationalDiscount', Math.max(0, cur - 1)); }}
+                                            className="w-8 h-full flex-shrink-0 flex items-center justify-center text-pink-500 hover:text-pink-700 hover:bg-pink-50 dark:hover:bg-gray-600 focus:outline-none"
+                                          >
+                                            -
+                                          </button>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max="20"
+                                            value={input.educationalDiscount === 0 ? 0 : input.educationalDiscount || ''}
+                                            onChange={(e) => { let v = parseInt(e.target.value); if(v>20)v=20; if(v<0)v=0; handleInputChange(product.id, 'educationalDiscount', isNaN(v)?'':v); }}
+                                            className="w-full h-full text-center text-xs p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
+                                            style={{ appearance: "textfield", MozAppearance: "textfield" }}
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => { let cur = Number(input.educationalDiscount) || 0; handleInputChange(product.id, 'educationalDiscount', Math.min(20, cur + 1)); }}
+                                            className="w-8 h-full flex-shrink-0 flex items-center justify-center text-pink-500 hover:text-pink-700 hover:bg-pink-50 dark:hover:bg-gray-600 focus:outline-none"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                  </div>
+                                )}
+
+                                {institutionType === InstitutionType.ACADEMIC && product.id === 'lxd' && (!isRenewal || input.changeInStats) && (
+                                  <div className="col-span-2 grid grid-cols-1 gap-2 mb-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-100 dark:border-blue-800">
+                                    <div>
+                                      <label className="block text-[10px] text-gray-600 dark:text-gray-400 font-bold mb-1">Total Healthcare Students <span className="text-red-500">*</span></label>
+                                      <FormattedNumberInput value={input.totalStudentsCount || 0} onChange={(val) => handleInputChange(product.id, 'totalStudentsCount', val)} className="w-full text-xs border-gray-300 dark:border-gray-600 rounded p-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-sans tabular-nums" />
+                                    </div>
+                                    <div className="flex flex-col space-y-1 mt-1">
+                                      <label className="flex items-center text-xs text-gray-700 dark:text-gray-300">
+                                        <input type="checkbox" checked={input.lxdAcademicBase ?? true} onChange={(e) => handleInputChange(product.id, 'lxdAcademicBase', e.target.checked)} className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" /> LXD Base Package ($7)
+                                      </label>
+                                      <label className="flex items-center text-xs text-gray-700 dark:text-gray-300">
+                                        <input type="checkbox" checked={input.lxdAcademicSelect ?? true} onChange={(e) => handleInputChange(product.id, 'lxdAcademicSelect', e.target.checked)} className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" /> Lexi-SELECT (Mobile App) ($3)
+                                      </label>
+                                      <label className="flex items-center text-xs text-gray-700 dark:text-gray-300">
+                                        <input type="checkbox" checked={input.lxdAcademicMartindale ?? false} onChange={(e) => handleInputChange(product.id, 'lxdAcademicMartindale', e.target.checked)} className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" /> Martindale ($1)
+                                      </label>
+                                    </div>
                                   </div>
                                 )}
 

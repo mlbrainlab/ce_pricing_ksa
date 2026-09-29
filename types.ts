@@ -48,6 +48,11 @@ export interface ProductInput {
   medStudentsCount?: number | "";
   pharmaStudentsCount?: number | "";
   totalStudentsCount?: number | "";
+  existingFacultyCount?: number | "";
+  existingResidentsCount?: number | "";
+  existingMedStudentsCount?: number | "";
+  existingPharmaStudentsCount?: number | "";
+  existingTotalStudentsCount?: number | "";
   lxdAcademicBase?: boolean;
   lxdAcademicSelect?: boolean;
   lxdAcademicMartindale?: boolean;

@@ -115,58 +115,69 @@ export const calculatePricing = (
     let listRate = 0;
     let baseGross = 0;
     
+    const calculateAcademicGross = (
+      pId: string,
+      variant: string,
+      faculty: number,
+      residents: number,
+      med: number,
+      pharma: number,
+      eduDiscount: number,
+      hospitalHc: number,
+      eaiActive: boolean,
+      totalStudents: number,
+    ) => {
+        if (pId === "utd") {
+            const academicClinicianBase = (faculty + residents) * (variant === "UTDEE" ? 210 : (variant === "UTDEE (265)" ? 265 : UTD_ACADEMIC_FACULTY_PRICE));
+            let hospitalCost = 0;
+            if (config.includeHospital) {
+               const vPrice = variant === "UTDADV" ? UTD_VARIANTS["ANYWHERE"] : (UTD_VARIANTS[variant] || 0);
+               hospitalCost = hospitalHc * vPrice;
+               hospitalCost = hospitalCost * (1 - eduDiscount);
+            }
+            const finalAcademicClinicianCost = config.includeHospital ? academicClinicianBase : (academicClinicianBase * (1 - eduDiscount));
+            const studentCost = (med * UTD_ACADEMIC_STUDENT_MED) + (pharma * UTD_ACADEMIC_STUDENT_PHARMA);
+            let g = finalAcademicClinicianCost + studentCost + hospitalCost;
+            if (variant === "UTDADV") g = g * 1.08;
+            if (eaiActive) g = g * 1.03;
+            return g;
+        } else if (pId === "lxd") {
+            const lxdBase = (inputs.lxdAcademicBase ?? true) ? LXD_ACADEMIC_BASE : 0;
+            const lxdSelect = inputs.lxdAcademicSelect ? LXD_ACADEMIC_SELECT : 0;
+            const lxdMartindale = inputs.lxdAcademicMartindale ? LXD_ACADEMIC_MARTINDALE : 0;
+            const academicCost = totalStudents * (lxdBase + lxdSelect + lxdMartindale);
+            let hospitalCost = 0;
+            if (config.includeHospital) {
+                const vPrice = LXD_VARIANTS[variant] || 0;
+                hospitalCost = hospitalHc * vPrice;
+            }
+            return academicCost + hospitalCost;
+        }
+        return 0;
+    };
+    
+    let oldAcademicGross = 0;
+    let newAcademicGross = 0;
+
     if (config.institutionType === InstitutionType.ACADEMIC) {
-      if (prodId === "utd") {
-        const faculty = Number(inputs.facultyCount) || 0;
-        const residents = Number(inputs.residentsCount) || 0;
-        const med = Number(inputs.medStudentsCount) || 0;
-        const pharma = Number(inputs.pharmaStudentsCount) || 0;
-        const eduDiscount = (Number(inputs.educationalDiscount) || 0) / 100;
-        const hospitalHc = Number(inputs.count) || 0;
-        
-        const academicClinicianBase = (faculty + residents) * (inputs.variant === "UTDEE" ? 210 : (inputs.variant === "UTDEE (265)" ? 265 : UTD_ACADEMIC_FACULTY_PRICE));
-        let hospitalCost = 0;
-        if (config.includeHospital) {
-           const vPrice = inputs.variant === "UTDADV" ? UTD_VARIANTS["ANYWHERE"] : (UTD_VARIANTS[inputs.variant] || 0);
-           hospitalCost = hospitalHc * vPrice;
-           // Apply discount to hospital rate if bundled
-           hospitalCost = hospitalCost * (1 - eduDiscount);
-        }
-        
-        // If pure academic, discount applies to the faculty+residents cost
-        const finalAcademicClinicianCost = config.includeHospital ? academicClinicianBase : (academicClinicianBase * (1 - eduDiscount));
-        
-        const studentCost = (med * UTD_ACADEMIC_STUDENT_MED) + (pharma * UTD_ACADEMIC_STUDENT_PHARMA);
-        
-        baseGross = finalAcademicClinicianCost + studentCost + hospitalCost;
-        
-        if (inputs.variant === "UTDADV") {
-           baseGross = baseGross * 1.08;
-        }
-        
-        // EAI Activation
-        const eaiActive = inputs.eaiActivation ?? true;
-        if (eaiActive) {
-          baseGross = baseGross * 1.03;
-        }
-        
-      } else if (prodId === "lxd") {
-        const totalStudents = Number(inputs.totalStudentsCount) || 0;
-        const lxdBase = (inputs.lxdAcademicBase ?? true) ? LXD_ACADEMIC_BASE : 0;
-        const lxdSelect = inputs.lxdAcademicSelect ? LXD_ACADEMIC_SELECT : 0;
-        const lxdMartindale = inputs.lxdAcademicMartindale ? LXD_ACADEMIC_MARTINDALE : 0;
-        
-        const academicCost = totalStudents * (lxdBase + lxdSelect + lxdMartindale);
-        
-        let hospitalCost = 0;
-        if (config.includeHospital) {
-            const beds = Number(inputs.count) || 0;
-            const vPrice = LXD_VARIANTS[inputs.variant] || 0;
-            hospitalCost = beds * vPrice;
-        }
-        
-        baseGross = academicCost + hospitalCost;
-      }
+      const eActive = inputs.eaiActivation ?? true;
+      const eduDiscount = (Number(inputs.educationalDiscount) || 0) / 100;
+      
+      newAcademicGross = calculateAcademicGross(
+          prodId, inputs.variant, 
+          Number(inputs.facultyCount) || 0, Number(inputs.residentsCount) || 0,
+          Number(inputs.medStudentsCount) || 0, Number(inputs.pharmaStudentsCount) || 0,
+          eduDiscount, Number(inputs.count) || 0, eActive, Number(inputs.totalStudentsCount) || 0
+      );
+      
+      oldAcademicGross = calculateAcademicGross(
+          prodId, inputs.existingVariant || inputs.variant, 
+          Number(inputs.existingFacultyCount) || 0, Number(inputs.existingResidentsCount) || 0,
+          Number(inputs.existingMedStudentsCount) || 0, Number(inputs.existingPharmaStudentsCount) || 0,
+          eduDiscount, Number(inputs.existingCount) || 0, eActive, Number(inputs.existingTotalStudentsCount) || 0
+      );
+      
+      baseGross = newAcademicGross;
     } else {
       // PROVIDER CALCULATION
       if (prodId === "utd") {
@@ -236,7 +247,41 @@ export const calculatePricing = (
       // Calculate Standard Base (Expiring * (1 + Uplift Rate))
       const standardBase = expiring * (1 + upliftVal / 100);
 
-      if (prodId === "utd") {
+      if (config.institutionType === InstitutionType.ACADEMIC) {
+          let upsellRatio = 0;
+          const triggeredChange = inputs.changeInStats || existing !== target;
+          if (triggeredChange && oldAcademicGross > 0 && newAcademicGross > oldAcademicGross) {
+              upsellRatio = (newAcademicGross - oldAcademicGross) / oldAcademicGross;
+          }
+          
+          let academicPathPrice = 0;
+          const isStatsIncrease = triggeredChange && upsellRatio > 0;
+          
+          if (existing === target) {
+             if (isStatsIncrease) {
+                 academicPathPrice = standardBase + (standardBase * upsellRatio);
+                 productNotes.push(`${prodId.toUpperCase()}: Volume Expansion (${(upsellRatio*100).toFixed(1)}%)`);
+             } else {
+                 academicPathPrice = standardBase;
+             }
+          } else {
+             if (isStatsIncrease) {
+                 const net = baseGross * (1 - (parseFloat(inputs.baseDiscount as any) || 0) / 100);
+                 academicPathPrice = applyWHT ? net / WHT_FACTOR : net;
+                 productNotes.push(`${prodId.toUpperCase()}: Variant Upgrade + Volume Expansion (List Rate Applied)`);
+             } else {
+                 if (existing === "ANYWHERE" && target === "UTDADV") {
+                     academicPathPrice = standardBase * 1.08;
+                     productNotes.push(`${prodId.toUpperCase()}: Upgrade to UTDADV (+8%)`);
+                 } else {
+                     academicPathPrice = standardBase;
+                 }
+             }
+          }
+          
+          actualY1Price = academicPathPrice;
+          renewalBase = standardBase;
+      } else if (prodId === "utd") {
         // UTD Logic
         let pathBasedPrice = 0;
         let finalTarget = target;
