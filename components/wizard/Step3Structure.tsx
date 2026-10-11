@@ -85,7 +85,7 @@ export const Step3Structure = () => {
                               type="checkbox"
                               checked={applyWHT}
                               onChange={(e) => setApplyWHT(e.target.checked)}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                              className="w-5 h-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600"
                             />
                             <label
                               htmlFor="wht-checkbox"
@@ -252,7 +252,7 @@ export const Step3Structure = () => {
                                 type="checkbox"
                                 checked={isPartialYear}
                                 onChange={(e) => setIsPartialYear(e.target.checked)}
-                                className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                                className="w-5 h-5 text-amber-600 focus:ring-amber-500 border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600"
                               />
                               <label
                                 htmlFor="partial-year-checkbox"
@@ -389,7 +389,7 @@ export const Step3Structure = () => {
                                   onChange={(e) =>
                                     setApplyAnnualRate(e.target.checked)
                                   }
-                                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                                  className="w-5 h-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600"
                                 />
                                 <label
                                   htmlFor="apply-annual-rate"
@@ -578,7 +578,7 @@ export const Step3Structure = () => {
                                 type="checkbox"
                                 checked={flatPricing}
                                 onChange={(e) => setFlatPricing(e.target.checked)}
-                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                                className="w-5 h-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600"
                               />
                               <label
                                 htmlFor="flat-pricing-checkbox"
@@ -603,7 +603,7 @@ export const Step3Structure = () => {
                             disabled={!isIndirect}
                             checked={isIndirect ? rounding : false}
                             onChange={(e) => setRounding(e.target.checked)}
-                            className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600 disabled:cursor-not-allowed"
+                            className="w-5 h-5 text-purple-600 focus:ring-purple-500 border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600 disabled:cursor-not-allowed"
                           />
                           <label
                             htmlFor="rounding-checkbox"

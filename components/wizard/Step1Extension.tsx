@@ -279,7 +279,7 @@ export const Step1Extension = () => {
                   disabled={!isIndirect}
                   checked={isIndirect ? roundUpOptionB : false}
                   onChange={(e) => setRoundUpOptionB(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600 cursor-pointer disabled:cursor-not-allowed"
+                  className="w-5 h-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600 cursor-pointer disabled:cursor-not-allowed"
                 />
                 <label
                   htmlFor="round-up-option-b-checkbox"
@@ -327,7 +327,7 @@ export const Step1Extension = () => {
                 type="checkbox"
                 checked={useFullExtension}
                 onChange={(e) => setUseFullExtension(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+                className="w-5 h-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600"
               />
               <label
                 htmlFor="use-full-extension-checkbox"

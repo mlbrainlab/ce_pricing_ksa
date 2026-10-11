@@ -134,7 +134,7 @@ const MainApp = () => {
                 type="checkbox"
                 checked={includeHospital}
                 onChange={(e) => setIncludeHospital(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-blue-300 rounded focus:ring-blue-500"
+                className="w-5 h-5 text-blue-600 border-blue-300 rounded-md focus:ring-blue-500"
               />
               <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">Include Affiliated Hospital</span>
             </label>

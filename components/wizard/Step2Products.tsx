@@ -157,7 +157,7 @@ export const Step2Products = () => {
                                     type="checkbox"
                                     checked={isSelected}
                                     onChange={() => toggleProduct(product.id)}
-                                    className={`h-4 w-4 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-500 ${product.id === "utd" ? "text-green-600 focus:ring-green-500" : "text-blue-600 focus:ring-blue-500"}`}
+                                    className={`w-5 h-5 border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-500 ${product.id === "utd" ? "text-green-600 focus:ring-green-500" : "text-blue-600 focus:ring-blue-500"}`}
                                   />
                                   <span
                                     className={`ml-3 text-sm font-medium ${isSelected ? (product.id === "utd" ? "text-green-900 dark:text-green-200" : "text-blue-900 dark:text-blue-200") : "text-gray-500 dark:text-gray-400"}`}
@@ -350,7 +350,7 @@ export const Step2Products = () => {
                                         <div className="col-span-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 p-2 rounded-xl flex items-center">
                                           <input
                                             type="checkbox"
-                                            className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded-xl"
+                                            className="w-5 h-5 text-purple-600 focus:ring-purple-500 border-gray-300 rounded-md"
                                             checked={input.changeInStats || false}
                                             onChange={(e) =>
                                               handleInputChange(
@@ -427,13 +427,13 @@ export const Step2Products = () => {
                                           </div>
                                           <div className="flex flex-col space-y-1 mt-1">
                                             <label className="flex items-center text-xs text-gray-700 dark:text-gray-300">
-                                              <input type="checkbox" checked={input.lxdAcademicBase ?? true} onChange={(e) => handleInputChange(product.id, 'lxdAcademicBase', e.target.checked)} className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-xl" /> LXD Base Package ($7)
+                                              <input type="checkbox" checked={input.lxdAcademicBase ?? true} onChange={(e) => handleInputChange(product.id, 'lxdAcademicBase', e.target.checked)} className="mr-2 w-5 h-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-md" /> LXD Base Package ($7)
                                             </label>
                                             <label className="flex items-center text-xs text-gray-700 dark:text-gray-300">
-                                              <input type="checkbox" checked={input.lxdAcademicSelect ?? true} onChange={(e) => handleInputChange(product.id, 'lxdAcademicSelect', e.target.checked)} className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-xl" /> Lexi-SELECT (Mobile App) ($3)
+                                              <input type="checkbox" checked={input.lxdAcademicSelect ?? true} onChange={(e) => handleInputChange(product.id, 'lxdAcademicSelect', e.target.checked)} className="mr-2 w-5 h-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-md" /> Lexi-SELECT (Mobile App) ($3)
                                             </label>
                                             <label className="flex items-center text-xs text-gray-700 dark:text-gray-300">
-                                              <input type="checkbox" checked={input.lxdAcademicMartindale ?? false} onChange={(e) => handleInputChange(product.id, 'lxdAcademicMartindale', e.target.checked)} className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-xl" /> Martindale ($1)
+                                              <input type="checkbox" checked={input.lxdAcademicMartindale ?? false} onChange={(e) => handleInputChange(product.id, 'lxdAcademicMartindale', e.target.checked)} className="mr-2 w-5 h-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-md" /> Martindale ($1)
                                             </label>
                                           </div>
                                         </div>
@@ -555,7 +555,7 @@ export const Step2Products = () => {
                                         <div className="col-span-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 p-2 rounded-xl flex items-center mt-1">
                                           <input
                                             type="checkbox"
-                                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded-xl"
+                                            className="w-5 h-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded-md"
                                             checked={input.eaiActivation ?? true}
                                             onChange={(e) =>
                                               handleInputChange(

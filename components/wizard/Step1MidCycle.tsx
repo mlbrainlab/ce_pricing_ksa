@@ -122,7 +122,7 @@ export const Step1MidCycle = () => {
                   checked={midCycleDlm}
                   onChange={(e) => setMidCycleDlm(e.target.checked)}
                   disabled={!midCycleBedCount}
-                  className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 w-4 h-4 disabled:cursor-not-allowed cursor-pointer"
+                  className="rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 w-5 h-5 disabled:cursor-not-allowed cursor-pointer"
                 />
                 <span className="font-medium">Include DLM Service (+$15,000 WHT-applicable)</span>
               </label>
@@ -135,7 +135,7 @@ export const Step1MidCycle = () => {
               id="mid-cycle-wht-checkbox"
               checked={midCycleWHT}
               onChange={(e) => setMidCycleWHT(e.target.checked)}
-              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600"
+              className="w-5 h-5 text-purple-600 focus:ring-purple-500 border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600"
             />
             <label
               htmlFor="mid-cycle-wht-checkbox"
