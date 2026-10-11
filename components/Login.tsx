@@ -97,10 +97,17 @@ export default function Login({ onLogin }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 transition-colors">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+    <div className="min-h-screen relative flex flex-col justify-center py-12 sm:px-6 lg:px-8 transition-colors overflow-hidden bg-gray-50 dark:bg-gray-900">
+      
+      {/* Animated Blobs Background */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-400/30 dark:bg-blue-600/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob"></div>
+        <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-purple-400/30 dark:bg-purple-600/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute bottom-[-20%] left-[20%] w-96 h-96 bg-pink-400/30 dark:bg-pink-600/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob" style={{ animationDelay: '4s' }}></div>
+      </div>
+      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <div className="flex justify-center">
-          <img src={WK_LOGO_BASE64} alt="WK Logo" className="h-12 w-auto object-contain bg-blue-600 p-2 rounded" />
+          <img src={WK_LOGO_BASE64} alt="WK Logo" className="h-14 w-auto object-contain bg-blue-600 p-2.5 rounded-2xl shadow-lg" />
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
           {isSignUp ? 'Create an account' : 'Sign in to access'}
@@ -112,8 +119,8 @@ export default function Login({ onLogin }: LoginProps) {
         </div>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white dark:bg-gray-800 py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-200 dark:border-gray-700 transition-colors">
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+        <div className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-2xl py-10 px-6 shadow-[0_8px_30px_rgb(0,0,0,0.12)] sm:rounded-[2rem] sm:px-12 border border-white/50 dark:border-gray-700/50 transition-all duration-300">
           <form className="space-y-6" onSubmit={handleSubmit}>
 
             {isSignUp && (
@@ -126,7 +133,7 @@ export default function Login({ onLogin }: LoginProps) {
                     required
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="mt-2 block w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-2xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500/50 sm:text-sm bg-white/50 dark:bg-gray-800/50 text-gray-900 dark:text-white backdrop-blur-md transition-all duration-300"
                   />
                 </div>
                 <div className="flex-1">
@@ -137,7 +144,7 @@ export default function Login({ onLogin }: LoginProps) {
                     required
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="mt-2 block w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-2xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500/50 sm:text-sm bg-white/50 dark:bg-gray-800/50 text-gray-900 dark:text-white backdrop-blur-md transition-all duration-300"
                   />
                 </div>
               </div>
@@ -154,7 +161,7 @@ export default function Login({ onLogin }: LoginProps) {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors ph-no-capture"
+                  className="mt-2 block w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-2xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500/50 sm:text-sm bg-white/50 dark:bg-gray-800/50 text-gray-900 dark:text-white backdrop-blur-md transition-all duration-300 ph-no-capture"
                   placeholder="you@example.com"
                 />
               </div>
@@ -172,7 +179,7 @@ export default function Login({ onLogin }: LoginProps) {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors ph-no-capture"
+                  className="mt-2 block w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-2xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500/50 sm:text-sm bg-white/50 dark:bg-gray-800/50 text-gray-900 dark:text-white backdrop-blur-md transition-all duration-300 ph-no-capture"
                   placeholder="********"
                 />
               </div>
@@ -194,7 +201,7 @@ export default function Login({ onLogin }: LoginProps) {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 transition-colors"
+                className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-2xl shadow-[0_4px_14px_0_rgb(59,130,246,0.39)] text-sm font-bold text-white bg-blue-600/90 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 disabled:opacity-50 transition-all active:scale-[0.98]"
               >
                 {isLoading ? (isSignUp ? 'Signing up...' : 'Signing in...') : (isSignUp ? 'Sign up' : 'Sign in')}
               </button>

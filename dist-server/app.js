@@ -126561,6 +126561,23 @@ import cookieParser from "cookie-parser";
 // constants.ts
 var CHANGELOG = [
   {
+    version: "7.0.0-dev",
+    date: (/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }),
+    changes: [
+      "Liquid-Glass UI: Full redesign featuring specular highlights, multi-layer blur, reflective pill navigation, and ambient lighting effects.",
+      "Progressive Step-by-Step Flow: Introduced guided step locking where Product Mix and Structure unlock sequentially as Deal Context and products are selected.",
+      "Animated Step Unlocking: Smooth fade and zoom transition animations when unlocking subsequent wizard sections.",
+      "Layout Geometry & Grid Alignment: Fixed 3-column top wizard layout matching the exact width of the commercial schedule below.",
+      "Deal Context Width Lockdown: Ensured Deal Context card maintains consistent 1/3 width across Standard, Extension, and Mid-Cycle modes.",
+      "Dynamic Extension Layout: Arranged Options A, B, and C in a single row, spreading configuration parameters across responsive multi-column layouts.",
+      "Glassmorphism Custom Dropdowns: Replaced all native browser select elements with custom glass-morphism popover menus.",
+      "Touch-Friendly Rounded Inputs: Applied soft rounded corners (rounded-xl) across all text inputs, headcount/bed counters, and discount steppers.",
+      "Export Center Upgrades: Applied rounded action buttons and detached the Preview Quote modal from container transforms to float across the full viewport.",
+      "Enhanced Reset Form: Enlarged Reset Form button with instant return to initial step-locked state.",
+      "Metadata Architecture: Replaced hardcoded pricing constants with resilient dynamic lookups from the secure backend metadata service."
+    ]
+  },
+  {
     version: "6.8.1",
     date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
     changes: [
@@ -126920,9 +126937,9 @@ var convertToSAR = (usdAmount, applyRounding) => {
   return applyRounding ? Math.ceil(rawSar / 100) * 100 : rawSar;
 };
 var calculatePricing = (config) => {
+  const dealType = config.dealType || "New Logo" /* NEW_LOGO */;
+  const channel = config.channel || "Direct" /* DIRECT */;
   const {
-    dealType,
-    channel,
     selectedProducts,
     productInputs,
     method,

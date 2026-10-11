@@ -1,7 +1,7 @@
 {
   "name": "pricing-calculator",
   "private": true,
-  "version": "6.8.1",
+  "version": "7.0.0-dev",
   "type": "module",
   "scripts": {
     "dev": "tsx --env-file=.env --experimental-websocket server.ts",
@@ -13,6 +13,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
     "@types/cors": "^2.8.19",
+    "canvas": "^3.2.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "exceljs": "^3.4.0",

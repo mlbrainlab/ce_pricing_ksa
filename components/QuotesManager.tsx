@@ -64,9 +64,9 @@ export function QuotesManager({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black bg-opacity-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full p-6 border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col">
-        <div className="flex justify-between items-center mb-4 border-b border-gray-200 dark:border-gray-700 pb-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm transition-all duration-300">
+      <div className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-2xl rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.12)] max-w-3xl w-full p-8 border border-white/50 dark:border-gray-700/50 max-h-[90vh] flex flex-col transition-all duration-300">
+        <div className="flex justify-between items-center mb-6 border-b border-gray-200/50 dark:border-gray-700/50 pb-4">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             📂 My Saved Quotes & Drafts
           </h2>
@@ -77,19 +77,19 @@ export function QuotesManager({
 
         <div className="space-y-3 overflow-y-auto flex-1 pr-2">
           {quotes.map(q => (
-            <div key={q.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
-              <div>
-                <span className="font-bold text-gray-800 dark:text-gray-200">{q.title}</span>
-                <span className={`ml-2 text-xs px-2 py-1 rounded-full ${q.is_draft ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
+            <div key={q.id} className="flex justify-between items-center p-4 bg-white/50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-md hover:bg-white/80 dark:hover:bg-gray-800/80">
+              <div className="min-w-0 flex-1 mr-4">
+                <span className="font-bold text-gray-800 dark:text-gray-200 break-all">{q.title}</span>
+                <span className={`inline-block ml-2 text-xs px-2 py-1 rounded-full whitespace-nowrap align-middle ${q.is_draft ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
                   {q.is_draft ? 'Draft' : 'Final'}
                 </span>
                 <div className="text-sm text-gray-500 mt-1">
                   {new Date(q.created_at).toLocaleString()}
                 </div>
               </div>
-              <div className="flex gap-3 items-center">
-                <button onClick={() => { onLoadQuote(q.config); onClose(); }} className="px-3 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded text-sm font-medium">Load</button>
-                <button onClick={() => handleDelete(q.id)} className="text-red-600 hover:text-red-800 text-sm font-medium px-2">Delete</button>
+              <div className="flex gap-3 items-center shrink-0">
+                <button onClick={() => { onLoadQuote(q.config); onClose(); }} className="px-4 py-2 bg-blue-600/10 text-blue-700 dark:text-blue-400 hover:bg-blue-600/20 rounded-xl text-sm font-bold transition-all">Load</button>
+                <button onClick={() => handleDelete(q.id)} className="px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl text-sm font-bold transition-all">Delete</button>
               </div>
             </div>
           ))}

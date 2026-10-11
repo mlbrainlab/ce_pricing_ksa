@@ -5,3 +5,16 @@
 body {
   font-family: 'Inter', sans-serif;
 }
+@font-face {
+  font-family: 'SaudiRiyalSymbol';
+  src: url('/fonts/saudiriyalsymbol.woff2') format('woff2'),
+       url('/fonts/saudiriyalsymbol.woff') format('woff'),
+       url('/fonts/saudiriyalsymbol.ttf') format('truetype');
+  font-display: swap;
+}
+
+.font-saudi-riyal {
+  font-family: 'SaudiRiyalSymbol', sans-serif;
+  font-weight: normal;
+  display: inline-block;
+}

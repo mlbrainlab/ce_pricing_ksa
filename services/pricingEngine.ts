@@ -69,9 +69,9 @@ const convertToSAR = (usdAmount: number, applyRounding: boolean): number => {
 export const calculatePricing = (
   config: DealConfiguration,
 ): CalculationOutput => {
+  const dealType = config.dealType || DealType.NEW_LOGO;
+  const channel = config.channel || ChannelType.DIRECT;
   const {
-    dealType,
-    channel,
     selectedProducts,
     productInputs,
 

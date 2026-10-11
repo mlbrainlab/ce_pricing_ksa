@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { APP_VERSION, CHANGELOG } from '../constants';
 
-export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void; userName?: string; onProfileClick?: () => void; onMyQuotesClick?: () => void; isAdmin?: boolean; onAdminClick?: () => void; }> = ({ children, onLogout, userName, onProfileClick, onMyQuotesClick, isAdmin, onAdminClick }) => {
+export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void; userName?: string; onProfileClick?: () => void; onMyQuotesClick?: () => void; isAdmin?: boolean;    onAdminClick?: () => void; }> = ({ children, onLogout, userName, onProfileClick, onMyQuotesClick, isAdmin,
+  
+  
+  onAdminClick }) => {
   const [themePref, setThemePref] = useState<'light' | 'dark' | 'system'>('system');
   const [mounted, setMounted] = useState(false);
   const [showReleaseAlert, setShowReleaseAlert] = useState(false);
@@ -73,8 +76,15 @@ export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans transition-colors duration-200">
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-50 via-purple-50 to-teal-50 dark:from-indigo-950 dark:via-purple-900/50 dark:to-teal-950 text-gray-900 dark:text-gray-100 font-sans transition-colors duration-200 bg-fixed relative">
+      {/* Liquid Blobs Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-[-1]">
+        <div className="absolute -top-[10%] -left-[10%] w-[40vw] h-[40vw] rounded-full bg-purple-300/30 dark:bg-purple-700/20 mix-blend-multiply dark:mix-blend-screen filter blur-[80px] opacity-70 animate-blob"></div>
+        <div className="absolute top-[20%] -right-[10%] w-[45vw] h-[45vw] rounded-full bg-teal-300/30 dark:bg-teal-700/20 mix-blend-multiply dark:mix-blend-screen filter blur-[80px] opacity-70 animate-blob animation-delay-2000"></div>
+        <div className="absolute -bottom-[20%] left-[20%] w-[50vw] h-[50vw] rounded-full bg-indigo-300/30 dark:bg-indigo-700/20 mix-blend-multiply dark:mix-blend-screen filter blur-[80px] opacity-70 animate-blob animation-delay-4000"></div>
+      </div>
+      
+      <header className="bg-white/30 dark:bg-gray-900/40 backdrop-blur-lg border-b border-white/20 dark:border-gray-700/50 sticky top-0 z-50 transition-colors duration-200 shadow-sm">
         {showReleaseAlert && (
           <div className="bg-blue-600 text-white px-4 py-2 flex items-center justify-between text-sm">
             <div className="flex items-center space-x-2">
@@ -90,7 +100,7 @@ export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3">
              {/* Logo Placeholder */}
-             <div className="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center text-white font-bold">
+             <div className="w-8 h-8 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold">
                CE
              </div>
              <h1 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white">
@@ -98,12 +108,15 @@ export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void
              </h1>
           </div>
           
+          
+
+
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               {isAdmin && onAdminClick && (
                 <button
                   onClick={onAdminClick}
-                  className="p-2 flex items-center gap-1 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-800/40 focus:outline-none transition-colors"
+                  className="p-2 flex items-center gap-1 rounded-2xl bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-800/40 focus:outline-none transition-colors"
                   title="Admin Dashboard"
                 >
                   🛡️ <span className="hidden sm:inline text-sm font-medium">Admin</span>
@@ -112,7 +125,7 @@ export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void
               {onMyQuotesClick && (
                 <button
                   onClick={onMyQuotesClick}
-                  className="p-2 flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none transition-colors"
+                  className="p-2 flex items-center gap-1 rounded-2xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none transition-colors"
                   title="My Saved Quotes & Drafts"
                 >
                   📂 <span className="hidden sm:inline text-sm font-medium">Quotes</span>
@@ -121,7 +134,7 @@ export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void
               {onLogout && (
                 <button
                   onClick={onLogout}
-                  className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  className="p-2 rounded-2xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                   aria-label="Lock Session (Return to Login)"
                   title="Lock Session / Return to Login"
                 >
@@ -132,7 +145,7 @@ export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void
               )}
               <button
                 onClick={openReleaseModal}
-                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                className="p-2 rounded-2xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                 aria-label="View Release Notes"
                 title="View Release Notes"
               >
@@ -142,7 +155,7 @@ export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void
               </button>
               <button
                 onClick={cycleTheme}
-                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                className="p-2 rounded-2xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                 aria-label="Toggle Theme"
                 title={`Current Theme: ${themePref.charAt(0).toUpperCase() + themePref.slice(1)}`}
               >
@@ -167,16 +180,16 @@ export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void
               className="text-sm text-blue-600 dark:text-blue-400 font-medium hidden sm:block hover:underline cursor-pointer"
               onClick={onProfileClick}
             >
-              {userName || "CE Pricing Architect"}
+              {userName || "User Profile"}
             </div>
           </div>
         </div>
       </header>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow flex flex-col relative w-full">
         {children}
       </main>
 
-      <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto transition-colors duration-200">
+      <footer className="bg-white/30 dark:bg-gray-900/40 backdrop-blur-lg border-t border-white/20 dark:border-gray-700/50 mt-auto transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-center">
           <p className="text-xs text-gray-500 dark:text-gray-400">
             &copy; Wolters Kluwer Arabia Regional Headquarters Limited.
@@ -186,9 +199,9 @@ export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void
 
       {/* Release Notes Modal */}
       {showReleaseModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6 border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center mb-4 border-b border-gray-200 dark:border-gray-700 pb-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm transition-all duration-300">
+          <div className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-2xl rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.12)] max-w-2xl w-full p-8 border border-white/50 dark:border-gray-700/50 max-h-[90vh] flex flex-col transition-all duration-300">
+            <div className="flex justify-between items-center mb-6 border-b border-gray-200/50 dark:border-gray-700/50 pb-4">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">What's New</h3>
               <button onClick={() => setShowReleaseModal(false)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -196,7 +209,7 @@ export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void
             </div>
             <div className="overflow-y-auto flex-1 pr-2">
               {CHANGELOG.map((release, index) => (
-                <div key={release.version} className={`mb-6 ${index !== CHANGELOG.length - 1 ? 'border-b border-gray-100 dark:border-gray-700 pb-6' : ''}`}>
+                <div key={release.version} className={`mb-6 ${index !== CHANGELOG.length - 1 ? 'border-b border-gray-100/50 dark:border-gray-700/50 pb-6' : ''}`}>
                   <div className="flex items-baseline space-x-2 mb-2">
                     <h4 className="text-lg font-bold text-blue-600 dark:text-blue-400">v{release.version}</h4>
                     <span className="text-sm text-gray-500 dark:text-gray-400">{release.date}</span>
@@ -209,10 +222,10 @@ export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void
                 </div>
               ))}
             </div>
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+            <div className="mt-6 pt-6 border-t border-gray-200/50 dark:border-gray-700/50 flex justify-end">
               <button 
                 onClick={() => setShowReleaseModal(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                className="px-6 py-2.5 bg-blue-600/90 hover:bg-blue-600 text-white rounded-xl text-sm font-bold shadow-[0_4px_14px_0_rgb(59,130,246,0.39)] transition-all"
               >
                 Got it
               </button>

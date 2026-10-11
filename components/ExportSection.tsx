@@ -1,5 +1,6 @@
 // @ts-nocheck
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAutoState } from '../hooks/useAutoState';
 import { useSaveQuote } from '../hooks/useSaveQuote';
 import { Download, FileText, Table } from 'lucide-react';
@@ -12,6 +13,26 @@ import ExcelJS from 'exceljs';
 import { SAMIR_WHITE_LOGO_BASE64 } from '../samirLogo';
 import { WK_LOGO_BASE64 } from '../wkLogo';
 import { EAI_LOGO_BASE64 } from '../eaiLogo';
+
+let _riyalCanvas = null;
+const getRiyalCanvas = () => {
+    if (_riyalCanvas) return _riyalCanvas;
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+        ctx.font = '50px "SaudiRiyalSymbol"';
+        ctx.fillStyle = '#000000';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('\u00ea', 32, 36);
+    }
+    _riyalCanvas = canvas;
+    return canvas;
+};
+
+
 
 interface ExportSectionProps {
   customerName: string;
@@ -68,7 +89,10 @@ interface SiteBreakdownItem {
 }
 
 const formatMoney = (amount: number, currency: string) => { 
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount); 
+  if (currency === 'SAR' || currency === '﷼') {
+    return `     ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)}`;
+  }
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount); 
 };
 
 export const ExportSection: React.FC<ExportSectionProps> = ({ 
@@ -227,6 +251,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   };
 
   const executePDFExport = async (isCp: boolean, isPreview: boolean = false) => {
+    if (!data && !isExtensionQuote && !isMidCycleQuote) { setIsPdfLoading(false); return null; }
     setShowCpModal(false);
     setIsPdfLoading(true);
     setPdfError(null);
@@ -243,7 +268,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           let arabicBoldB64 = fontCache['NotoSansArabic'].bold;
 
           const needsMain = !regularFontB64 || !boldFontB64;
-          const needsArabic = isCp && (!arabicRegB64 || !arabicBoldB64);
+          const needsArabic = (isCp || displayCurrency === 'SAR') && (!arabicRegB64 || !arabicBoldB64);
 
           if (needsMain || needsArabic) {
                setIsFontLoading(true);
@@ -293,7 +318,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               doc.addFont(`${fontName}-Bold.ttf`, fontName, 'bold');
           }
           
-          if (isCp && arabicRegB64 && arabicBoldB64) {
+          if (arabicRegB64 && arabicBoldB64) {
               doc.addFileToVFS(`NotoSansArabic-Regular.ttf`, arabicRegB64);
               doc.addFont(`NotoSansArabic-Regular.ttf`, 'NotoSansArabic', 'normal');
               doc.addFileToVFS(`NotoSansArabic-Bold.ttf`, arabicBoldB64);
@@ -592,9 +617,9 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
       tableHead = [['Description', 'Value']];
       tableBody = extRows;
-    } else if (isMidCycleQuote && data.midCycleResults) {
-      let productDisplay = data.midCycleResults.product;
-      if (data.midCycleResults.dlmSelected) {
+    } else if (isMidCycleQuote && data?.midCycleResults) {
+      let productDisplay = data?.midCycleResults.product;
+      if (data?.midCycleResults.dlmSelected) {
           productDisplay += " + DLM Service";
       }
 
@@ -604,7 +629,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         const mo = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; 
         return `${mo[date.getMonth()]} ${date.getDate().toString().padStart(2, '0')}, ${date.getFullYear()}`; 
       };
-      const durationLabel = `${formatD(config.midCycleStartDate)} to\n${formatD(config.midCycleExpiryDate)}\n(${Math.round(data.midCycleResults.durationMonths)} Months)`;
+      const durationLabel = `${formatD(config.midCycleStartDate)} to\n${formatD(config.midCycleExpiryDate)}\n(${Math.round(data?.midCycleResults.durationMonths)} Months)`;
 
       const isLxd = config.midCycleProduct?.startsWith('LXD_');
       columnStyles[1] = isLxd ? { fillColor: [224, 242, 254] } : { fillColor: [220, 252, 231] };
@@ -617,17 +642,17 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         tableHead = [['Duration', `${productNameDisplay} (SAR)`, 'Total (SAR)', 'VAT (15%)', 'Grand Total\n(SAR)']];
         tableBody = [[
           durationLabel,
-          formatMoney(data.midCycleResults.grossSAR, 'SAR'),
-          formatMoney(data.midCycleResults.grossSAR, 'SAR'),
-          formatMoney(data.midCycleResults.vatSAR, 'SAR'),
-          formatMoney(data.midCycleResults.grandTotalSAR, 'SAR')
+          formatMoney(data?.midCycleResults.grossSAR, 'SAR'),
+          formatMoney(data?.midCycleResults.grossSAR, 'SAR'),
+          formatMoney(data?.midCycleResults.vatSAR, 'SAR'),
+          formatMoney(data?.midCycleResults.grandTotalSAR, 'SAR')
         ]];
       } else {
         tableHead = [['Duration', `${productNameDisplay} (USD)`, 'Total (USD)']];
         tableBody = [[
           durationLabel,
-          formatMoney(data.midCycleResults.endUserGrossUSD, 'USD'),
-          formatMoney(data.midCycleResults.endUserGrossUSD, 'USD')
+          formatMoney(data?.midCycleResults.endUserGrossUSD, 'USD'),
+          formatMoney(data?.midCycleResults.endUserGrossUSD, 'USD')
         ]];
       }
     } else {
@@ -642,24 +667,24 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       if (isIndirect) {
         const prodCols = config.selectedProducts.map(pid => { return `${pid === 'utd' ? 'UpToDate' : pid === 'lxd' ? 'Lexidrug' : pid} (SAR)`; });
         tableHead = [['Term', ...prodCols, 'Total (SAR)', 'VAT (15%)', 'Grand Total\n(SAR)']];
-        tableBody = data.yearlyResults.map((r, i) => {
+        tableBody = data?.yearlyResults?.map((r, i) => {
           const pValues = config.selectedProducts.map(pid => { const bd = r.breakdown.find(x => x.id === pid); return bd ? formatMoney(bd.grossSAR, 'SAR') : '-'; });
-          return [ getTermLabel(r, i, data.yearlyResults), ...pValues, formatMoney(r.grossSAR, 'SAR'), formatMoney(r.vatSAR, 'SAR'), formatMoney(r.grandTotalSAR, 'SAR') ];
+          return [ getTermLabel(r, i, data?.yearlyResults), ...pValues, formatMoney(r.grossSAR, 'SAR'), formatMoney(r.vatSAR, 'SAR'), formatMoney(r.grandTotalSAR, 'SAR') ];
         });
         if (showTotals) {
-           const totals = ['TOTAL', ...config.selectedProducts.map(pid => formatMoney(data.productNetTotals[pid] * EXCHANGE_RATE_SAR, 'SAR')), formatMoney(data.totalGrossSAR, 'SAR'), formatMoney(data.totalVatSAR, 'SAR'), formatMoney(data.totalGrandTotalSAR, 'SAR')];
+           const totals = ['TOTAL', ...config.selectedProducts.map(pid => formatMoney(data?.productNetTotals[pid] * EXCHANGE_RATE_SAR, 'SAR')), formatMoney(data.totalGrossSAR, 'SAR'), formatMoney(data.totalVatSAR, 'SAR'), formatMoney(data.totalGrandTotalSAR, 'SAR')];
            tableBody.push(totals);
         }
       } else {
         const prodCols = config.selectedProducts.map(pid => { return `${pid === 'utd' ? 'UpToDate' : pid === 'lxd' ? 'Lexidrug' : pid} (USD)`; });
         tableHead = [['Term', ...prodCols, 'Total (USD)']];
-        tableBody = data.yearlyResults.map((r, i) => {
+        tableBody = data?.yearlyResults?.map((r, i) => {
           const pValues = config.selectedProducts.map(pid => { const bd = r.breakdown.find(x => x.id === pid); return bd ? formatMoney(bd.gross, 'USD') : '-'; });
-          return [ getTermLabel(r, i, data.yearlyResults), ...pValues, formatMoney(r.grossUSD, 'USD') ];
+          return [ getTermLabel(r, i, data?.yearlyResults), ...pValues, formatMoney(r.grossUSD, 'USD') ];
         });
         if (showTotals) {
             const productTotalsUSD = config.selectedProducts.map(pid => {
-                const total = data.yearlyResults.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === pid)?.gross || 0), 0);
+                const total = data?.yearlyResults?.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === pid)?.gross || 0), 0);
                 return formatMoney(total, 'USD');
             });
             tableBody.push(['TOTAL', ...productTotalsUSD, formatMoney(data.totalGrossUSD, 'USD')]);
@@ -673,10 +698,59 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       styles: { fontSize: 9, font: fontName, overflow: 'linebreak', cellPadding: 2, valign: 'middle', halign: 'left' }, 
       columnStyles: columnStyles, margin: { top: 35, left: 14, right: 14 },
       didParseCell: (data) => {
+        if (data.cell.text && data.cell.text.length > 0) {
+            for (let i = 0; i < data.cell.text.length; i++) {
+                if (data.cell.text[i].startsWith('   ')) {
+                    data.cell.hasRiyalSymbol = true;
+                }
+            }
+        }
+        
         if (isExtensionQuote) {
             if (data.section === 'body' && ['Dates', 'Extension Duration', 'Available Duration', 'End-User Price (SAR)', 'End-User Price (USD)', 'Total (SAR)', 'Total (USD)'].includes(Array.isArray(data.row.raw) ? String(data.row.raw[0]) : '')) data.cell.styles.fontStyle = 'bold';
         } else {
             if (showTotals && data.section === 'body' && data.row.index === tableBody.length - 1) data.cell.styles.fontStyle = 'bold'; 
+        }
+      },
+      didDrawCell: (data) => {
+        if (data.cell.hasRiyalSymbol) {
+            // Draw the riyal symbol image
+            // We left 5 spaces padding at the start.
+            // data.cell.x is the left edge of the cell.
+            // image dimensions: 128x128
+            const imgWidth = 4;
+            const imgHeight = 4;
+            let paddingLeft = 2; // default
+            if (data.cell.padding) {
+                paddingLeft = typeof data.cell.padding === 'number' ? data.cell.padding : (data.cell.padding.left || 2);
+            }
+            
+            let xOffset = data.cell.x + paddingLeft;
+            if (data.cell.styles.halign === 'right') {
+                 // The text string might be '     123.00'
+                 // the width of the whole text includes spaces.
+                 // It's tricky to align right perfectly with custom image, let's just put it at data.cell.x + padding.
+                 // If it looks weird, we can tweak. Wait, we replaced the symbol with spaces. So the spaces will push the text correctly to the left. We just draw at X = where the spaces are!
+                 // If right aligned, the text is at the right edge, so the spaces are on the left of the text.
+                 // We don't have text x-coord easily in didDrawCell. We'll just put it at data.cell.textPos.x.
+            }
+            // Actually, data.cell.textPos.x gives the starting X coordinate of the text!
+            // Wait, autoTable 3.5+ exposes data.cell.textPos. Let's use a safe fallback.
+            let textX = data.cursor ? data.cursor.x : data.cell.x + paddingLeft; 
+            if (data.cell.textPos && typeof data.cell.textPos.x === 'number') {
+                textX = data.cell.textPos.x;
+            } else if (data.cell.styles.halign === 'right') {
+                // Approximate right align
+                const textWidth = doc.getTextWidth(data.cell.text[0] || '');
+                textX = data.cell.x + data.cell.width - paddingLeft - textWidth;
+            } else if (data.cell.styles.halign === 'center') {
+                const textWidth = doc.getTextWidth(data.cell.text[0] || '');
+                textX = data.cell.x + data.cell.width / 2 - textWidth / 2;
+            }
+
+            const x = textX;
+            const y = data.cell.y + (data.cell.height / 2) - (imgHeight / 2);
+            doc.addImage(getRiyalCanvas(), 'PNG', x, y, imgWidth, imgHeight);
         }
       }
     });
@@ -782,8 +856,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           const getValue = (valUSD: number, valSAR: number) => isIndirect ? valSAR : valUSD;
           if (config.selectedProducts.includes('utd')) {
               const count = config.productInputs['utd'].count || 1;
-              const totalGrossUSD = data.yearlyResults.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === 'utd')?.gross || 0), 0);
-              const totalGrossSAR = data.yearlyResults.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === 'utd')?.grossSAR || 0), 0);
+              const totalGrossUSD = data?.yearlyResults?.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === 'utd')?.gross || 0), 0);
+              const totalGrossSAR = data?.yearlyResults?.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === 'utd')?.grossSAR || 0), 0);
               const valStr = `${displayCurrency} ${((getValue(totalGrossUSD, totalGrossSAR) / getProdYears('utd')) / count / 12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
               doc.setFont(fontName, 'normal'); doc.text("Your UpToDate subscription costs ", 14, finalY);
               const w1 = doc.getTextWidth("Your UpToDate subscription costs "); doc.setFont(fontName, 'bold'); doc.text(valStr, 14 + w1, finalY);
@@ -791,8 +865,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           }
           if (config.selectedProducts.includes('lxd')) {
               const count = config.productInputs['lxd'].count || 1;
-              const totalGrossUSD = data.yearlyResults.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === 'lxd')?.gross || 0), 0);
-              const totalGrossSAR = data.yearlyResults.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === 'lxd')?.grossSAR || 0), 0);
+              const totalGrossUSD = data?.yearlyResults?.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === 'lxd')?.gross || 0), 0);
+              const totalGrossSAR = data?.yearlyResults?.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === 'lxd')?.grossSAR || 0), 0);
               const valStr = `${displayCurrency} ${((getValue(totalGrossUSD, totalGrossSAR) / getProdYears('lxd')) / count / 12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
               doc.setFont(fontName, 'normal'); doc.text("Your Lexidrug subscription costs ", 14, finalY);
               const w1 = doc.getTextWidth("Your Lexidrug subscription costs "); doc.setFont(fontName, 'bold'); doc.text(valStr, 14 + w1, finalY);
@@ -830,7 +904,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                         let prodM = config.years * 12;
                         if (config.dealType === DealType.NEW_LOGO && config.isPartialYear) prodM += (config.partialMonths?.[pid] || 0);
                         const prodY = Math.max(0.01, prodM / 12);
-                        const productTotalNet = data.productNetTotals[pid] / prodY; 
+                        const productTotalNet = data?.productNetTotals[pid] / prodY; 
                         if (totalCount > 0) siteTotalCost += (count / totalCount) * productTotalNet;
                     }
                 });
@@ -1060,6 +1134,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const getColLetter = (colIndex: number) => { let letter = ''; while (colIndex > 0) { let remainder = (colIndex - 1) % 26; letter = String.fromCharCode(65 + remainder) + letter; colIndex = Math.floor((colIndex - 1) / 26); } return letter; };
 
   const handleExcelExport = async () => {
+    if (!data && !isExtensionQuote && !isMidCycleQuote) return;
     if (hasPartialMonths && (!useStartDate || !startMonthYear)) {
       alert("Start Date is mandatory for partial-year New Logo deals.");
       return;
@@ -1109,9 +1184,9 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
              const totRow = ws.addRow(['Total (SAR)', extensionResults.endUserPrice * EXCHANGE_RATE_SAR * 1.15]); totRow.font = { bold: true }; totRow.numFmt = '#,##0.00';
              contentRowStart = 18;
          }
-      } else if (isMidCycleQuote && data.midCycleResults) {
-         let productDisplay = data.midCycleResults.product;
-         if (data.midCycleResults.dlmSelected) {
+      } else if (isMidCycleQuote && data?.midCycleResults) {
+         let productDisplay = data?.midCycleResults.product;
+         if (data?.midCycleResults.dlmSelected) {
              productDisplay += " + DLM Service";
          }
          
@@ -1124,7 +1199,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
          
          const isLxd = config.midCycleProduct?.startsWith('LXD_');
          const productNameDisplay = isLxd ? 'Lexidrug' : 'UpToDate';
-         const durationLabel = `${formatD(config.midCycleStartDate)} to ${formatD(config.midCycleExpiryDate)} (${Math.round(data.midCycleResults.durationMonths)} Months)`;
+         const durationLabel = `${formatD(config.midCycleStartDate)} to ${formatD(config.midCycleExpiryDate)} (${Math.round(data?.midCycleResults.durationMonths)} Months)`;
 
          if (isIndirect) {
              const headers = ['Duration', `${productNameDisplay} (SAR)`, 'Total (SAR)', 'VAT (15%)', 'Grand Total (SAR)'];
@@ -1134,10 +1209,10 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
              const row = ws.addRow([
                  durationLabel,
-                 data.midCycleResults.grossSAR,
-                 data.midCycleResults.grossSAR,
-                 data.midCycleResults.vatSAR,
-                 data.midCycleResults.grandTotalSAR
+                 data?.midCycleResults.grossSAR,
+                 data?.midCycleResults.grossSAR,
+                 data?.midCycleResults.vatSAR,
+                 data?.midCycleResults.grandTotalSAR
              ]);
              row.getCell(2).numFmt = '#,##0.00';
              row.getCell(3).numFmt = '#,##0.00';
@@ -1152,8 +1227,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
              const row = ws.addRow([
                  durationLabel,
-                 data.midCycleResults.endUserGrossUSD,
-                 data.midCycleResults.endUserGrossUSD
+                 data?.midCycleResults.endUserGrossUSD,
+                 data?.midCycleResults.endUserGrossUSD
              ]);
              row.getCell(2).numFmt = '#,##0.00';
              row.getCell(3).numFmt = '#,##0.00';
@@ -1214,8 +1289,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           };
 
           const startRowIndex = ws.rowCount + 1;
-          data.yearlyResults.forEach((r, idx) => {
-              const rowData: any[] = [getTermLabelExcel(r, idx, data.yearlyResults)];
+          data?.yearlyResults?.forEach((r, idx) => {
+              const rowData: any[] = [getTermLabelExcel(r, idx, data?.yearlyResults)];
               
               // Product USD columns
               config.selectedProducts.forEach(pid => { 
@@ -1279,7 +1354,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                   calcWs.addRow([p.name, 'Base Count', 'User Input', inp.count || inp.existingCount]);
                   calcWs.addRow(['', 'Pricing Method', 'Logic Select', config.productMethods[pid] || config.method]);
                   
-                  const y1Net = data.yearlyResults[0]?.breakdown.find(b => b.id === pid)?.net || 0;
+                  const y1Net = data?.yearlyResults?.[0]?.breakdown.find(b => b.id === pid)?.net || 0;
                   calcWs.addRow(['', 'Year 1 Net (USD)', 'Final After Discounts/Floors', y1Net]).getCell(4).numFmt = '#,##0.00';
                   
                   if (config.dealType === 'RENEWAL') {
@@ -1336,7 +1411,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                       let prodM = config.years * 12;
                       if (config.dealType === DealType.NEW_LOGO && config.isPartialYear) prodM += (config.partialMonths?.[pid] || 0);
                       const prodY = Math.max(0.01, prodM / 12);
-                      const productTotalNet = data.productNetTotals[pid] / prodY; 
+                      const productTotalNet = data?.productNetTotals[pid] / prodY; 
                       if (totalCount > 0) siteTotalCost += (count / totalCount) * productTotalNet;
                   }
               });
@@ -1374,22 +1449,47 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const handleSiteCheckboxChange = () => { if (hasDesignatedSites) { setHasDesignatedSites(false); setIsBreakdownPerSite(false); setShowSitesOnly(false); } else { setHasDesignatedSites(true); setIsSiteModalOpen(true); } };
   const handleStartDateCheckboxChange = () => { if (useStartDate) { setUseStartDate(false); } else { setUseStartDate(true); setIsStartDateModalOpen(true); } };
 
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden mt-8 transition-all duration-300">
-      <div className="px-6 py-3 bg-blue-600 dark:bg-blue-800 border-b border-blue-700 dark:border-blue-900">
-        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-          <Download className="w-4 h-4 text-white" /> Export Options
-        </h2>
+    <>
+      <div className="mt-12 flex justify-center w-full mb-12">
+        <button 
+          onClick={() => setIsSheetOpen(true)}
+          className="w-full max-w-md flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:shadow-[0_8px_30px_rgb(79,70,229,0.3)] font-semibold text-lg transform transition-all hover:-translate-y-1 active:scale-95 ring-4 ring-blue-500/20"
+        >
+          <Download className="w-6 h-6" /> Export & Preview Quote
+        </button>
       </div>
 
-      <div className="p-6 space-y-8">
-        <div className="space-y-6 max-w-4xl">
+      {mounted && createPortal(
+        <>
+          <div 
+            className={`fixed inset-0 bg-black/40 z-[100] backdrop-blur-sm transition-opacity duration-300 ${isSheetOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+            onClick={() => setIsSheetOpen(false)}
+          />
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 pointer-events-none">
+          <div className={`pointer-events-auto w-fit max-w-[95vw] bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.2)] border border-white/20 dark:border-gray-700/50 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] flex flex-col max-h-[90vh] ${isSheetOpen ? 'translate-y-0' : 'translate-y-[100vh]'}`}>
+
+            <div className="px-8 pt-8 pb-4 border-b border-white/10 dark:border-gray-700/50 flex justify-between items-center flex-shrink-0">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                <Download className="w-6 h-6 text-blue-600 dark:text-blue-400" /> Export Center
+              </h2>
+              <button onClick={() => setIsSheetOpen(false)} className="p-2 bg-gray-100/50 dark:bg-gray-700/50 rounded-full text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-8">
+        <div className="space-y-6 w-full mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <h3 className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Customer Information</h3>
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Customer Name <span className="text-red-500">*</span></label>
-                <input type="text" required className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white" placeholder="Enter customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+                <input type="text" required className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white" placeholder="Enter customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
               </div>
             </div>
 
@@ -1398,11 +1498,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Sales Rep Name</label>
-                  <input type="text" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white" value={repName} onChange={(e) => {setRepName(e.target.value); localStorage.setItem('wk_rep_name', e.target.value);}} />
+                  <input type="text" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white" value={repName} onChange={(e) => {setRepName(e.target.value); localStorage.setItem('wk_rep_name', e.target.value);}} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
-                  <input type="tel" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white" value={repPhone} onChange={(e) => {setRepPhone(e.target.value); localStorage.setItem('wk_rep_phone', e.target.value);}} />
+                  <input type="tel" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white" value={repPhone} onChange={(e) => {setRepPhone(e.target.value); localStorage.setItem('wk_rep_phone', e.target.value);}} />
                 </div>
               </div>
             </div>
@@ -1412,42 +1512,42 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             <h3 className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Export Contents</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                  <input type="checkbox" checked={includeCalcDetails} onChange={(e) => setIncludeCalcDetails(e.target.checked)} className="rounded text-green-600 focus:ring-green-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                  <input type="checkbox" checked={includeCalcDetails} onChange={(e) => setIncludeCalcDetails(e.target.checked)} className="w-5 h-5 rounded-md text-green-600 focus:ring-green-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                   <span>Include Calc Details</span>
                 </label>
               {isExtensionQuote && (
                 <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                  <input type="checkbox" checked={showAvailableMonths} onChange={(e) => setShowAvailableMonths(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                  <input type="checkbox" checked={showAvailableMonths} onChange={(e) => setShowAvailableMonths(e.target.checked)} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                   <span>Show Available Months/Days</span>
                 </label>
               )}
               {!isExtensionQuote && (
                 <>
                   <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                    <input type="checkbox" checked={showStats} onChange={(e) => setShowStats(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                    <input type="checkbox" checked={showStats} onChange={(e) => setShowStats(e.target.checked)} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                     <span>Include Statistics</span>
                   </label>
                   <label className={`flex items-center space-x-2 text-xs ${isUtdSm ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}>
-                    <input type="checkbox" checked={isUtdSm ? false : showMonthlyCost} onChange={(e) => setShowMonthlyCost(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
+                    <input type="checkbox" checked={isUtdSm ? false : showMonthlyCost} onChange={(e) => setShowMonthlyCost(e.target.checked)} disabled={isUtdSm} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                     <span>Show Monthly Cost</span>
                   </label>
                   <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                    <input type="checkbox" checked={showTotals} onChange={(e) => setShowTotals(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                    <input type="checkbox" checked={showTotals} onChange={(e) => setShowTotals(e.target.checked)} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                     <span>Show Grand Totals</span>
                   </label>
                   <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                    <input type="checkbox" checked={isUtdSm ? false : showEmrIntegration} onChange={(e) => setShowEmrIntegration(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
+                    <input type="checkbox" checked={isUtdSm ? false : showEmrIntegration} onChange={(e) => setShowEmrIntegration(e.target.checked)} disabled={isUtdSm} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                     <span>Include EMR Term</span>
                   </label>
                   {!isMidCycleQuote && (
                     <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                      <input type="checkbox" checked={isUtdSm ? false : hasOptOutClause} onChange={(e) => setHasOptOutClause(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
+                      <input type="checkbox" checked={isUtdSm ? false : hasOptOutClause} onChange={(e) => setHasOptOutClause(e.target.checked)} disabled={isUtdSm} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                       <span>Opt-Out Clause</span>
                     </label>
                   )}
                   {canShowFLinkIntegration && (
                     <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                      <input type="checkbox" checked={showFLinkIntegration} onChange={(e) => setShowFLinkIntegration(e.target.checked)} className="rounded text-purple-600 focus:ring-purple-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                      <input type="checkbox" checked={showFLinkIntegration} onChange={(e) => setShowFLinkIntegration(e.target.checked)} className="w-5 h-5 rounded-md text-purple-600 focus:ring-purple-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                       <span>Formulink Term</span>
                     </label>
                   )}
@@ -1455,14 +1555,14 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
               )}
               {config.dealType === DealType.RENEWAL && renewalNotes.length > 0 && (
                 <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                  <input type="checkbox" checked={includeRenewalIncreaseInfo} onChange={(e) => setIncludeRenewalIncreaseInfo(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                  <input type="checkbox" checked={includeRenewalIncreaseInfo} onChange={(e) => setIncludeRenewalIncreaseInfo(e.target.checked)} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                   <span>Renewal Increase Info</span>
                 </label>
               )}
               
               <div className="flex items-center space-x-2">
                 <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                  <input type="checkbox" checked={hasDesignatedSites} onChange={handleSiteCheckboxChange} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                  <input type="checkbox" checked={hasDesignatedSites} onChange={handleSiteCheckboxChange} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                   <span>Add Designated Sites</span>
                 </label>
                 {hasDesignatedSites && (
@@ -1477,7 +1577,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
               <div className="flex items-center space-x-2">
                 <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                  <input type="checkbox" checked={useStartDate} onChange={handleStartDateCheckboxChange} className="rounded text-green-600 focus:ring-green-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                  <input type="checkbox" checked={useStartDate} onChange={handleStartDateCheckboxChange} className="w-5 h-5 rounded-md text-green-600 focus:ring-green-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                   <span>Include Start Date</span>
                 </label>
                 {useStartDate && (
@@ -1496,7 +1596,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             <button 
               onClick={() => saveQuote(true, config, data, customerName)} 
               disabled={isSavingAny || !customerName.trim()} 
-              className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
+              className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-[2rem] shadow-md transition-all active:scale-95"
             >
               {isSavingDraft ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <span className="text-xl">📝</span>}
               {isSavingDraft ? 'Saving...' : 'Save Draft'}
@@ -1504,7 +1604,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             <button 
               onClick={() => saveQuote(false, config, data, customerName)} 
               disabled={isSavingAny || !customerName.trim()} 
-              className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
+              className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-[2rem] shadow-md transition-all active:scale-95"
             >
               {isSavingFinal ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <span className="text-xl">💾</span>}
               {isSavingFinal ? 'Saving...' : 'Save Final'}
@@ -1513,7 +1613,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             <button 
               onClick={handlePDFPreview} 
               disabled={!!exportDisabledMessage || isPdfLoading || isFontLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (hasPartialMonths && !useStartDate))} 
-              className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
+              className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-[2rem] shadow-md transition-all active:scale-95"
             >
               {isPdfLoading || isFontLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FileText className="w-5 h-5" />}
               {isFontLoading ? 'Loading Fonts...' : isPdfLoading ? 'Generating Preview...' : 'Preview Quote'}
@@ -1521,7 +1621,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             <button 
               onClick={handlePDFExport} 
               disabled={!!exportDisabledMessage || isPdfLoading || isFontLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (hasPartialMonths && !useStartDate))} 
-              className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
+              className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-[2rem] shadow-md transition-all active:scale-95"
             >
               {isPdfLoading || isFontLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Download className="w-5 h-5" />}
               {isFontLoading ? 'Loading Fonts...' : isPdfLoading ? 'Generating PDF...' : 'Download Quote'}
@@ -1529,7 +1629,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             <button 
               onClick={handleExcelExport} 
               disabled={!!exportDisabledMessage || isExcelLoading || !customerName.trim() || ((config.dealType !== DealType.NEW_LOGO && !useStartDate) || (hasPartialMonths && !useStartDate))} 
-              className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95"
+              className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-[2rem] shadow-md transition-all active:scale-95"
             >
               {isExcelLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Table className="w-5 h-5" />}
               {isExcelLoading ? 'Generating Excel...' : 'Export to Excel'}
@@ -1546,12 +1646,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             </div>
           )}
           {includeCalcDetails && (
-            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-200 dark:border-gray-700">
                <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-3">Calculation Audit Trail</h4>
                <div className="space-y-3">
                   {config.selectedProducts.map(pid => {
                      const p = AVAILABLE_PRODUCTS.find(x => x.id === pid);
-                     const y1 = data.yearlyResults[0]?.breakdown.find(b => b.id === pid);
+                     const y1 = data?.yearlyResults?.[0]?.breakdown.find(b => b.id === pid);
                      if (!p || !y1) return null;
                      return (
                         <div key={pid} className="text-xs flex flex-col gap-1 border-b border-gray-100 dark:border-gray-700 pb-2 last:border-0 last:pb-0">
@@ -1576,9 +1676,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           {pdfError && <div className="text-red-500 text-sm mt-2">{pdfError}</div>}
         </div>
       </div>
-      {showCpModal && (
+                </div>
+          </div>
+{showCpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-96">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl w-96">
             <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Export Mode</h3>
             <p className="mb-4 text-gray-700 dark:text-gray-300">Do you want to generate the quote as a Channel Partner (Samir Group)?</p>
             <div className="flex justify-end gap-3">
@@ -1591,7 +1693,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
       {isSiteModalOpen && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Designated Sites</h3>
             
             <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
@@ -1607,13 +1709,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                 } else if (!checked && siteBreakdown.length > 0) {
                   setDesignatedSites(siteBreakdown.map(s => s.name).join('\n'));
                 }
-              }} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+              }} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
               <span>Allow Price Breakdown per Site</span>
             </label>
             
             {isBreakdownPerSite && (
               <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                <input type="checkbox" checked={showSitesOnly} onChange={e => setShowSitesOnly(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                <input type="checkbox" checked={showSitesOnly} onChange={e => setShowSitesOnly(e.target.checked)} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                 <span>Hide price breakdown (Show sites and capacity only)</span>
               </label>
             )}
@@ -1732,13 +1834,13 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
       {isStartDateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-80">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl w-80">
             <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Start Date</h3>
             <input
               type="date"
               value={startMonthYear}
               onChange={e => setStartMonthYear(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-6"
+              className="w-full px-3 py-2 border rounded-2xl dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-6"
             />
             <div className="flex justify-end">
               <button 
@@ -1756,8 +1858,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
       )}
 
       {isPreviewModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 md:p-8 bg-black/75 backdrop-blur-sm overflow-hidden">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-5xl h-full max-h-[85vh] flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6 md:p-8 bg-black/75 backdrop-blur-sm overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-5xl h-full max-h-[85vh] flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700">
                 <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><FileText className="w-5 h-5" /> PDF Preview</h3>
                     <div className="flex gap-3">
@@ -1768,49 +1870,49 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                                 link.download = previewFilename;
                                 link.click();
                             }}
-                            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium flex gap-2 items-center text-sm"
+                            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-2xl font-medium flex gap-2 items-center text-sm"
                         >
                             <Download className="w-4 h-4" /> Download PDF
                         </button>
-                        <button onClick={() => setIsPreviewModalOpen(false)} className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium">Close</button>
+                        <button onClick={() => setIsPreviewModalOpen(false)} className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-white rounded-2xl hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium">Close</button>
                     </div>
                 </div>
-                <div className="flex-1 flex flex-col md:flex-row bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                    <div className="w-full md:w-64 p-6 flex flex-col gap-4 overflow-y-auto bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+                <div className="flex-1 flex flex-col md:flex-row bg-gray-100/50 dark:bg-gray-700/50 overflow-hidden min-h-[600px] rounded-b-[2rem]">
+                    <div className="w-full md:w-72 p-6 flex flex-col gap-4 overflow-y-auto bg-white/50 dark:bg-gray-800/50 border-r border-gray-200/50 dark:border-gray-700/50">
                         <h4 className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-2">Export Options</h4>
                         {isExtensionQuote && (
                           <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                              <input type="checkbox" checked={showAvailableMonths} onChange={(e) => setShowAvailableMonths(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                              <input type="checkbox" checked={showAvailableMonths} onChange={(e) => setShowAvailableMonths(e.target.checked)} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                               <span>Show Available Months/Days</span>
                           </label>
                         )}
                         {!isExtensionQuote && (
                           <>
                             <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                                <input type="checkbox" checked={showStats} onChange={(e) => setShowStats(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                                <input type="checkbox" checked={showStats} onChange={(e) => setShowStats(e.target.checked)} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                                 <span>Include Statistics</span>
                             </label>
                             <label className={`flex items-center space-x-2 text-xs ${isUtdSm ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}>
-                                <input type="checkbox" checked={isUtdSm ? false : showMonthlyCost} onChange={(e) => setShowMonthlyCost(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
+                                <input type="checkbox" checked={isUtdSm ? false : showMonthlyCost} onChange={(e) => setShowMonthlyCost(e.target.checked)} disabled={isUtdSm} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                                 <span>Show Monthly Cost</span>
                             </label>
                             <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                                <input type="checkbox" checked={showTotals} onChange={(e) => setShowTotals(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                                <input type="checkbox" checked={showTotals} onChange={(e) => setShowTotals(e.target.checked)} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                                 <span>Show Grand Totals</span>
                             </label>
                             <label className={`flex items-center space-x-2 text-xs ${isUtdSm ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}>
-                                <input type="checkbox" checked={isUtdSm ? false : showEmrIntegration} onChange={(e) => setShowEmrIntegration(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
+                                <input type="checkbox" checked={isUtdSm ? false : showEmrIntegration} onChange={(e) => setShowEmrIntegration(e.target.checked)} disabled={isUtdSm} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                                 <span>Include EMR Term</span>
                             </label>
                             {!isMidCycleQuote && (
                                 <label className={`flex items-center space-x-2 text-xs ${isUtdSm ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}>
-                                    <input type="checkbox" checked={isUtdSm ? false : hasOptOutClause} onChange={(e) => setHasOptOutClause(e.target.checked)} disabled={isUtdSm} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
+                                    <input type="checkbox" checked={isUtdSm ? false : hasOptOutClause} onChange={(e) => setHasOptOutClause(e.target.checked)} disabled={isUtdSm} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 disabled:opacity-50" />
                                     <span>Opt-Out Clause</span>
                                 </label>
                             )}
                             {canShowFLinkIntegration && (
                                 <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                                    <input type="checkbox" checked={showFLinkIntegration} onChange={(e) => setShowFLinkIntegration(e.target.checked)} className="rounded text-purple-600 focus:ring-purple-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                                    <input type="checkbox" checked={showFLinkIntegration} onChange={(e) => setShowFLinkIntegration(e.target.checked)} className="w-5 h-5 rounded-md text-purple-600 focus:ring-purple-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                                     <span>Formulink Term</span>
                                 </label>
                             )}
@@ -1818,7 +1920,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                         )}
                         {config.dealType === DealType.RENEWAL && renewalNotes.length > 0 && (
                           <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                            <input type="checkbox" checked={includeRenewalIncreaseInfo} onChange={(e) => setIncludeRenewalIncreaseInfo(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                            <input type="checkbox" checked={includeRenewalIncreaseInfo} onChange={(e) => setIncludeRenewalIncreaseInfo(e.target.checked)} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                             <span>Renewal Increase Info</span>
                           </label>
                         )}
@@ -1826,27 +1928,27 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                            <div className="flex items-center justify-between">
                               <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                                <input type="checkbox" checked={hasDesignatedSites} onChange={handleSiteCheckboxChange} className="rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                                <input type="checkbox" checked={hasDesignatedSites} onChange={handleSiteCheckboxChange} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                                 <span>Designated Sites</span>
                               </label>
                            </div>
                            <div className="flex items-center justify-between mt-2">
                               <label className="flex items-center space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                                <input type="checkbox" checked={useStartDate} onChange={handleStartDateCheckboxChange} className="rounded text-green-600 focus:ring-green-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+                                <input type="checkbox" checked={useStartDate} onChange={handleStartDateCheckboxChange} className="w-5 h-5 rounded-md text-green-600 focus:ring-green-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
                                 <span>Include Start Date</span>
                               </label>
                            </div>
                         </div>
 
                     </div>
-                    <div className="flex-1 p-4 md:p-8 bg-gray-200 dark:bg-gray-900 border-l border-gray-300 dark:border-gray-700 overflow-hidden relative">
+                    <div className="w-full md:w-[700px] lg:w-[800px] p-4 md:p-8 bg-gray-200/50 dark:bg-gray-900/50 border-l border-gray-300/50 dark:border-gray-700/50 overflow-hidden relative">
                       {isPdfLoading || isFontLoading ? (
-                          <div className="w-full h-full flex flex-col items-center justify-center gap-4 text-gray-500 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+                          <div className="w-full h-full flex flex-col items-center justify-center gap-4 text-gray-500 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-2xl bg-gray-50 dark:bg-gray-800">
                               <div className="w-10 h-10 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
                               <span className="font-medium">Updating preview...</span>
                           </div>
                       ) : previewPdfUrl ? (
-                          <iframe src={`${previewPdfUrl}#view=FitH`} className="w-full h-full bg-white dark:bg-gray-100 rounded-lg shadow-indigo-500/20 shadow-2xl border border-gray-300 dark:border-gray-600" />
+                          <iframe src={`${previewPdfUrl}#view=FitH`} className="w-full h-full bg-white dark:bg-gray-100 rounded-2xl shadow-indigo-500/20 shadow-2xl border border-gray-300 dark:border-gray-600" />
                       ) : (
                           <div className="w-full h-full flex items-center justify-center text-gray-400">Failed to load preview</div>
                       )}
@@ -1855,6 +1957,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             </div>
         </div>
       )}
-    </div>
+        </>
+      , document.body)}
+    </>
   );
 };

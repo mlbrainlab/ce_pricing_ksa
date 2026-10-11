@@ -84,8 +84,8 @@ export interface PricingResult {
 }
 
 export interface DealConfiguration {
-  dealType: DealType;
-  channel: ChannelType;
+  dealType: DealType | null;
+  channel: ChannelType | null;
   institutionType?: InstitutionType;
   includeHospital?: boolean;
   selectedProducts: string[]; // IDs
