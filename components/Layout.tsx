@@ -99,9 +99,30 @@ export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void
         )}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-             {/* Logo Placeholder */}
-             <div className="w-8 h-8 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold">
-               CE
+             {/* Liquid-Glass CE Brand Mark */}
+             <div
+               className="group relative flex items-center justify-center p-[1.5px] rounded-2xl bg-gradient-to-b from-white/80 via-white/25 to-cyan-300/30 dark:from-white/40 dark:via-white/10 dark:to-cyan-400/20 shadow-[0_4px_16px_rgba(37,99,235,0.35),0_2px_4px_rgba(0,0,0,0.08)] hover:shadow-[0_6px_22px_rgba(37,99,235,0.5),0_2px_8px_rgba(0,0,0,0.12)] transition-all duration-300 hover:scale-105 active:scale-95 cursor-default select-none flex-shrink-0"
+               title="Clinical Effectiveness"
+             >
+               <div className="relative w-9 h-9 rounded-[14px] bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-500 dark:from-blue-500 dark:via-indigo-600 dark:to-cyan-400 flex items-center justify-center overflow-hidden shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.7),inset_0_-2px_3px_rgba(0,0,0,0.25)]">
+                 {/* Specular Curved Convex Lens Glare */}
+                 <div className="absolute inset-x-0 top-0 h-[48%] bg-gradient-to-b from-white/60 via-white/20 to-transparent rounded-t-[14px] pointer-events-none" />
+
+                 {/* Liquid Caustic Glows */}
+                 <div className="absolute -top-1 -left-1 w-4 h-4 bg-white/40 rounded-full blur-[2px] pointer-events-none" />
+                 <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-cyan-300/50 dark:bg-cyan-400/30 rounded-full blur-[3px] pointer-events-none" />
+
+                 {/* Fluid Refractive Edge Rim */}
+                 <div className="absolute inset-0 rounded-[14px] border border-white/40 dark:border-white/20 pointer-events-none" />
+
+                 {/* Interactive Dynamic Shimmer */}
+                 <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out bg-gradient-to-r from-transparent via-white/35 to-transparent -skew-x-12 pointer-events-none" />
+
+                 {/* "CE" Lettermark */}
+                 <span className="relative z-10 text-[13px] font-black tracking-wider text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.8)] select-none">
+                   CE
+                 </span>
+               </div>
              </div>
              <h1 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white">
                Pricing KSA <span className="text-gray-400 font-normal">v{APP_VERSION}</span>
@@ -175,12 +196,18 @@ export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void
                   </svg>
                 )}
               </button>
-            </div>
-            <div 
-              className="text-sm text-blue-600 dark:text-blue-400 font-medium hidden sm:block hover:underline cursor-pointer"
-              onClick={onProfileClick}
-            >
-              {userName || "User Profile"}
+              {onProfileClick && (
+                <button
+                  onClick={onProfileClick}
+                  className="p-2 rounded-2xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center cursor-pointer"
+                  aria-label="User Profile"
+                  title={userName ? `User Profile (${userName})` : "User Profile"}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
         </div>

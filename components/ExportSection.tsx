@@ -1697,7 +1697,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Designated Sites</h3>
             
             <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-              <input type="checkbox" checked={isBreakdownPerSite} onChange={e => {
+              <input type="checkbox" checked={isBreakdownPerSite} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" onChange={e => {
                 const checked = e.target.checked;
                 setIsBreakdownPerSite(checked);
                 if (checked && designatedSites.trim()) {
@@ -1709,7 +1709,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                 } else if (!checked && siteBreakdown.length > 0) {
                   setDesignatedSites(siteBreakdown.map(s => s.name).join('\n'));
                 }
-              }} className="w-5 h-5 rounded-md text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600" />
+              }} />
               <span>Allow Price Breakdown per Site</span>
             </label>
             
