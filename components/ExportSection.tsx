@@ -75,9 +75,9 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   data, config, useStartDate, setUseStartDate, startMonthYear, setStartMonthYear,
   isExtensionQuote, extensionResults, isMidCycleQuote, renewalNotes = [], customerName, setCustomerName, exportDisabledMessage
 }) => {
-    const [repName, setRepName] = useState(() => localStorage.getItem('wk_rep_name') || '');
-  const [repPhone, setRepPhone] = useState(() => localStorage.getItem('wk_rep_phone') || '');
-  const [repEmail, setRepEmail] = useState(() => localStorage.getItem('wk_rep_email') || '');
+  const [repName, setRepName] = useAutoState('repName', () => localStorage.getItem('wk_rep_name') || '');
+  const [repPhone, setRepPhone] = useAutoState('repPhone', () => localStorage.getItem('wk_rep_phone') || '');
+  const [repEmail, setRepEmail] = useAutoState('repEmail', () => localStorage.getItem('wk_rep_email') || '');
   const { saveQuote, savingType } = useSaveQuote();
   const isSavingDraft = savingType === 'draft';
   const isSavingFinal = savingType === 'final';
@@ -123,7 +123,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const [isBreakdownPerSite, setIsBreakdownPerSite] = useAutoState('isBreakdownPerSite', false);
   const [showSitesOnly, setShowSitesOnly] = useAutoState('showSitesOnly', false);
   const [siteBreakdown, setSiteBreakdown] = useAutoState<SiteBreakdownItem[]>('siteBreakdown', []);
-  const [bulkPasteText, setBulkPasteText] = useState('');
+  const [bulkPasteText, setBulkPasteText] = useAutoState('bulkPasteText', '');
 
   const [autoSitesSyncedName, setAutoSitesSyncedName] = useState("");
 
@@ -133,12 +133,12 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         setHasDesignatedSites(true);
         setDesignatedSites(`${customerName}\n${customerName} Hospital`);
         setAutoSitesSyncedName(customerName);
-      } else if (hasDesignatedSites && designatedSites === `${autoSitesSyncedName}\n${autoSitesSyncedName} Hospital`) {
+      } else if (hasDesignatedSites && autoSitesSyncedName && designatedSites === `${autoSitesSyncedName}\n${autoSitesSyncedName} Hospital`) {
         setDesignatedSites(`${customerName}\n${customerName} Hospital`);
         setAutoSitesSyncedName(customerName);
       }
     } else if (config.institutionType === "Academic Institutions" && !config.includeHospital) {
-      if (hasDesignatedSites && designatedSites === `${autoSitesSyncedName}\n${autoSitesSyncedName} Hospital`) {
+      if (hasDesignatedSites && autoSitesSyncedName && designatedSites === `${autoSitesSyncedName}\n${autoSitesSyncedName} Hospital`) {
         setHasDesignatedSites(false);
         setDesignatedSites('');
         setAutoSitesSyncedName('');
@@ -647,7 +647,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           return [ getTermLabel(r, i, data.yearlyResults), ...pValues, formatMoney(r.grossSAR, 'SAR'), formatMoney(r.vatSAR, 'SAR'), formatMoney(r.grandTotalSAR, 'SAR') ];
         });
         if (showTotals) {
-           const totals = ['TOTAL', ...config.selectedProducts.map(pid => formatMoney(data.productNetTotals[pid] * EXCHANGE_RATE_SAR, 'SAR')), formatMoney(data.totalGrossSAR, 'SAR'), formatMoney(data.totalVatSAR, 'SAR'), formatMoney(data.totalGrandTotalSAR, 'SAR')];
+           const productTotalsSAR = config.selectedProducts.map(pid => {
+               const total = data.yearlyResults.reduce((sum, r) => sum + (r.breakdown.find(x => x.id === pid)?.grossSAR || 0), 0);
+               return formatMoney(total, 'SAR');
+           });
+           const totals = ['TOTAL', ...productTotalsSAR, formatMoney(data.totalGrossSAR, 'SAR'), formatMoney(data.totalVatSAR, 'SAR'), formatMoney(data.totalGrandTotalSAR, 'SAR')];
            tableBody.push(totals);
         }
       } else {
