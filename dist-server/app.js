@@ -126561,8 +126561,19 @@ import cookieParser from "cookie-parser";
 // constants.ts
 var CHANGELOG = [
   {
-    version: "6.8.1",
+    version: "6.8.2",
     date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+    changes: [
+      "Comprehensive State Saving & Hydration: Guaranteed complete capture and restoration of all Product Mix inputs, including HC/BC counts, renewal existing stats, variant selections, expiring spend, DPH, stats change toggles, EAI activations, and full Academic metrics (faculty, residents, med/pharma/total student counts, and educational discounts)",
+      "Structure & Multi-Year State Persistence: Persisted partial months, split product pricing methods (MYFPI/MYPP), custom annual increase rates, and renewal uplift percentages across saved quotes",
+      "Export Section & Seller Details Persistence: Fixed persistence for customer name, sales rep info (name, phone, email), start date, designated sites (including per-site breakdown), and export checkbox configurations",
+      "Quote Restoration Protection: Added execution guards to prevent default-calculation side-effects from overwriting loaded rates, WHT toggles, or rounding configurations",
+      "Legacy Quote Compatibility: Added fallback parser to automatically recover customer names from saved quote titles for older drafts"
+    ]
+  },
+  {
+    version: "6.8.1",
+    date: "2026-09-28",
     changes: [
       "Removed hardcoded 90 headcount minimum for UTDEE",
       "Restricted UTDEE in New Logo to >= $30,000 ACV and added threshold alert",
