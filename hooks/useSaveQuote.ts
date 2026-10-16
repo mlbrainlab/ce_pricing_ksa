@@ -13,8 +13,9 @@ export function useSaveQuote() {
   ) => {
     setSavingType(isDraft ? 'draft' : 'final');
     try {
+      const resolvedCustomerName = (customerName || currentConfig?.customerName || autoStateValues.customerName || '').trim();
       // Auto-generate title
-      const safeAccountName = customerName ? customerName.trim().replace(/\s+/g, '_') : 'Customer';
+      const safeAccountName = resolvedCustomerName ? resolvedCustomerName.replace(/\s+/g, '_') : 'Customer';
       const accountType = (currentConfig.institutionType === 'ACADEMIC' || currentConfig.institutionType === 'Academic Institutions') ? 'AA' : 'PP';
       const dealTypeStr = currentConfig.dealType || 'DEAL';
       
@@ -55,12 +56,22 @@ export function useSaveQuote() {
         }
       }
 
+      const fullConfig = {
+        ...currentConfig,
+        customerName: resolvedCustomerName,
+        ...autoStateValues,
+        uiState: {
+          ...autoStateValues,
+          customerName: resolvedCustomerName,
+        }
+      };
+
       const { error } = await supabase
         .from('quotes')
         .insert([{
           user_id: session.user.id,
           title: versionedTitle,
-          config: { ...currentConfig, uiState: autoStateValues },
+          config: fullConfig,
           results: currentResults,
           is_draft: isDraft,
           rep_name: `${session.user.user_metadata?.first_name || 'Unknown'} ${session.user.user_metadata?.last_name || 'Rep'}`.trim()

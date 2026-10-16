@@ -127419,7 +127419,7 @@ var calculatePricing = (config) => {
       });
       productNetTotals[prodId] += netVal;
     });
-    const yearGrossSAR = convertToSAR(yearSum, config.rounding || false);
+    const yearGrossSAR = breakdown.reduce((sum, b) => sum + b.grossSAR, 0);
     const yearVatSAR = yearGrossSAR * 0.15;
     const yearGrandTotalSAR = yearGrossSAR + yearVatSAR;
     const recognizedUSD = yearSum * netFactor;

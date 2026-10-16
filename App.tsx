@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { useAutoState, restoreAutoState } from "./hooks/useAutoState";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useAutoState, restoreAutoState, clearAutoStateCache } from "./hooks/useAutoState";
 import posthog from "posthog-js";
 import Login from "./components/Login";
 import { Layout } from "./components/Layout";
@@ -43,7 +43,17 @@ if (typeof window !== "undefined" && !(window as any).__POSTHOG_INITIALIZED__) {
   (window as any).__POSTHOG_INITIALIZED__ = true;
 }
 
+function extractCustomerNameFromTitle(title: string): string {
+  if (!title || typeof title !== 'string') return '';
+  const match = title.match(/^Quote_([^_]+(?:_[^_]+)*?)_(?:PP|AA|DEAL|New Logo|Renewal|Extension|Mid-Cycle)_/i);
+  if (match && match[1]) {
+    return match[1].replace(/_/g, ' ');
+  }
+  return '';
+}
+
 const App: React.FC = () => {
+  const isRestoringQuoteRef = useRef(false);
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthChecked, setIsAuthChecked] = useState(false);
@@ -181,6 +191,7 @@ const App: React.FC = () => {
 
   // Auto-fill customer name for Academic Institutions
   useEffect(() => {
+    if (isRestoringQuoteRef.current) return;
     if (institutionType === InstitutionType.ACADEMIC && !customerName.trim()) {
       setCustomerName("___ University");
     }
@@ -199,11 +210,11 @@ const App: React.FC = () => {
   const [selectedProductIds, setSelectedProductIds] = useAutoState<string[]>('selectedProductIds', []);
   const [years, setYears] = useAutoState<number>('years', 3);
   const [isPartialYear, setIsPartialYear] = useAutoState<boolean>('isPartialYear', false);
-  const [partialMonths, setPartialMonths] = useState<Record<string, number>>({});
+  const [partialMonths, setPartialMonths] = useAutoState<Record<string, number>>('partialMonths', {});
   const [method, setMethod] = useAutoState<PricingMethod>('method', PricingMethod.MYFPI);
-  const [productMethods, setProductMethods] = useState<
+  const [productMethods, setProductMethods] = useAutoState<
     Record<string, PricingMethod>
-  >({ utd: PricingMethod.MYFPI, lxd: PricingMethod.MYFPI });
+  >('productMethods', { utd: PricingMethod.MYFPI, lxd: PricingMethod.MYFPI });
   const [applyWHT, setApplyWHT] = useAutoState<boolean>('applyWHT', true); // Default true for KSA
   const [flatPricing, setFlatPricing] = useAutoState<boolean>('flatPricing', false);
   const [rounding, setRounding] = useAutoState<boolean>('rounding', false); // New Rounding Option
@@ -244,9 +255,9 @@ const App: React.FC = () => {
   const [renewalUpliftLXD, setRenewalUpliftLXD] = useAutoState<number>('renewalUpliftLXD', 5);
 
   // Product Inputs State
-  const [productInputs, setProductInputs] = useState<
+  const [productInputs, setProductInputs] = useAutoState<
     Record<string, ProductInput>
-  >({
+  >('productInputs', {
     utd: {
       count: 100,
       existingCount: 100,
@@ -257,6 +268,7 @@ const App: React.FC = () => {
       dph: 0,
       forceHeadcountOverride: false,
       changeInStats: false,
+      educationalDiscount: 0,
     },
     lxd: {
       count: 50,
@@ -272,12 +284,17 @@ const App: React.FC = () => {
   });
 
   const resetForm = () => {
+    setCustomerName("");
+    clearAutoStateCache();
     setDealType(DealType.NEW_LOGO);
     setChannel(ChannelType.DIRECT);
     setInstitutionType(InstitutionType.PROVIDER);
     setIncludeHospital(false);
     setSelectedProductIds([]);
     setYears(3);
+    setIsPartialYear(false);
+    setPartialMonths({});
+    setUseStartDate(false);
     setMethod(PricingMethod.MYFPI);
     setProductMethods({ utd: PricingMethod.MYFPI, lxd: PricingMethod.MYFPI });
     setApplyWHT(true);
@@ -351,6 +368,7 @@ const App: React.FC = () => {
 
   // EFFECT: Auto-Uncheck WHT when Renewal is selected, force FULFILMENT for Extension
   useEffect(() => {
+    if (isRestoringQuoteRef.current) return;
     if (dealType === DealType.RENEWAL) {
       setApplyWHT(false);
       // Sync UTD EAI Activation to 11% baseline for renewals
@@ -371,6 +389,7 @@ const App: React.FC = () => {
   }, [dealType]);
 
   useEffect(() => {
+    if (isRestoringQuoteRef.current) return;
     if (dealType === DealType.MID_CYCLE && midCycleStartDate) {
       setUseStartDate(true);
       setStartMonthYear(midCycleStartDate);
@@ -379,6 +398,7 @@ const App: React.FC = () => {
 
   // EFFECT: Auto-enable rounding when Fulfillment or Partner Sourced, disable when Direct
   useEffect(() => {
+    if (isRestoringQuoteRef.current) return;
     if (channel === ChannelType.DIRECT) {
       setRounding(false);
       setRoundUpOptionB(false);
@@ -392,6 +412,7 @@ const App: React.FC = () => {
 
   // EFFECT: Set Default Rates when selection changes
   useEffect(() => {
+    if (isRestoringQuoteRef.current) return;
     // Only apply defaults if one product is selected to avoid overwriting user preference aggressively
     if (selectedProductIds.length === 1) {
       if (selectedProductIds.includes("utd")) {
@@ -458,16 +479,90 @@ const App: React.FC = () => {
   // Derived Config
 
   const loadConfig = (loadedConfig: any) => {
-    // Automatically restore all registered state
-    restoreAutoState(loadedConfig);
-    if (loadedConfig.uiState) {
-      restoreAutoState(loadedConfig.uiState);
+    if (!loadedConfig) return;
+    isRestoringQuoteRef.current = true;
+
+    // Source of truth: check both loadedConfig directly, plus uiState
+    const src = { ...loadedConfig, ...(loadedConfig.uiState || {}) };
+
+    // 1. Deal Basics & Customer Name
+    const loadedCustomerName = src.customerName || (src.title ? extractCustomerNameFromTitle(src.title) : "");
+    if (loadedCustomerName) setCustomerName(loadedCustomerName);
+
+    if (src.dealType !== undefined) setDealType(src.dealType);
+    if (src.channel !== undefined) setChannel(src.channel);
+    if (src.institutionType !== undefined) setInstitutionType(src.institutionType);
+    if (src.includeHospital !== undefined) setIncludeHospital(src.includeHospital);
+
+    // 2. Product Mix & Inputs
+    const products = src.selectedProductIds || src.selectedProducts;
+    if (products !== undefined) setSelectedProductIds(products);
+    if (src.productInputs !== undefined) {
+      setProductInputs(prev => ({
+        ...prev,
+        ...src.productInputs
+      }));
     }
-    // Specific edge cases that aren't auto-state
-    if (loadedConfig.selectedProducts !== undefined) setSelectedProductIds(loadedConfig.selectedProducts);
-    
+
+    // 3. Structure
+    if (src.years !== undefined) setYears(src.years);
+    if (src.isPartialYear !== undefined) setIsPartialYear(src.isPartialYear);
+    if (src.partialMonths !== undefined) setPartialMonths(src.partialMonths);
+    if (src.method !== undefined) setMethod(src.method);
+    if (src.productMethods !== undefined) setProductMethods(src.productMethods);
+    if (src.applyWHT !== undefined) setApplyWHT(src.applyWHT);
+    if (src.flatPricing !== undefined) setFlatPricing(src.flatPricing);
+    if (src.rounding !== undefined) setRounding(src.rounding);
+    if (src.useStartDate !== undefined) setUseStartDate(src.useStartDate);
+    if (src.startMonthYear !== undefined) setStartMonthYear(src.startMonthYear);
+    if (src.applyAnnualRate !== undefined) setApplyAnnualRate(src.applyAnnualRate);
+
+    // Rates & Uplifts
+    const gRate = src.globalRateVal ?? src.rates?.[0];
+    if (gRate !== undefined) setGlobalRateVal(gRate);
+    const uRate = src.utdRateVal ?? src.productRates?.utd?.[0];
+    if (uRate !== undefined) setUtdRateVal(uRate);
+    const lRate = src.lxdRateVal ?? src.productRates?.lxd?.[0];
+    if (lRate !== undefined) setLxdRateVal(lRate);
+
+    const rGlobal = src.renewalUpliftGlobal ?? src.renewalUpliftRates?.utd;
+    if (rGlobal !== undefined) setRenewalUpliftGlobal(rGlobal);
+    const rUtd = src.renewalUpliftUTD ?? src.renewalUpliftRates?.utd;
+    if (rUtd !== undefined) setRenewalUpliftUTD(rUtd);
+    const rLxd = src.renewalUpliftLXD ?? src.renewalUpliftRates?.lxd;
+    if (rLxd !== undefined) setRenewalUpliftLXD(rLxd);
+
+    // Extension & Mid-Cycle
+    if (src.extensionOption !== undefined) setExtensionOption(src.extensionOption);
+    if (src.expiringTerm !== undefined) setExpiringTerm(src.expiringTerm);
+    if (src.expiringTCV !== undefined) setExpiringTCV(src.expiringTCV);
+    if (src.currentSpend !== undefined) setCurrentSpend(src.currentSpend);
+    if (src.extensionPercentage !== undefined) setExtensionPercentage(src.extensionPercentage);
+    if (src.extensionFPI !== undefined) setExtensionFPI(src.extensionFPI);
+    if (src.extensionVariant !== undefined) setExtensionVariant(src.extensionVariant);
+    if (src.useFullExtension !== undefined) setUseFullExtension(src.useFullExtension);
+    if (src.roundUpOptionB !== undefined) setRoundUpOptionB(src.roundUpOptionB);
+    if (src.optionBMonths !== undefined) setOptionBMonths(src.optionBMonths);
+    if (src.optionCValue !== undefined) setOptionCValue(src.optionCValue);
+    if (src.optionCMonths !== undefined) setOptionCMonths(src.optionCMonths);
+
+    if (src.midCycleExpiryDate !== undefined) setMidCycleExpiryDate(src.midCycleExpiryDate);
+    if (src.midCycleStartDate !== undefined) setMidCycleStartDate(src.midCycleStartDate);
+    if (src.midCycleProduct !== undefined) setMidCycleProduct(src.midCycleProduct);
+    if (src.midCycleExistingSpend !== undefined) setMidCycleExistingSpend(src.midCycleExistingSpend);
+    if (src.midCycleBedCount !== undefined) setMidCycleBedCount(src.midCycleBedCount);
+    if (src.midCycleWHT !== undefined) setMidCycleWHT(src.midCycleWHT);
+    if (src.midCycleDlm !== undefined) setMidCycleDlm(src.midCycleDlm);
+
+    // Dynamic auto-state restoration for all registered components (e.g. ExportSection)
+    restoreAutoState(src);
+
     // Reset key to force child components to update
     setResetKey(prev => prev + 1);
+
+    setTimeout(() => {
+      isRestoringQuoteRef.current = false;
+    }, 500);
   };
   const config: DealConfiguration = useMemo(() => {
     // Determine effective structure rates based on toggle
@@ -525,6 +620,7 @@ const App: React.FC = () => {
       channel,
       institutionType,
       includeHospital,
+      customerName,
       selectedProducts: selectedProductIds,
       productInputs,
       years,
@@ -540,6 +636,13 @@ const App: React.FC = () => {
       rounding,
       useStartDate,
       startMonthYear,
+      globalRateVal,
+      utdRateVal,
+      lxdRateVal,
+      renewalUpliftGlobal,
+      renewalUpliftUTD,
+      renewalUpliftLXD,
+      applyAnnualRate,
       extensionOption,
       expiringTerm,
       expiringTCV,
@@ -565,6 +668,7 @@ const App: React.FC = () => {
     channel,
     institutionType,
     includeHospital,
+    customerName,
     selectedProductIds,
     productInputs,
     years,
@@ -824,13 +928,6 @@ const App: React.FC = () => {
         },
       };
 
-      // Auto-set educational discount to 20 if faculty >= 50
-      if (id === "utd" && field === "facultyCount") {
-        const numVal = Number(value) || 0;
-        if (numVal >= 50) {
-          newState["utd"].educationalDiscount = 20;
-        }
-      }
 
       // Removed 90 HC minimum for UTDEE, restriction is now based on $30k deal size
 
@@ -2035,7 +2132,7 @@ const App: React.FC = () => {
                                             type="number"
                                             min="0"
                                             max="20"
-                                            value={input.educationalDiscount === 0 ? 0 : input.educationalDiscount || ''}
+                                            value={input.educationalDiscount === '' ? '' : (input.educationalDiscount ?? 0)}
                                             onChange={(e) => { let v = parseInt(e.target.value); if(v>20)v=20; if(v<0)v=0; handleInputChange(product.id, 'educationalDiscount', isNaN(v)?'':v); }}
                                             className="w-full h-full text-center text-xs p-0 bg-transparent text-gray-900 dark:text-white outline-none font-sans tabular-nums ph-no-capture"
                                             style={{ appearance: "textfield", MozAppearance: "textfield" }}

@@ -88,7 +88,7 @@ export function QuotesManager({
                 </div>
               </div>
               <div className="flex gap-3 items-center">
-                <button onClick={() => { onLoadQuote(q.config); onClose(); }} className="px-3 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded text-sm font-medium">Load</button>
+                <button onClick={() => { onLoadQuote({ ...q.config, title: q.title }); onClose(); }} className="px-3 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded text-sm font-medium">Load</button>
                 <button onClick={() => handleDelete(q.id)} className="text-red-600 hover:text-red-800 text-sm font-medium px-2">Delete</button>
               </div>
             </div>
